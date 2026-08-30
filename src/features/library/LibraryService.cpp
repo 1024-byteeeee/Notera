@@ -231,19 +231,28 @@ void LibraryService::importAndStitchImages(const QVariantList& urls)
         return;
     }
 
+    // 辅助：把 QVariant（可能是 QUrl 或 QString）解析为本地路径
+    auto resolveLocalPath = [](const QVariant& variant) -> QString {
+        // 先尝试 QUrl
+        QUrl url = variant.toUrl();
+        if (url.isValid() && url.isLocalFile()) {
+            return url.toLocalFile();
+        }
+        // 再尝试纯字符串路径
+        QString str = variant.toString();
+        if (str.isEmpty()) return {};
+        if (str.startsWith(QStringLiteral("file://"), Qt::CaseInsensitive)) {
+            return QUrl(str).toLocalFile();
+        }
+        return str;
+    };
+
     // 解析并加载所有图片
     QList<QImage> images;
     for (const auto& variant : urls) {
-        const QUrl url = variant.toUrl();
-        QString localPath;
-        if (url.isLocalFile()) {
-            localPath = url.toLocalFile();
-        } else if (url.scheme().isEmpty()) {
-            localPath = url.path();
-            if (localPath.isEmpty()) localPath = url.toString();
-        }
+        const QString localPath = resolveLocalPath(variant);
         if (localPath.isEmpty() || !QFileInfo::exists(localPath)) {
-            emit errorOccurred(QStringLiteral("无法读取图片文件。"));
+            emit errorOccurred(QStringLiteral("无法读取图片文件：%1").arg(variant.toString()));
             return;
         }
         QImage img(localPath);
