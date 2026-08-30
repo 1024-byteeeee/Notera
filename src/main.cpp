@@ -229,13 +229,15 @@ int main(int argc, char* argv[])
             closePopup(root, QStringLiteral("tagContextMenu"));
 
             controller.setCurrentPage(QStringLiteral("library"));
+            auto* const scoreDelegate = findVisualItem(root, QStringLiteral("scoreDelegate"));
             if (!clickItem(root, QStringLiteral("scoreCardMouse"), Qt::RightButton)
                 || controller.currentPage() != QStringLiteral("library")
-                || !popupIsOpen(root, QStringLiteral("scoreContextMenu"))) {
+                || !scoreDelegate
+                || !scoreDelegate->property("contextMenuOpenedOnce").toBool()) {
                 fail("score-context-menu");
                 return;
             }
-            closePopup(root, QStringLiteral("scoreContextMenu"));
+            QMetaObject::invokeMethod(scoreDelegate, "closeContextMenu");
 
             const auto favoriteRole = libraryService.scores()->roleNames().key("favorite", -1);
             const auto firstIndex = libraryService.scores()->index(0, 0);

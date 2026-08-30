@@ -121,6 +121,7 @@ Rectangle {
 
                 delegate: Item {
                     id: scoreDelegate
+                    objectName: "scoreDelegate"
                     required property string scoreId
                     required property string title
                     required property string composer
@@ -129,6 +130,11 @@ Rectangle {
                     required property bool favorite
                     required property string filePath
                     required property string fileType
+                    readonly property bool contextMenuOpenedOnce: scoreMenu.openedOnce
+
+                    function closeContextMenu() {
+                        scoreMenu.close()
+                    }
 
                     width: grid.cellWidth
                     height: grid.cellHeight
