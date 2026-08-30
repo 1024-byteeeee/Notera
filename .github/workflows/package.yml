@@ -48,6 +48,20 @@ jobs:
           test -n "$bundle_path"
           codesign --verify --deep --strict --verbose=2 "$bundle_path"
 
+      - name: Smoke test application startup
+        run: |
+          bundle_path=$(find build/macos-universal/packages/_CPack_Packages -type d -name Notera.app -print -quit)
+          "$bundle_path/Contents/MacOS/Notera" >notera-startup.log 2>&1 &
+          app_pid=$!
+          sleep 5
+          if ! kill -0 "$app_pid" 2>/dev/null; then
+            wait "$app_pid" || true
+            cat notera-startup.log
+            exit 1
+          fi
+          kill "$app_pid"
+          wait "$app_pid" || true
+
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
