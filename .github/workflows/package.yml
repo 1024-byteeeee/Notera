@@ -2,12 +2,11 @@ name: Package desktop applications
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*"
+  release:
+    types: [published]
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   # Required by this repository's Node.js 20 policy. GitHub currently warns
@@ -49,6 +48,12 @@ jobs:
           name: Notera-macos-universal-dmg
           path: build/macos-universal/packages/*.dmg
           if-no-files-found: error
+
+      - name: Attach DMG to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/macos-universal/packages/*.dmg
 
   windows-msi:
     name: Windows x64 MSI
@@ -92,3 +97,9 @@ jobs:
           name: Notera-windows-x64-msi
           path: build/windows-x64/packages/*.msi
           if-no-files-found: error
+
+      - name: Attach MSI to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/windows-x64/packages/*.msi

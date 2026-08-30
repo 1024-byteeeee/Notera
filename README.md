@@ -37,6 +37,7 @@ Phase 1 establishes the shell and architecture only. Importing, persistence and 
 
 ## Continuous packaging
 
-GitHub Actions runs the packaging workflow manually or when a `v*` tag is pushed.
-It builds a universal macOS DMG (Apple Silicon and Intel) and a Windows x64 MSI,
-then uploads both as workflow artifacts.
+GitHub Actions runs the packaging workflow manually or when a GitHub Release is published.
+It builds a universal macOS DMG (Apple Silicon and Intel) and a Windows x64 MSI.
+Manual runs upload both as workflow artifacts; release runs also attach both installers
+to that GitHub Release.
