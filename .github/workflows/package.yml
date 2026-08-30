@@ -42,6 +42,12 @@ jobs:
       - name: Create DMG
         run: cpack --config build/macos-universal/CPackConfig.cmake -G DragNDrop
 
+      - name: Verify signed application bundle
+        run: |
+          bundle_path=$(find build/macos-universal/_CPack_Packages -type d -name Notera.app -print -quit)
+          test -n "$bundle_path"
+          codesign --verify --deep --strict --verbose=2 "$bundle_path"
+
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:

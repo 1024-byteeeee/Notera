@@ -41,3 +41,7 @@ GitHub Actions runs the packaging workflow manually or when a GitHub Release is 
 It builds a universal macOS DMG (Apple Silicon and Intel) and a Windows x64 MSI.
 Manual runs upload both as workflow artifacts; release runs also attach both installers
 to that GitHub Release.
+
+macOS packages are consistently ad-hoc signed during CPack so every nested Qt binary
+passes macOS code-signature validation. A public release without Gatekeeper warnings
+additionally requires a Developer ID Application certificate and notarization credentials.

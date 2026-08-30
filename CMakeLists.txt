@@ -93,6 +93,9 @@ set(CPACK_PACKAGE_DIRECTORY "${CMAKE_BINARY_DIR}/packages")
 if(APPLE)
     set(CPACK_GENERATOR "DragNDrop")
     set(CPACK_DMG_VOLUME_NAME "Notera")
+    # CPack runs this after Qt deployment has copied all nested frameworks and
+    # plug-ins, but before the DMG is assembled.
+    set(CPACK_PRE_BUILD_SCRIPTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignMacBundle.cmake")
 elseif(WIN32)
     # Requires WiX Toolset on the Windows packaging machine.
     set(CPACK_GENERATOR "WIX")
