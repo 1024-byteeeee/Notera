@@ -357,11 +357,11 @@ Rectangle {
                 }
             }
 
-            // 空白区域右键菜单
+            // 空白区域右键菜单（z:-1 让卡片右键菜单优先）
             MouseArea {
                 anchors.fill: parent
                 acceptedButtons: Qt.RightButton
-                z: 1
+                z: -1
                 onClicked: function(mouse) {
                     if (mouse.button === Qt.RightButton) {
                         blankContextMenu.popup()
