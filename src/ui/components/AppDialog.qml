@@ -14,6 +14,7 @@ Dialog {
     x: parent ? Math.round((parent.width - width) / 2) : 0
     y: parent ? Math.round((parent.height - height) / 2) : 0
     width: parent ? Math.min(380, parent.width - 48) : 380
+    popupType: Popup.Item
     modal: true
     focus: true
     padding: 22

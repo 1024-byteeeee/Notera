@@ -6,9 +6,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Qt6 6.6 REQUIRED COMPONENTS Concurrent Quick QuickControls2 QuickDialogs2 Pdf Sql)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Concurrent Quick QuickControls2 QuickDialogs2 Pdf Sql)
 
-qt_standard_project_setup(REQUIRES 6.6)
+qt_standard_project_setup(REQUIRES 6.8)
 
 set_source_files_properties(src/ui/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 

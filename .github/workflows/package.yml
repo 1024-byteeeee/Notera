@@ -44,6 +44,9 @@ jobs:
       - name: Build application
         run: cmake --build --preset macos-universal --parallel
 
+      - name: Smoke test UI interactions
+        run: build/macos-universal/Notera.app/Contents/MacOS/Notera --ui-smoke-test
+
       - name: Create DMG
         run: cpack --config build/macos-universal/CPackConfig.cmake -G DragNDrop
 
@@ -59,7 +62,6 @@ jobs:
           "$bundle_path/Contents/MacOS/Notera" --theme-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --import-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --reader-smoke-test
-          "$bundle_path/Contents/MacOS/Notera" --ui-smoke-test
           "$bundle_path/Contents/MacOS/Notera" >notera-startup.log 2>&1 &
           app_pid=$!
           sleep 5

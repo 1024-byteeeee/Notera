@@ -4,6 +4,7 @@ import Notera
 
 Menu {
     id: menu
+    popupType: Popup.Item
     implicitWidth: 176
     padding: 6
 

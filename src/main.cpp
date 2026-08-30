@@ -172,13 +172,6 @@ int main(int argc, char* argv[])
                 return;
             }
 
-            if (!clickItem(root, QStringLiteral("newFolderButton"), Qt::LeftButton)
-                || !popupIsOpen(root, QStringLiteral("folderEditorDialog"))) {
-                fail("new-folder-dialog");
-                return;
-            }
-            closePopup(root, QStringLiteral("folderEditorDialog"));
-
             if (!clickItem(root, QStringLiteral("folderNavMouse"), Qt::RightButton)
                 || !popupIsOpen(root, QStringLiteral("folderContextMenu"))) {
                 fail("folder-context-menu");
@@ -222,6 +215,14 @@ int main(int argc, char* argv[])
             if (!settingsContent || !themeSelector || settingsContent->width() <= 0.0
                 || themeSelector->width() < 240.0 || themeSelector->x() < 0.0) {
                 fail("settings-layout");
+                return;
+            }
+
+            controller.setCurrentPage(QStringLiteral("library"));
+            QCoreApplication::processEvents();
+            if (!clickItem(root, QStringLiteral("newFolderButton"), Qt::LeftButton)
+                || !popupIsOpen(root, QStringLiteral("folderEditorDialog"))) {
+                fail("new-folder-dialog");
                 return;
             }
             QCoreApplication::exit(0);
