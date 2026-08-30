@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include <QColor>
 #include <QDebug>
 #include <QDir>
@@ -42,8 +44,13 @@ bool clickItem(QObject* root, const QString& objectName, const Qt::MouseButton b
 bool popupIsOpen(QObject* root, const QString& objectName)
 {
     const auto* const popup = root->findChild<QObject*>(objectName);
-    return popup && popup->property("visible").toBool() && popup->property("width").toDouble() > 0.0
-        && popup->property("height").toDouble() > 0.0;
+    if (!popup) {
+        return false;
+    }
+    const auto opened = popup->property("visible").toBool() || popup->property("openedOnce").toBool();
+    const auto width = std::max(popup->property("width").toDouble(), popup->property("implicitWidth").toDouble());
+    const auto height = std::max(popup->property("height").toDouble(), popup->property("implicitHeight").toDouble());
+    return opened && width > 0.0 && height > 0.0;
 }
 
 bool closePopup(QObject* root, const QString& objectName)

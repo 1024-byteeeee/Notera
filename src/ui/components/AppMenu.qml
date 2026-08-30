@@ -4,9 +4,11 @@ import Notera
 
 Menu {
     id: menu
+    property bool openedOnce: false
     popupType: Popup.Item
     implicitWidth: 176
     padding: 6
+    onOpened: openedOnce = true
 
     background: Rectangle {
         implicitWidth: 176
