@@ -179,8 +179,21 @@ int main(int argc, char* argv[])
                 return;
             }
 
-            if (!clickItem(root, QStringLiteral("folderNavMouse"), Qt::RightButton)
-                || !popupIsOpen(root, QStringLiteral("folderContextMenu"))) {
+            const auto folderClicked = clickItem(root, QStringLiteral("folderNavMouse"), Qt::RightButton);
+            if (!folderClicked || !popupIsOpen(root, QStringLiteral("folderContextMenu"))) {
+                const auto* const folderMouse = root->findChild<QObject*>(QStringLiteral("folderNavMouse"));
+                const auto* const folderItem = folderMouse ? folderMouse->parent() : nullptr;
+                const auto* const folderMenu = root->findChild<QObject*>(QStringLiteral("folderContextMenu"));
+                qWarning() << "Folder context diagnostics"
+                           << "clicked" << folderClicked
+                           << "acceptedButtons" << (folderMouse ? folderMouse->property("acceptedButtons") : QVariant())
+                           << "contextEnabled" << (folderItem ? folderItem->property("contextEnabled") : QVariant())
+                           << "requests" << (folderItem ? folderItem->property("contextRequestCount") : QVariant())
+                           << "targetName" << (folderMenu ? folderMenu->property("targetName") : QVariant())
+                           << "visible" << (folderMenu ? folderMenu->property("visible") : QVariant())
+                           << "openedOnce" << (folderMenu ? folderMenu->property("openedOnce") : QVariant())
+                           << "size" << (folderMenu ? folderMenu->property("width") : QVariant())
+                           << (folderMenu ? folderMenu->property("height") : QVariant());
                 fail("folder-context-menu");
                 return;
             }
