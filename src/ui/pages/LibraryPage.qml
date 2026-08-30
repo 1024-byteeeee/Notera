@@ -23,7 +23,6 @@ Rectangle {
                 onTextChanged: libraryService.searchQuery = text
             }
             Button { text: "导入"; onClicked: fileDialog.open() }
-            Button { text: "网络导入"; onClicked: urlDialog.open() }
         }
 
         Rectangle {
@@ -51,6 +50,7 @@ Rectangle {
                     required property string thumbnailPath
                     required property bool favorite
                     required property string filePath
+                    required property string fileType
 
                     width: grid.cellWidth
                     height: grid.cellHeight
@@ -131,7 +131,10 @@ Rectangle {
 
             DropArea {
                 anchors.fill: parent
-                onDropped: drop => libraryService.importUrls(drop.urls)
+                onDropped: function(drop) {
+                    for (let index = 0; index < drop.urls.length; ++index)
+                        libraryService.importLocalFile(drop.urls[index])
+                }
             }
         }
     }
@@ -141,23 +144,9 @@ Rectangle {
         title: "导入乐谱"
         fileMode: FileDialog.OpenFiles
         nameFilters: ["所有文件 (*)"]
-        onAccepted: libraryService.importUrls(selectedFiles)
-    }
-
-    Dialog {
-        id: urlDialog
-        title: "从网络导入"
-        modal: true
-        anchors.centerIn: parent
-        standardButtons: Dialog.Ok | Dialog.Cancel
         onAccepted: {
-            libraryService.importUrl(urlInput.text)
-            urlInput.clear()
-        }
-        TextField {
-            id: urlInput
-            width: 420
-            placeholderText: "输入 HTTP 或 HTTPS 文件地址"
+            for (let index = 0; index < selectedFiles.length; ++index)
+                libraryService.importLocalFile(selectedFiles[index])
         }
     }
 

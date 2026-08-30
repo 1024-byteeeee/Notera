@@ -1,9 +1,7 @@
 #pragma once
 
 #include <QObject>
-#include <QNetworkAccessManager>
 #include <QUrl>
-#include <QVariantList>
 
 #include "features/library/ScoreListModel.h"
 #include "features/library/ScoreRepository.h"
@@ -23,8 +21,7 @@ public:
     [[nodiscard]] QString searchQuery() const;
     void setSearchQuery(const QString& searchQuery);
 
-    Q_INVOKABLE void importUrls(const QVariantList& urls);
-    Q_INVOKABLE void importUrl(const QString& url);
+    Q_INVOKABLE void importLocalFile(const QUrl& url);
     Q_INVOKABLE void toggleFavorite(const QString& scoreId, bool favorite);
     Q_INVOKABLE void renameScore(const QString& scoreId, const QString& title);
     Q_INVOKABLE void deleteScore(const QString& scoreId, const QString& filePath, const QString& thumbnailPath);
@@ -37,12 +34,10 @@ signals:
 private:
     void reload();
     void importFile(const QString& sourcePath, const QString& titleOverride = {});
-    void downloadFile(const QUrl& url);
 
     DatabaseService m_databaseService;
     ScoreRepository m_repository;
     ScoreListModel m_scores;
     ThumbnailGenerator m_thumbnailGenerator;
     QString m_searchQuery;
-    QNetworkAccessManager m_network;
 };

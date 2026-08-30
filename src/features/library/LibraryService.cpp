@@ -1,17 +1,12 @@
 #include "features/library/LibraryService.h"
 
 #include <algorithm>
-#include <QFile>
 #include <QFileInfo>
-#include <QNetworkReply>
-#include <QNetworkRequest>
 #include <QPdfDocument>
-#include <QTemporaryFile>
 #include <QUrl>
 #include <QUuid>
 
 #include "services/FileService.h"
-#include "platform/AppDataPaths.h"
 
 namespace {
 
@@ -72,62 +67,13 @@ void LibraryService::setSearchQuery(const QString& searchQuery)
     reload();
 }
 
-void LibraryService::importUrls(const QVariantList& urls)
+void LibraryService::importLocalFile(const QUrl& url)
 {
-    for (const auto& value : urls) {
-        QUrl url = value.toUrl();
-        if (!url.isValid() || url.scheme().isEmpty()) {
-            const auto input = value.toString().trimmed();
-            url = QFileInfo(input).exists() ? QUrl::fromLocalFile(input) : QUrl::fromUserInput(input);
-        }
-        if (url.isLocalFile()) {
-            importFile(url.toLocalFile());
-        } else if (url.scheme() == QStringLiteral("http") || url.scheme() == QStringLiteral("https")) {
-            downloadFile(url);
-        } else {
-            emit errorOccurred(QStringLiteral("无法识别导入地址：%1").arg(value.toString()));
-        }
+    if (!url.isValid() || !url.isLocalFile()) {
+        emit errorOccurred(QStringLiteral("请选择电脑上的文件。"));
+        return;
     }
-}
-
-void LibraryService::importUrl(const QString& url)
-{
-    importUrls({url});
-}
-
-void LibraryService::downloadFile(const QUrl& url)
-{
-    QNetworkRequest request(url);
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-    auto* const reply = m_network.get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, url] {
-        reply->deleteLater();
-        if (reply->error() != QNetworkReply::NoError) {
-            emit errorOccurred(QStringLiteral("下载失败：%1").arg(reply->errorString()));
-            return;
-        }
-        constexpr qint64 MaximumDownloadSize = 512LL * 1024LL * 1024LL;
-        const auto declaredSize = reply->header(QNetworkRequest::ContentLengthHeader).toLongLong();
-        if (declaredSize > MaximumDownloadSize) {
-            emit errorOccurred(QStringLiteral("下载文件超过 512 MB。"));
-            return;
-        }
-        const auto data = reply->readAll();
-        if (data.isEmpty() || data.size() > MaximumDownloadSize) {
-            emit errorOccurred(QStringLiteral("下载文件为空或超过 512 MB。"));
-            return;
-        }
-        const auto suffix = QFileInfo(url.path()).suffix().toLower();
-        QTemporaryFile temporary(AppDataPaths::cacheDirectory() + QStringLiteral("/download-XXXXXX")
-            + (suffix.isEmpty() ? QString() : QLatin1Char('.') + suffix));
-        if (!temporary.open() || temporary.write(data) != data.size()) {
-            emit errorOccurred(QStringLiteral("无法保存下载的临时文件。"));
-            return;
-        }
-        const auto temporaryPath = temporary.fileName();
-        temporary.close();
-        importFile(temporaryPath, QFileInfo(url.path()).completeBaseName());
-    });
+    importFile(url.toLocalFile());
 }
 
 void LibraryService::toggleFavorite(const QString& scoreId, const bool favorite)

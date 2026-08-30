@@ -21,6 +21,26 @@ int main(int argc, char* argv[])
 
     ApplicationController controller;
     LibraryService libraryService;
+
+    QTemporaryFile importSmokeFile;
+    if (app.arguments().contains(QStringLiteral("--import-smoke-test"))) {
+        importSmokeFile.setFileTemplate(QDir::tempPath() + QStringLiteral("/notera-import-XXXXXX.png"));
+        if (!importSmokeFile.open()) {
+            return 1;
+        }
+        const auto imagePath = importSmokeFile.fileName();
+        importSmokeFile.close();
+        QImage image(1754, 2480, QImage::Format_Indexed8);
+        image.setColorTable({qRgb(255, 255, 255), qRgb(0, 0, 0)});
+        image.fill(0);
+        if (!image.save(imagePath)) {
+            return 1;
+        }
+        const auto previousCount = libraryService.scores()->rowCount();
+        libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
+        return libraryService.scores()->rowCount() == previousCount + 1 ? 0 : 1;
+    }
+
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("appController"), &controller);
     engine.rootContext()->setContextProperty(QStringLiteral("libraryService"), &libraryService);
