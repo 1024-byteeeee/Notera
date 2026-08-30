@@ -106,7 +106,7 @@ Rectangle {
                 color: Theme.foreground
                 font.pixelSize: 18
                 font.weight: Font.Bold
-                letterSpacing: 0.3
+                font.letterSpacing: 0.3
             }
         }
 

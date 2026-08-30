@@ -260,7 +260,7 @@ Rectangle {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onDoubleTapped: appController.openScore(title, filePath, fileType, pageCount)
+                        onDoubleClicked: appController.openScore(title, filePath, fileType, pageCount)
                         onPressAndHold: contextMenu.popup()
                     }
 
