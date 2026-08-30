@@ -2,6 +2,11 @@ name: Package desktop applications
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "要覆盖附件的现有 Release tag（留空则只生成构建产物）"
+        required: false
+        type: string
   release:
     types: [published]
 
@@ -51,6 +56,7 @@ jobs:
       - name: Smoke test application startup
         run: |
           bundle_path=$(find build/macos-universal/packages/_CPack_Packages -type d -name Notera.app -print -quit)
+          "$bundle_path/Contents/MacOS/Notera" --theme-smoke-test
           "$bundle_path/Contents/MacOS/Notera" >notera-startup.log 2>&1 &
           app_pid=$!
           sleep 5
@@ -70,10 +76,12 @@ jobs:
           if-no-files-found: error
 
       - name: Attach DMG to GitHub Release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.release.tag_name || inputs.release_tag }}
           files: build/macos-universal/packages/*.dmg
+          overwrite_files: true
 
   windows-msi:
     name: Windows x64 MSI
@@ -119,7 +127,9 @@ jobs:
           if-no-files-found: error
 
       - name: Attach MSI to GitHub Release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.release.tag_name || inputs.release_tag }}
           files: build/windows-x64/packages/*.msi
+          overwrite_files: true

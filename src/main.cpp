@@ -1,4 +1,5 @@
 #include <QGuiApplication>
+#include <QLocale>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 
@@ -8,6 +9,7 @@
 int main(int argc, char* argv[])
 {
     QGuiApplication app(argc, argv);
+    QLocale::setDefault(QLocale(QLocale::Chinese, QLocale::China));
     app.setOrganizationName(QStringLiteral("Notera"));
     app.setOrganizationDomain(QStringLiteral("notera.app"));
     app.setApplicationName(QStringLiteral("Notera"));

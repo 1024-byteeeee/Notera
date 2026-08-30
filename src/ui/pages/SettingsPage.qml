@@ -10,25 +10,29 @@ Rectangle {
         anchors.margins: 36
         spacing: 24
 
-        Label { text: "Settings"; color: Theme.foreground; font.pixelSize: 28; font.weight: Font.DemiBold }
+        Label { text: "设置"; color: Theme.foreground; font.pixelSize: 28; font.weight: Font.DemiBold }
 
         GroupBox {
-            title: "General"
+            title: "通用"
             Layout.fillWidth: true
             ColumnLayout {
                 anchors.fill: parent
-                Label { text: "Theme"; color: Theme.foreground }
-                ComboBox { model: ["System", "Light", "Dark"]; currentIndex: 0 }
+                Label { text: "主题"; color: Theme.foreground }
+                ComboBox {
+                    model: ["跟随系统", "浅色", "深色"]
+                    currentIndex: appController.themeMode
+                    onActivated: function(index) { appController.themeMode = index }
+                }
             }
         }
 
         GroupBox {
-            title: "Reader"
+            title: "阅读器"
             Layout.fillWidth: true
             ColumnLayout {
                 anchors.fill: parent
-                Label { text: "Default reader mode"; color: Theme.foreground }
-                ComboBox { model: ["Single", "Double", "Continuous", "Horizontal"]; currentIndex: 0 }
+                Label { text: "默认阅读模式"; color: Theme.foreground }
+                ComboBox { model: ["单页", "双页", "连续", "横向"]; currentIndex: 0 }
             }
         }
 

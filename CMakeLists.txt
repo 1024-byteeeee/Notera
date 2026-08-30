@@ -75,7 +75,6 @@ qt_finalize_executable(Notera)
 qt_generate_deploy_qml_app_script(
     TARGET Notera
     OUTPUT_SCRIPT deploy_script
-    NO_TRANSLATIONS
 )
 
 install(TARGETS Notera
@@ -87,7 +86,7 @@ install(SCRIPT ${deploy_script})
 set(CPACK_PACKAGE_NAME "Notera")
 set(CPACK_PACKAGE_VENDOR "Notera")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A local-first sheet music reader")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "本地优先的乐谱阅读器")
 set(CPACK_PACKAGE_DIRECTORY "${CMAKE_BINARY_DIR}/packages")
 
 if(APPLE)

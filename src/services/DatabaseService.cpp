@@ -20,7 +20,7 @@ bool DatabaseService::initialize(QString* error)
     m_database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), QString::fromLatin1(ConnectionName));
     m_database.setDatabaseName(AppDataPaths::databaseDirectory() + QStringLiteral("/notera.db"));
     if (!m_database.open()) {
-        *error = QStringLiteral("Notera could not open its library database: %1").arg(m_database.lastError().text());
+        *error = QStringLiteral("Notera 无法打开乐谱库数据库：%1").arg(m_database.lastError().text());
         return false;
     }
 

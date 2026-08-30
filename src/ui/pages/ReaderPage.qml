@@ -16,9 +16,9 @@ Rectangle {
             RowLayout {
                 anchors.fill: parent
                 anchors.margins: 16
-                Button { text: "← Library"; onClicked: appController.currentPage = "library" }
+                Button { text: "← 乐谱库"; onClicked: appController.currentPage = "library" }
                 Item { Layout.fillWidth: true }
-                Label { text: "Reader"; color: Theme.foreground; font.pixelSize: 17 }
+                Label { text: "阅读器"; color: Theme.foreground; font.pixelSize: 17 }
                 Item { Layout.fillWidth: true }
                 Label { text: "100%"; color: Theme.mutedForeground }
             }
@@ -28,7 +28,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
             color: "#303030"
-            Label { anchors.centerIn: parent; text: "PDF and image rendering arrives in Phase 3"; color: Theme.mutedForeground }
+            Label { anchors.centerIn: parent; text: "PDF 和图片渲染将在第三阶段实现"; color: Theme.mutedForeground }
         }
 
         Rectangle {

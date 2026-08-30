@@ -26,9 +26,9 @@ Rectangle {
 
         Repeater {
             model: [
-                { label: "Library", page: "library" },
-                { label: "Recent", page: "library" },
-                { label: "Favorites", page: "library" }
+                { label: "乐谱库", page: "library" },
+                { label: "最近使用", page: "library" },
+                { label: "收藏", page: "library" }
             ]
 
             delegate: Button {
@@ -39,13 +39,13 @@ Rectangle {
             }
         }
 
-        Label { text: "Folders"; color: Theme.mutedForeground; font.pixelSize: 12; Layout.topMargin: 14 }
-        Label { text: "Tags"; color: Theme.mutedForeground; font.pixelSize: 12 }
+        Label { text: "文件夹"; color: Theme.mutedForeground; font.pixelSize: 12; Layout.topMargin: 14 }
+        Label { text: "标签"; color: Theme.mutedForeground; font.pixelSize: 12 }
 
         Item { Layout.fillHeight: true }
 
         Button {
-            text: "Settings"
+            text: "设置"
             Layout.fillWidth: true
             onClicked: root.pageSelected("settings")
         }

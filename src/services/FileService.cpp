@@ -31,14 +31,14 @@ QString copyScoreIntoLibrary(const QString& sourcePath, const QString& scoreId, 
 {
     const QFileInfo source(sourcePath);
     if (!source.exists() || !source.isFile()) {
-        *error = QStringLiteral("The selected score file no longer exists.");
+        *error = QStringLiteral("所选乐谱文件已不存在。");
         return {};
     }
 
     const auto destination = AppDataPaths::libraryDirectory() + QLatin1Char('/') + scoreId + QLatin1Char('.')
         + canonicalSuffix(sourcePath);
     if (!QFile::copy(sourcePath, destination)) {
-        *error = QStringLiteral("Notera could not copy the score into its library.");
+        *error = QStringLiteral("Notera 无法将乐谱复制到乐谱库。");
         return {};
     }
     return destination;
@@ -52,7 +52,7 @@ bool removeFile(const QString& path, QString* error)
     if (QFile::remove(path)) {
         return true;
     }
-    *error = QStringLiteral("Notera could not remove a library file.");
+    *error = QStringLiteral("Notera 无法删除乐谱库文件。");
     return false;
 }
 

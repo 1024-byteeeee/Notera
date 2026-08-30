@@ -13,15 +13,15 @@ Rectangle {
 
         RowLayout {
             Layout.fillWidth: true
-            Label { text: "Library"; color: Theme.foreground; font.pixelSize: 28; font.weight: Font.DemiBold }
+            Label { text: "乐谱库"; color: Theme.foreground; font.pixelSize: 28; font.weight: Font.DemiBold }
             Item { Layout.fillWidth: true }
             TextField {
-                placeholderText: "Search scores"
+                placeholderText: "搜索乐谱"
                 implicitWidth: 220
                 text: libraryService.searchQuery
                 onTextChanged: libraryService.searchQuery = text
             }
-            Button { text: "Import"; onClicked: fileDialog.open() }
+            Button { text: "导入"; onClicked: fileDialog.open() }
         }
 
         Rectangle {
@@ -81,14 +81,14 @@ Rectangle {
                                 Label {
                                     anchors.centerIn: parent
                                     visible: thumbnailPath.length === 0
-                                    text: "Score"
+                                    text: "乐谱"
                                     color: "#737373"
                                 }
                             }
 
                             Label { width: parent.width; text: title; color: Theme.foreground; font.weight: Font.DemiBold; elide: Text.ElideRight }
-                            Label { width: parent.width; text: composer.length > 0 ? composer : "Unknown composer"; color: Theme.mutedForeground; elide: Text.ElideRight }
-                            Label { text: pageCount + (pageCount === 1 ? " page" : " pages"); color: Theme.mutedForeground; font.pixelSize: 12 }
+                            Label { width: parent.width; text: composer.length > 0 ? composer : "未知作曲者"; color: Theme.mutedForeground; elide: Text.ElideRight }
+                            Label { text: pageCount + " 页"; color: Theme.mutedForeground; font.pixelSize: 12 }
                         }
 
                         Button {
@@ -110,10 +110,10 @@ Rectangle {
 
                         Menu {
                             id: contextMenu
-                            MenuItem { text: favorite ? "Remove from Favorites" : "Add to Favorites"; onTriggered: libraryService.toggleFavorite(scoreId, !favorite) }
-                            MenuItem { text: "Rename"; onTriggered: renameDialog.openFor(scoreId, title) }
+                            MenuItem { text: favorite ? "取消收藏" : "添加到收藏"; onTriggered: libraryService.toggleFavorite(scoreId, !favorite) }
+                            MenuItem { text: "重命名"; onTriggered: renameDialog.openFor(scoreId, title) }
                             MenuSeparator { }
-                            MenuItem { text: "Delete"; onTriggered: deleteDialog.openFor(scoreId, filePath, thumbnailPath) }
+                            MenuItem { text: "删除"; onTriggered: deleteDialog.openFor(scoreId, filePath, thumbnailPath) }
                         }
                     }
                 }
@@ -123,8 +123,8 @@ Rectangle {
                 anchors.centerIn: parent
                 visible: grid.count === 0
                 spacing: 10
-                Label { anchors.horizontalCenter: parent.horizontalCenter; text: libraryService.searchQuery.length > 0 ? "No scores match your search" : "Your score library is empty"; color: Theme.foreground; font.pixelSize: 18 }
-                Label { anchors.horizontalCenter: parent.horizontalCenter; text: "Import PDF, JPG or PNG scores to begin."; color: Theme.mutedForeground }
+                Label { anchors.horizontalCenter: parent.horizontalCenter; text: libraryService.searchQuery.length > 0 ? "没有符合搜索条件的乐谱" : "乐谱库为空"; color: Theme.foreground; font.pixelSize: 18 }
+                Label { anchors.horizontalCenter: parent.horizontalCenter; text: "请导入 PDF、JPG 或 PNG 乐谱。"; color: Theme.mutedForeground }
             }
 
             DropArea {
@@ -136,22 +136,22 @@ Rectangle {
 
     FileDialog {
         id: fileDialog
-        title: "Import scores"
+        title: "导入乐谱"
         fileMode: FileDialog.OpenFiles
-        nameFilters: ["Scores (*.pdf *.jpg *.jpeg *.png)"]
+        nameFilters: ["乐谱文件 (*.pdf *.jpg *.jpeg *.png)"]
         onAccepted: libraryService.importUrls(selectedFiles)
     }
 
     Dialog {
         id: renameDialog
         property string scoreId: ""
-        title: "Rename score"
+        title: "重命名乐谱"
         modal: true
         anchors.centerIn: parent
         standardButtons: Dialog.Ok | Dialog.Cancel
         function openFor(id, name) { scoreId = id; nameInput.text = name; open() }
         onAccepted: libraryService.renameScore(scoreId, nameInput.text)
-        TextField { id: nameInput; width: 300; placeholderText: "Score title" }
+        TextField { id: nameInput; width: 300; placeholderText: "乐谱名称" }
     }
 
     Dialog {
@@ -159,12 +159,12 @@ Rectangle {
         property string scoreId: ""
         property string filePath: ""
         property string thumbnailPath: ""
-        title: "Delete score?"
+        title: "删除乐谱？"
         modal: true
         anchors.centerIn: parent
         standardButtons: Dialog.Yes | Dialog.No
         function openFor(id, file, thumbnail) { scoreId = id; filePath = file; thumbnailPath = thumbnail; open() }
         onAccepted: libraryService.deleteScore(scoreId, filePath, thumbnailPath)
-        Label { text: "The imported copy and its metadata will be removed." }
+        Label { text: "导入的文件副本及其元数据将被删除。" }
     }
 }

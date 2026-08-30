@@ -31,14 +31,14 @@ LibraryService::LibraryService(QObject* parent)
 {
     QString error;
     if (!m_databaseService.initialize(&error)) {
-        emit errorOccurred(QStringLiteral("Failed to initialize the library database."));
+        emit errorOccurred(QStringLiteral("初始化乐谱库数据库失败。"));
         return;
     }
     m_repository = ScoreRepository(m_databaseService.database());
     connect(&m_thumbnailGenerator, &ThumbnailGenerator::generated, this, [this](const QString& scoreId, const QString& path) {
         QString error;
         if (!m_repository.updateThumbnail(scoreId, path, &error)) {
-            emit errorOccurred(QStringLiteral("Failed to update a score thumbnail."));
+            emit errorOccurred(QStringLiteral("更新乐谱缩略图失败。"));
             return;
         }
         reload();
@@ -72,7 +72,7 @@ void LibraryService::importUrls(const QVariantList& urls)
     for (const auto& value : urls) {
         const auto url = value.toUrl();
         if (!url.isLocalFile()) {
-            emit errorOccurred(QStringLiteral("Only local score files can be imported."));
+            emit errorOccurred(QStringLiteral("只能导入本地乐谱文件。"));
             continue;
         }
         importFile(url.toLocalFile());
@@ -83,7 +83,7 @@ void LibraryService::toggleFavorite(const QString& scoreId, const bool favorite)
 {
     QString error;
     if (!m_repository.setFavorite(scoreId, favorite, &error)) {
-        emit errorOccurred(QStringLiteral("Failed to update favorite status."));
+        emit errorOccurred(QStringLiteral("更新收藏状态失败。"));
         return;
     }
     reload();
@@ -92,12 +92,12 @@ void LibraryService::toggleFavorite(const QString& scoreId, const bool favorite)
 void LibraryService::renameScore(const QString& scoreId, const QString& title)
 {
     if (title.trimmed().isEmpty()) {
-        emit errorOccurred(QStringLiteral("A score title cannot be empty."));
+        emit errorOccurred(QStringLiteral("乐谱名称不能为空。"));
         return;
     }
     QString error;
     if (!m_repository.rename(scoreId, title, &error)) {
-        emit errorOccurred(QStringLiteral("Failed to rename the score."));
+        emit errorOccurred(QStringLiteral("重命名乐谱失败。"));
         return;
     }
     reload();
@@ -111,7 +111,7 @@ void LibraryService::deleteScore(const QString& scoreId, const QString& filePath
         return;
     }
     if (!m_repository.remove(scoreId, &error)) {
-        emit errorOccurred(QStringLiteral("Failed to remove the score record."));
+        emit errorOccurred(QStringLiteral("删除乐谱记录失败。"));
         return;
     }
     reload();
@@ -122,7 +122,7 @@ void LibraryService::reload()
     QString error;
     const auto scores = m_repository.list(m_searchQuery, &error);
     if (!error.isEmpty()) {
-        emit errorOccurred(QStringLiteral("Failed to load the library."));
+        emit errorOccurred(QStringLiteral("加载乐谱库失败。"));
         return;
     }
     m_scores.replaceAll(scores);
@@ -131,7 +131,7 @@ void LibraryService::reload()
 void LibraryService::importFile(const QString& sourcePath)
 {
     if (!FileService::isSupportedScoreFile(sourcePath)) {
-        emit errorOccurred(QStringLiteral("Notera supports PDF, JPG, JPEG and PNG scores."));
+        emit errorOccurred(QStringLiteral("Notera 支持 PDF、JPG、JPEG 和 PNG 格式的乐谱。"));
         return;
     }
 
@@ -157,10 +157,10 @@ void LibraryService::importFile(const QString& sourcePath)
     };
     if (!m_repository.insert(score, &error)) {
         FileService::removeFile(storedPath, &error);
-        emit errorOccurred(QStringLiteral("Failed to add the score to the library."));
+        emit errorOccurred(QStringLiteral("将乐谱添加到乐谱库失败。"));
         return;
     }
     m_thumbnailGenerator.generate(score.id, score.filePath, score.fileType);
     reload();
-    emit noticeOccurred(QStringLiteral("Imported %1").arg(score.title));
+    emit noticeOccurred(QStringLiteral("已导入 %1").arg(score.title));
 }

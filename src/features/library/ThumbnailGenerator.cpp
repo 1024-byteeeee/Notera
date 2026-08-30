@@ -21,7 +21,7 @@ void ThumbnailGenerator::generate(const QString& scoreId, const QString& scorePa
             QPdfDocument document;
             document.load(scorePath);
             if (document.status() != QPdfDocument::Status::Ready || document.pageCount() < 1) {
-                QMetaObject::invokeMethod(this, [this, scoreId] { emit failed(scoreId, QStringLiteral("Notera could not render the PDF thumbnail.")); }, Qt::QueuedConnection);
+                QMetaObject::invokeMethod(this, [this, scoreId] { emit failed(scoreId, QStringLiteral("Notera 无法生成 PDF 缩略图。")); }, Qt::QueuedConnection);
                 return;
             }
             const auto pointSize = document.pagePointSize(0);
@@ -33,7 +33,7 @@ void ThumbnailGenerator::generate(const QString& scoreId, const QString& scorePa
 
         const auto thumbnailPath = AppDataPaths::thumbnailDirectory() + QLatin1Char('/') + scoreId + QStringLiteral(".png");
         if (image.isNull() || !image.save(thumbnailPath, "PNG")) {
-            QMetaObject::invokeMethod(this, [this, scoreId] { emit failed(scoreId, QStringLiteral("Notera could not save the score thumbnail.")); }, Qt::QueuedConnection);
+            QMetaObject::invokeMethod(this, [this, scoreId] { emit failed(scoreId, QStringLiteral("Notera 无法保存乐谱缩略图。")); }, Qt::QueuedConnection);
             return;
         }
         QMetaObject::invokeMethod(this, [this, scoreId, thumbnailPath] { emit generated(scoreId, thumbnailPath); }, Qt::QueuedConnection);
