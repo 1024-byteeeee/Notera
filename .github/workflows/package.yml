@@ -1,0 +1,79 @@
+name: Package desktop applications
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  macos-dmg:
+    name: macOS universal DMG
+    runs-on: macos-14
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.*"
+          modules: "qtpdf"
+          cache: true
+
+      - name: Configure universal build
+        run: cmake --preset macos-universal
+
+      - name: Build application
+        run: cmake --build --preset macos-universal --parallel
+
+      - name: Create DMG
+        run: cpack --config build/macos-universal/CPackConfig.cmake -G DragNDrop
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Notera-macos-universal-dmg
+          path: build/macos-universal/*.dmg
+          if-no-files-found: error
+
+  windows-msi:
+    name: Windows x64 MSI
+    runs-on: windows-2022
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install WiX Toolset
+        shell: powershell
+        run: choco install wixtoolset --yes --no-progress
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.*"
+          arch: "win64_msvc2022_64"
+          modules: "qtpdf"
+          cache: true
+
+      - name: Configure build
+        shell: powershell
+        run: cmake --preset windows-x64
+
+      - name: Build application
+        shell: powershell
+        run: cmake --build --preset windows-x64 --parallel
+
+      - name: Create MSI
+        shell: powershell
+        run: cpack --config build/windows-x64/CPackConfig.cmake -G WIX
+
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: Notera-windows-x64-msi
+          path: build/windows-x64/*.msi
+          if-no-files-found: error

@@ -1,0 +1,86 @@
+cmake_minimum_required(VERSION 3.24)
+
+project(Notera VERSION 0.1.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+find_package(Qt6 6.6 REQUIRED COMPONENTS Quick QuickControls2 Pdf Sql)
+
+qt_standard_project_setup(REQUIRES 6.6)
+
+set_source_files_properties(src/ui/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+
+qt_add_executable(Notera
+    MACOSX_BUNDLE
+    WIN32
+    src/main.cpp
+    src/app/ApplicationController.h
+    src/app/ApplicationController.cpp
+    src/platform/AppDataPaths.h
+    src/platform/AppDataPaths.cpp
+)
+
+qt_add_qml_module(Notera
+    URI Notera
+    VERSION 1.0
+    QML_FILES
+        src/ui/Main.qml
+        src/ui/AppShell.qml
+        src/ui/Theme.qml
+        src/ui/components/Sidebar.qml
+        src/ui/pages/LibraryPage.qml
+        src/ui/pages/ReaderPage.qml
+        src/ui/pages/SettingsPage.qml
+)
+
+target_include_directories(Notera PRIVATE src)
+
+target_link_libraries(Notera
+    PRIVATE
+        Qt6::Quick
+        Qt6::QuickControls2
+        Qt6::Pdf
+        Qt6::Sql
+)
+
+set_target_properties(Notera PROPERTIES
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.notera.app"
+    MACOSX_BUNDLE_BUNDLE_NAME "Notera"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+    WIN32_EXECUTABLE TRUE
+)
+
+qt_finalize_executable(Notera)
+
+# Qt generates an install-time deployment script. It bundles the required Qt
+# frameworks on macOS and the required DLLs on Windows before CPack packages them.
+qt_generate_deploy_qml_app_script(
+    TARGET Notera
+    OUTPUT_SCRIPT deploy_script
+    NO_TRANSLATIONS
+)
+
+install(TARGETS Notera
+    BUNDLE DESTINATION .
+    RUNTIME DESTINATION bin
+)
+install(SCRIPT ${deploy_script})
+
+set(CPACK_PACKAGE_NAME "Notera")
+set(CPACK_PACKAGE_VENDOR "Notera")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A local-first sheet music reader")
+
+if(APPLE)
+    set(CPACK_GENERATOR "DragNDrop")
+    set(CPACK_DMG_VOLUME_NAME "Notera")
+elseif(WIN32)
+    # Requires WiX Toolset on the Windows packaging machine.
+    set(CPACK_GENERATOR "WIX")
+    set(CPACK_WIX_UPGRADE_GUID "C2A4B1D0-76FB-4D37-94B3-32D3A9FD44F1")
+endif()
+
+include(CPack)

@@ -1,0 +1,7 @@
+/build/
+/.qt/
+/.vs/
+/.vscode/
+*.user
+*.suo
+*.DS_Store
