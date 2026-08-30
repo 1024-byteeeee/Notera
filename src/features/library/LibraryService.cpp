@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <QBuffer>
+#include <QDir>
 #include <QFileInfo>
 #include <QImage>
 #include <QPainter>
