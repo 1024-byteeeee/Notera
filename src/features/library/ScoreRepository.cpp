@@ -366,3 +366,46 @@ bool ScoreRepository::createTag(const QString& name, QString* error) const
     *error = query.lastError().text();
     return false;
 }
+
+bool ScoreRepository::renameFolder(const QString& folderId, const QString& name, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("UPDATE folders SET name = ?, updated_at = ? WHERE id = ?"));
+    query.addBindValue(name.trimmed());
+    query.addBindValue(QDateTime::currentMSecsSinceEpoch());
+    query.addBindValue(folderId);
+    if (query.exec() && query.numRowsAffected() == 1) return true;
+    *error = query.lastError().text();
+    return false;
+}
+
+bool ScoreRepository::deleteFolder(const QString& folderId, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("DELETE FROM folders WHERE id = ?"));
+    query.addBindValue(folderId);
+    if (query.exec() && query.numRowsAffected() == 1) return true;
+    *error = query.lastError().text();
+    return false;
+}
+
+bool ScoreRepository::renameTag(const QString& tagId, const QString& name, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("UPDATE tags SET name = ? WHERE id = ?"));
+    query.addBindValue(name.trimmed());
+    query.addBindValue(tagId);
+    if (query.exec() && query.numRowsAffected() == 1) return true;
+    *error = query.lastError().text();
+    return false;
+}
+
+bool ScoreRepository::deleteTag(const QString& tagId, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("DELETE FROM tags WHERE id = ?"));
+    query.addBindValue(tagId);
+    if (query.exec() && query.numRowsAffected() == 1) return true;
+    *error = query.lastError().text();
+    return false;
+}

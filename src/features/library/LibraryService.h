@@ -34,7 +34,11 @@ public:
     Q_INVOKABLE void renameScore(const QString& scoreId, const QString& title);
     Q_INVOKABLE void deleteScore(const QString& scoreId, const QString& filePath, const QString& thumbnailPath);
     Q_INVOKABLE void createFolder(const QString& name);
+    Q_INVOKABLE void renameFolder(const QString& folderId, const QString& name);
+    Q_INVOKABLE void deleteFolder(const QString& folderId);
     Q_INVOKABLE void createTag(const QString& name);
+    Q_INVOKABLE void renameTag(const QString& tagId, const QString& name);
+    Q_INVOKABLE void deleteTag(const QString& tagId);
 
 signals:
     void searchQueryChanged();

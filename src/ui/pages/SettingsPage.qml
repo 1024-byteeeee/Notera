@@ -9,123 +9,115 @@ Rectangle {
     Flickable {
         anchors.fill: parent
         contentWidth: width
-        contentHeight: column.height
+        contentHeight: contentCol.height + 80
         clip: true
 
-        ColumnLayout {
-            id: column
+        Column {
+            id: contentCol
             width: parent.width
-            spacing: Theme.spacingLg
+            spacing: 20
 
-            // 顶部间距
-            Item { Layout.fillWidth: true; Layout.preferredHeight: Theme.spacingXl }
+            Item { width: parent.width; height: 36 }
 
             // 标题
-            ColumnLayout {
-                Layout.fillWidth: true
-                Layout.leftMargin: Theme.spacingXl
-                Layout.rightMargin: Theme.spacingXl
+            Column {
+                width: parent.width
                 spacing: 4
+                leftPadding: 36
                 Label {
                     text: "设置"
                     color: Theme.foreground
-                    font.pixelSize: Theme.font2xl
+                    font.pixelSize: 26
                     font.weight: Font.Bold
                 }
                 Label {
                     text: "个性化你的阅读体验"
                     color: Theme.mutedForeground
-                    font.pixelSize: Theme.fontSm
+                    font.pixelSize: 13
                 }
             }
 
             // ── 通用设置卡片 ─────────────────────────────
             Rectangle {
-                Layout.fillWidth: true
-                Layout.leftMargin: Theme.spacingXl
-                Layout.rightMargin: Theme.spacingXl
+                width: parent.width - 72
+                x: 36
                 color: Theme.surface
                 radius: Theme.radiusLg
                 border.color: Theme.border
                 border.width: 1
 
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: Theme.spacingLg
-                    spacing: Theme.spacingSm
+                Column {
+                    id: generalCol
+                    width: parent.width
+                    spacing: 10
+                    topPadding: 20
+                    bottomPadding: 20
+                    leftPadding: 20
+                    rightPadding: 20
 
                     Label {
                         text: "通用"
                         color: Theme.foreground
-                        font.pixelSize: Theme.fontLg
+                        font.pixelSize: 16
                         font.weight: Font.DemiBold
-                        Layout.bottomMargin: Theme.spacingSm
+                        bottomPadding: 6
                     }
 
                     // 主题选择行
                     Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 56
+                        width: parent.width
+                        height: 56
                         color: Theme.elevatedSurface
                         radius: Theme.radiusMd
                         border.color: Theme.border
                         border.width: 1
 
-                        RowLayout {
+                        Row {
                             anchors.fill: parent
                             anchors.leftMargin: 16
                             anchors.rightMargin: 16
                             spacing: 12
 
-                            ColumnLayout {
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
                                 spacing: 2
                                 Label {
                                     text: "主题"
                                     color: Theme.foreground
-                                    font.pixelSize: Theme.fontMd
+                                    font.pixelSize: 14
                                     font.weight: Font.Medium
                                 }
                                 Label {
                                     text: "选择浅色、深色或跟随系统"
                                     color: Theme.mutedForeground
-                                    font.pixelSize: Theme.fontXs
+                                    font.pixelSize: 11
                                 }
                             }
 
-                            Item { Layout.fillWidth: true }
+                            Item { width: parent.width - 32 - themeCol.width - themeRow.width - 12; height: 1 }
 
                             // 分段选择器
                             Row {
+                                id: themeRow
+                                anchors.verticalCenter: parent.verticalCenter
                                 spacing: 0
                                 Repeater {
-                                    id: themeRepeater
                                     model: ["跟随系统", "浅色", "深色"]
                                     delegate: Rectangle {
                                         required property int index
                                         required property string modelData
                                         width: 84
                                         height: 34
-                                        radius: 0
                                         color: appController.themeMode === index ? Theme.accent : Theme.buttonBackground
                                         border.width: 1
                                         border.color: appController.themeMode === index ? Theme.accent : Theme.buttonBorder
-
-                                        // 第一个左圆角，最后一个右圆角
-                                        Rectangle {
-                                            visible: index === 0
-                                            anchors.fill: parent
-                                            radius: Theme.radiusSm
-                                            color: parent.color
-                                            border.width: 1
-                                            border.color: parent.border.color
-                                            z: -1
-                                        }
+                                        radius: index === 0 ? Theme.radiusSm : (index === 2 ? Theme.radiusSm : 0)
 
                                         Label {
                                             anchors.centerIn: parent
                                             text: modelData
                                             color: appController.themeMode === index ? Theme.accentForeground : Theme.buttonText
-                                            font.pixelSize: Theme.fontSm
+                                            font.pixelSize: 12
                                             font.weight: appController.themeMode === index ? Font.DemiBold : Font.Medium
                                         }
 
@@ -144,65 +136,68 @@ Rectangle {
 
             // ── 阅读器设置卡片 ───────────────────────────
             Rectangle {
-                Layout.fillWidth: true
-                Layout.leftMargin: Theme.spacingXl
-                Layout.rightMargin: Theme.spacingXl
+                width: parent.width - 72
+                x: 36
                 color: Theme.surface
                 radius: Theme.radiusLg
                 border.color: Theme.border
                 border.width: 1
 
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: Theme.spacingLg
-                    spacing: Theme.spacingSm
+                Column {
+                    width: parent.width
+                    spacing: 10
+                    topPadding: 20
+                    bottomPadding: 20
+                    leftPadding: 20
+                    rightPadding: 20
 
                     Label {
                         text: "阅读器"
                         color: Theme.foreground
-                        font.pixelSize: Theme.fontLg
+                        font.pixelSize: 16
                         font.weight: Font.DemiBold
-                        Layout.bottomMargin: Theme.spacingSm
+                        bottomPadding: 6
                     }
 
                     // 默认滚动速度
                     Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 56
+                        width: parent.width
+                        height: 56
                         color: Theme.elevatedSurface
                         radius: Theme.radiusMd
                         border.color: Theme.border
                         border.width: 1
 
-                        RowLayout {
+                        Row {
                             anchors.fill: parent
                             anchors.leftMargin: 16
                             anchors.rightMargin: 16
                             spacing: 12
 
-                            ColumnLayout {
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
                                 spacing: 2
                                 Label {
                                     text: "默认滚动速度"
                                     color: Theme.foreground
-                                    font.pixelSize: Theme.fontMd
+                                    font.pixelSize: 14
                                     font.weight: Font.Medium
                                 }
                                 Label {
                                     text: "自动滚动时的初始速度"
                                     color: Theme.mutedForeground
-                                    font.pixelSize: Theme.fontXs
+                                    font.pixelSize: 11
                                 }
                             }
 
-                            Item { Layout.fillWidth: true }
+                            Item { width: parent.width - 32 - speedCol.width - 60 - 12; height: 1 }
 
                             Label {
+                                anchors.verticalCenter: parent.verticalCenter
                                 text: Math.round(appController.autoScrollSpeed) + " px/s"
                                 color: Theme.accent
-                                font.pixelSize: Theme.fontSm
+                                font.pixelSize: 12
                                 font.weight: Font.DemiBold
-                                Layout.preferredWidth: 64
                                 horizontalAlignment: Text.AlignRight
                             }
                         }
@@ -210,47 +205,49 @@ Rectangle {
 
                     // 关于
                     Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 56
+                        width: parent.width
+                        height: 56
                         color: Theme.elevatedSurface
                         radius: Theme.radiusMd
                         border.color: Theme.border
                         border.width: 1
 
-                        RowLayout {
+                        Row {
                             anchors.fill: parent
                             anchors.leftMargin: 16
                             anchors.rightMargin: 16
                             spacing: 12
 
-                            ColumnLayout {
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
                                 spacing: 2
                                 Label {
                                     text: "关于"
                                     color: Theme.foreground
-                                    font.pixelSize: Theme.fontMd
+                                    font.pixelSize: 14
                                     font.weight: Font.Medium
                                 }
                                 Label {
                                     text: "本地优先的乐谱阅读器"
                                     color: Theme.mutedForeground
-                                    font.pixelSize: Theme.fontXs
+                                    font.pixelSize: 11
                                 }
                             }
 
-                            Item { Layout.fillWidth: true }
+                            Item { width: parent.width - 32 - aboutCol.width - 50 - 12; height: 1 }
 
                             Label {
+                                anchors.verticalCenter: parent.verticalCenter
                                 text: "v0.1.2"
                                 color: Theme.mutedForeground
-                                font.pixelSize: Theme.fontSm
+                                font.pixelSize: 12
                             }
                         }
                     }
                 }
             }
 
-            Item { Layout.fillWidth: true; Layout.preferredHeight: Theme.spacingXl }
+            Item { width: parent.width; height: 40 }
         }
     }
 }

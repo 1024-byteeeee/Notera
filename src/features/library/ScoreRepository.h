@@ -23,8 +23,12 @@ public:
 
     [[nodiscard]] QVariantList folders(QString* error) const;
     [[nodiscard]] bool createFolder(const QString& name, QString* error) const;
+    [[nodiscard]] bool renameFolder(const QString& folderId, const QString& name, QString* error) const;
+    [[nodiscard]] bool deleteFolder(const QString& folderId, QString* error) const;
     [[nodiscard]] QVariantList tags(QString* error) const;
     [[nodiscard]] bool createTag(const QString& name, QString* error) const;
+    [[nodiscard]] bool renameTag(const QString& tagId, const QString& name, QString* error) const;
+    [[nodiscard]] bool deleteTag(const QString& tagId, QString* error) const;
 
 private:
     QSqlDatabase m_database;

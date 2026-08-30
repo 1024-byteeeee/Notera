@@ -57,7 +57,7 @@ Rectangle {
 
             // 搜索框
             Rectangle {
-                width: 240
+                Layout.preferredWidth: 220
                 height: Theme.controlHeight
                 radius: Theme.radiusMd
                 color: Theme.inputBackground
@@ -71,17 +71,13 @@ Rectangle {
                     anchors.rightMargin: 10
                     spacing: 8
 
-                    Label {
-                        text: "⌕"
-                        color: Theme.mutedForeground
-                        font.pixelSize: 14
-                    }
+                    Label { text: "⌕"; color: Theme.mutedForeground; font.pixelSize: 14 }
 
                     TextField {
                         id: searchField
                         Layout.fillWidth: true
                         background: Rectangle { color: "transparent" }
-                        placeholderText: "搜索乐谱…"
+                        placeholderText: "搜索…"
                         placeholderTextColor: Theme.inputPlaceholder
                         color: Theme.foreground
                         font.pixelSize: Theme.fontMd
@@ -105,18 +101,8 @@ Rectangle {
                     anchors.rightMargin: 16
                     spacing: 7
 
-                    Label {
-                        text: "+"
-                        color: Theme.accentForeground
-                        font.pixelSize: 16
-                        font.weight: Font.Bold
-                    }
-                    Label {
-                        text: "导入"
-                        color: Theme.accentForeground
-                        font.pixelSize: Theme.fontMd
-                        font.weight: Font.DemiBold
-                    }
+                    Label { text: "+"; color: Theme.accentForeground; font.pixelSize: 16; font.weight: Font.Bold }
+                    Label { text: "导入"; color: Theme.accentForeground; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
                 }
 
                 MouseArea {
@@ -161,13 +147,13 @@ Rectangle {
                     width: grid.cellWidth
                     height: grid.cellHeight
 
-                    // 卡片
+                    // 卡片背景
                     Rectangle {
                         id: card
                         anchors.fill: parent
                         anchors.margins: 8
-                        color: cardMouse.containsMouse ? Theme.cardHover : Theme.cardBackground
-                        border.color: cardMouse.containsMouse ? Theme.strongBorder : Theme.cardBorder
+                        color: cardTapHandler.hovered ? Theme.cardHover : Theme.cardBackground
+                        border.color: cardTapHandler.hovered ? Theme.strongBorder : Theme.cardBorder
                         border.width: 1
                         radius: Theme.radiusMd
                         Behavior on color { ColorAnimation { duration: 150 } }
@@ -227,7 +213,7 @@ Rectangle {
 
                             // 标题
                             Label {
-                                width: parent.width - 36
+                                width: parent.width - 8
                                 text: title
                                 color: Theme.foreground
                                 font.pixelSize: Theme.fontMd
@@ -243,76 +229,48 @@ Rectangle {
                                 elide: Text.ElideRight
                             }
                         }
+                    }
 
-                        // 收藏按钮（z: 2 确保在卡片 MouseArea 之上）
-                        Rectangle {
-                            id: favBtn
-                            z: 2
-                            width: 28
-                            height: 28
-                            radius: 8
-                            anchors.right: parent.right
-                            anchors.top: parent.top
-                            anchors.margins: 10
-                            color: favorite ? Theme.accentSoft : (favMouse.containsMouse ? Theme.buttonHover : "transparent")
-                            Behavior on color { ColorAnimation { duration: 120 } }
+                    // 收藏按钮（delegate 层级，z:2 确保在最上）
+                    Rectangle {
+                        id: favBtn
+                        z: 2
+                        width: 30
+                        height: 30
+                        radius: 8
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 14
+                        color: favorite ? Theme.accentSoft : (favMouse.containsMouse ? Theme.buttonHover : "transparent")
+                        Behavior on color { ColorAnimation { duration: 120 } }
 
-                            Label {
-                                anchors.centerIn: parent
-                                text: favorite ? "★" : "☆"
-                                color: favorite ? Theme.accent : Theme.mutedForeground
-                                font.pixelSize: 14
-                            }
-
-                            MouseArea {
-                                id: favMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: libraryService.toggleFavorite(scoreId, !favorite)
-                            }
+                        Label {
+                            anchors.centerIn: parent
+                            text: favorite ? "★" : "☆"
+                            color: favorite ? Theme.accent : Theme.mutedForeground
+                            font.pixelSize: 15
                         }
 
-                        // 删除按钮（hover 时显示）
-                        Rectangle {
-                            id: delBtn
-                            z: 2
-                            visible: cardMouse.containsMouse
-                            width: 28
-                            height: 28
-                            radius: 8
-                            anchors.left: parent.left
-                            anchors.top: parent.top
-                            anchors.margins: 10
-                            color: delMouse.containsMouse ? Theme.dangerSoft : Theme.buttonHover
-                            Behavior on color { ColorAnimation { duration: 120 } }
-
-                            Label {
-                                anchors.centerIn: parent
-                                text: "🗑"
-                                font.pixelSize: 13
-                            }
-
-                            MouseArea {
-                                id: delMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: deleteDialog.openFor(scoreId, filePath, thumbnailPath)
-                            }
+                        MouseArea {
+                            id: favMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: libraryService.toggleFavorite(scoreId, !favorite)
                         }
                     }
 
-                    // 卡片交互层
-                    MouseArea {
-                        id: cardMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onDoubleClicked: appController.openScore(title, filePath, fileType, pageCount)
-                        onPressAndHold: contextMenu.popup()
-                        onClicked: {
-                            // 单击不做任何事，避免和收藏/删除按钮冲突
+                    // 卡片点击处理器（单击进入，右键菜单）
+                    TapHandler {
+                        id: cardTapHandler
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        gesturePolicy: TapHandler.ReleaseWithinBounds
+                        onTapped: function(eventPoint) {
+                            if (eventPoint.button === Qt.RightButton) {
+                                contextMenu.popup()
+                            } else {
+                                appController.openScore(title, filePath, fileType, pageCount)
+                            }
                         }
                     }
 
@@ -333,19 +291,12 @@ Rectangle {
                 spacing: 14
 
                 Rectangle {
-                    width: 72
-                    height: 72
-                    radius: 20
+                    width: 72; height: 72; radius: 20
                     color: Theme.elevatedSurface
                     border.color: Theme.border
                     border.width: 1
                     anchors.horizontalCenter: parent.horizontalCenter
-                    Label {
-                        anchors.centerIn: parent
-                        text: "♪"
-                        color: Theme.mutedForeground
-                        font.pixelSize: 32
-                    }
+                    Label { anchors.centerIn: parent; text: "♪"; color: Theme.mutedForeground; font.pixelSize: 32 }
                 }
 
                 Label {

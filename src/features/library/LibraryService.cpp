@@ -122,6 +122,68 @@ void LibraryService::createTag(const QString& name)
     emit noticeOccurred(QStringLiteral("已创建标签 %1").arg(name.trimmed()));
 }
 
+void LibraryService::renameFolder(const QString& folderId, const QString& name)
+{
+    if (name.trimmed().isEmpty()) {
+        emit errorOccurred(QStringLiteral("文件夹名称不能为空。"));
+        return;
+    }
+    QString error;
+    if (!m_repository.renameFolder(folderId, name, &error)) {
+        emit errorOccurred(QStringLiteral("重命名文件夹失败。"));
+        return;
+    }
+    reloadFolders();
+    emit noticeOccurred(QStringLiteral("已重命名为 %1").arg(name.trimmed()));
+}
+
+void LibraryService::deleteFolder(const QString& folderId)
+{
+    QString error;
+    if (!m_repository.deleteFolder(folderId, &error)) {
+        emit errorOccurred(QStringLiteral("删除文件夹失败。"));
+        return;
+    }
+    if (m_filterMode.startsWith(QStringLiteral("folder:"))) {
+        m_filterMode = QStringLiteral("all");
+        emit filterModeChanged();
+    }
+    reloadFolders();
+    reload();
+    emit noticeOccurred(QStringLiteral("文件夹已删除"));
+}
+
+void LibraryService::renameTag(const QString& tagId, const QString& name)
+{
+    if (name.trimmed().isEmpty()) {
+        emit errorOccurred(QStringLiteral("标签名称不能为空。"));
+        return;
+    }
+    QString error;
+    if (!m_repository.renameTag(tagId, name, &error)) {
+        emit errorOccurred(QStringLiteral("重命名标签失败。"));
+        return;
+    }
+    reloadTags();
+    emit noticeOccurred(QStringLiteral("已重命名为 %1").arg(name.trimmed()));
+}
+
+void LibraryService::deleteTag(const QString& tagId)
+{
+    QString error;
+    if (!m_repository.deleteTag(tagId, &error)) {
+        emit errorOccurred(QStringLiteral("删除标签失败。"));
+        return;
+    }
+    if (m_filterMode.startsWith(QStringLiteral("tag:"))) {
+        m_filterMode = QStringLiteral("all");
+        emit filterModeChanged();
+    }
+    reloadTags();
+    reload();
+    emit noticeOccurred(QStringLiteral("标签已删除"));
+}
+
 void LibraryService::importLocalFile(const QUrl& url)
 {
     if (!url.isValid()) {
