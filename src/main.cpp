@@ -3,6 +3,7 @@
 #include <QQmlContext>
 
 #include "app/ApplicationController.h"
+#include "features/library/LibraryService.h"
 
 int main(int argc, char* argv[])
 {
@@ -12,8 +13,10 @@ int main(int argc, char* argv[])
     app.setApplicationName(QStringLiteral("Notera"));
 
     ApplicationController controller;
+    LibraryService libraryService;
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("appController"), &controller);
+    engine.rootContext()->setContextProperty(QStringLiteral("libraryService"), &libraryService);
     engine.loadFromModule("Notera", "Main");
 
     if (engine.rootObjects().isEmpty()) {

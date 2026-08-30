@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Qt6 6.6 REQUIRED COMPONENTS Quick QuickControls2 Pdf Sql)
+find_package(Qt6 6.6 REQUIRED COMPONENTS Concurrent Quick QuickControls2 QuickDialogs2 Pdf Sql)
 
 qt_standard_project_setup(REQUIRES 6.6)
 
@@ -20,6 +20,19 @@ qt_add_executable(Notera
     src/app/ApplicationController.cpp
     src/platform/AppDataPaths.h
     src/platform/AppDataPaths.cpp
+    src/services/DatabaseService.h
+    src/services/DatabaseService.cpp
+    src/services/FileService.h
+    src/services/FileService.cpp
+    src/features/library/Score.h
+    src/features/library/ScoreListModel.h
+    src/features/library/ScoreListModel.cpp
+    src/features/library/ScoreRepository.h
+    src/features/library/ScoreRepository.cpp
+    src/features/library/ThumbnailGenerator.h
+    src/features/library/ThumbnailGenerator.cpp
+    src/features/library/LibraryService.h
+    src/features/library/LibraryService.cpp
 )
 
 qt_add_qml_module(Notera
@@ -41,6 +54,8 @@ target_link_libraries(Notera
     PRIVATE
         Qt6::Quick
         Qt6::QuickControls2
+        Qt6::QuickDialogs2
+        Qt6::Concurrent
         Qt6::Pdf
         Qt6::Sql
 )
