@@ -13,6 +13,11 @@ Rectangle {
     readonly property bool isImage: ["jpg", "jpeg", "png", "bmp", "gif", "webp", "tif", "tiff"].indexOf(appController.currentFileType) !== -1
     property bool autoScrolling: false
     property real scrollSpeed: appController.autoScrollSpeed
+    property real zoomLevel: 1.0
+
+    function resetZoom() { root.zoomLevel = 1.0 }
+    function zoomIn() { root.zoomLevel = Math.min(3.0, root.zoomLevel + 0.25) }
+    function zoomOut() { root.zoomLevel = Math.max(0.4, root.zoomLevel - 0.25) }
 
     function stopAtEnd() {
         const maximum = Math.max(0, readerFlick.contentHeight - readerFlick.height)
@@ -106,7 +111,7 @@ Rectangle {
 
                 // 速度控制
                 Rectangle {
-                    Layout.preferredWidth: 200
+                    Layout.preferredWidth: 180
                     height: Theme.controlHeight
                     radius: Theme.radiusMd
                     color: Theme.buttonBackground
@@ -145,6 +150,75 @@ Rectangle {
                         }
                     }
                 }
+
+                // 缩放控制
+                Rectangle {
+                    Layout.preferredWidth: 170
+                    height: Theme.controlHeight
+                    radius: Theme.radiusMd
+                    color: Theme.buttonBackground
+                    border.color: Theme.buttonBorder
+                    border.width: 1
+                    visible: root.isPdf || root.isImage
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        spacing: 2
+
+                        // 缩小
+                        Rectangle {
+                            Layout.preferredWidth: 30
+                            height: 28
+                            radius: 6
+                            color: zoomOutMouse.containsMouse ? Theme.buttonHover : "transparent"
+                            Label { anchors.centerIn: parent; text: "−"; color: Theme.buttonText; font.pixelSize: 16; font.weight: Font.Bold }
+                            MouseArea {
+                                id: zoomOutMouse
+                                anchors.fill: parent; hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.zoomOut()
+                            }
+                        }
+
+                        // 百分比（点击重置）
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 28
+                            radius: 6
+                            color: zoomResetMouse.containsMouse ? Theme.buttonHover : "transparent"
+                            Label {
+                                anchors.centerIn: parent
+                                text: Math.round(root.zoomLevel * 100) + "%"
+                                color: Theme.buttonText
+                                font.pixelSize: 12
+                                font.weight: Font.Medium
+                            }
+                            MouseArea {
+                                id: zoomResetMouse
+                                anchors.fill: parent; hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.resetZoom()
+                            }
+                        }
+
+                        // 放大
+                        Rectangle {
+                            Layout.preferredWidth: 30
+                            height: 28
+                            radius: 6
+                            color: zoomInMouse.containsMouse ? Theme.buttonHover : "transparent"
+                            Label { anchors.centerIn: parent; text: "+"; color: Theme.buttonText; font.pixelSize: 16; font.weight: Font.Bold }
+                            MouseArea {
+                                id: zoomInMouse
+                                anchors.fill: parent; hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.zoomIn()
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -158,6 +232,14 @@ Rectangle {
             contentWidth: width
             contentHeight: documentColumn.height
             boundsBehavior: Flickable.StopAtBounds
+
+            onWheel: function(wheel) {
+                if (wheel.modifiers & Qt.ControlModifier) {
+                    wheel.accepted = true
+                    const delta = wheel.angleDelta.y / 1200
+                    root.zoomLevel = Math.max(0.4, Math.min(3.0, root.zoomLevel + delta))
+                }
+            }
 
             Column {
                 id: documentColumn
@@ -176,7 +258,7 @@ Rectangle {
                     delegate: Rectangle {
                         required property int index
                         readonly property size pageSize: pdfDocument.pagePointSize(index)
-                        width: Math.min(documentColumn.width - 48, 1100)
+                        width: Math.min(documentColumn.width - 48, 1100) * root.zoomLevel
                         height: pageSize.width > 0 ? width * pageSize.height / pageSize.width : 800
                         x: (documentColumn.width - width) / 2
                         color: "white"
@@ -198,7 +280,7 @@ Rectangle {
 
                 Image {
                     visible: root.isImage
-                    width: visible ? Math.min(documentColumn.width - 48, 1400) : 0
+                    width: visible ? Math.min(documentColumn.width - 48, 1400) * root.zoomLevel : 0
                     height: visible ? (sourceSize.width > 0 ? width * sourceSize.height / sourceSize.width : 700) : 0
                     x: (documentColumn.width - width) / 2
                     source: root.isImage ? appController.currentFileUrl : ""
@@ -264,6 +346,7 @@ Rectangle {
         function onCurrentScoreChanged() {
             readerFlick.contentY = 0
             root.autoScrolling = false
+            root.zoomLevel = 1.0
         }
     }
 }

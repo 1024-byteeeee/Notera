@@ -93,6 +93,14 @@ Rectangle {
                 primary: true
                 onClicked: fileDialog.open()
             }
+
+            AppButton {
+                objectName: "stitchButton"
+                Layout.preferredWidth: 120
+                text: "拼接导入"
+                symbol: "⬚⬚"
+                onClicked: stitchDialog.open()
+            }
         }
 
         Rectangle {
@@ -348,6 +356,59 @@ Rectangle {
                         libraryService.importLocalFile(drop.urls[index])
                 }
             }
+
+            // 空白区域右键菜单
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.RightButton
+                z: 1
+                onClicked: function(mouse) {
+                    if (mouse.button === Qt.RightButton) {
+                        blankContextMenu.popup()
+                    }
+                }
+            }
+        }
+    }
+
+    // 空白区域右键菜单
+    Menu {
+        id: blankContextMenu
+        MenuItem { text: "新建文件夹"; onTriggered: newFolderDialog.open() }
+        MenuItem { text: "新建标签"; onTriggered: newTagDialog.open() }
+        MenuSeparator { }
+        MenuItem { text: "导入乐谱"; onTriggered: fileDialog.open() }
+    }
+
+    // 新建文件夹对话框
+    Dialog {
+        id: newFolderDialog
+        title: "新建文件夹"
+        modal: true
+        anchors.centerIn: parent
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: libraryService.createFolder(folderNameInput.text)
+        TextField {
+            id: folderNameInput
+            width: 280
+            placeholderText: "输入文件夹名称"
+            focus: true
+        }
+    }
+
+    // 新建标签对话框
+    Dialog {
+        id: newTagDialog
+        title: "新建标签"
+        modal: true
+        anchors.centerIn: parent
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: libraryService.createTag(tagNameInput.text)
+        TextField {
+            id: tagNameInput
+            width: 280
+            placeholderText: "输入标签名称"
+            focus: true
         }
     }
 
@@ -360,6 +421,14 @@ Rectangle {
             for (let index = 0; index < selectedFiles.length; ++index)
                 libraryService.importLocalFile(selectedFiles[index])
         }
+    }
+
+    FileDialog {
+        id: stitchDialog
+        title: "选择多张图片拼接导入（按选择顺序垂直拼接）"
+        fileMode: FileDialog.OpenFiles
+        nameFilters: ["图片文件 (*.jpg *.jpeg *.png *.bmp *.gif *.webp *.tif *.tiff)", "所有文件 (*)"]
+        onAccepted: libraryService.importAndStitchImages(selectedFiles)
     }
 
     AppDialog {

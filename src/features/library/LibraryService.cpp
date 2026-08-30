@@ -1,8 +1,12 @@
 #include "features/library/LibraryService.h"
 
 #include <algorithm>
+#include <QBuffer>
 #include <QFileInfo>
+#include <QImage>
+#include <QPainter>
 #include <QPdfDocument>
+#include <QTemporaryFile>
 #include <QUrl>
 #include <QUuid>
 
@@ -217,6 +221,86 @@ void LibraryService::importLocalFile(const QUrl& url)
     }
 
     importFile(localPath);
+}
+
+void LibraryService::importAndStitchImages(const QVariantList& urls)
+{
+    if (urls.size() < 2) {
+        emit errorOccurred(QStringLiteral("拼接导入需要至少选择两张图片。"));
+        return;
+    }
+
+    // 解析并加载所有图片
+    QList<QImage> images;
+    for (const auto& variant : urls) {
+        const QUrl url = variant.toUrl();
+        QString localPath;
+        if (url.isLocalFile()) {
+            localPath = url.toLocalFile();
+        } else if (url.scheme().isEmpty()) {
+            localPath = url.path();
+            if (localPath.isEmpty()) localPath = url.toString();
+        }
+        if (localPath.isEmpty() || !QFileInfo::exists(localPath)) {
+            emit errorOccurred(QStringLiteral("无法读取图片文件。"));
+            return;
+        }
+        QImage img(localPath);
+        if (img.isNull()) {
+            emit errorOccurred(QStringLiteral("无法加载图片：%1").arg(QFileInfo(localPath).fileName()));
+            return;
+        }
+        images.append(img);
+    }
+
+    // 计算拼接尺寸：宽度取最大值，高度累加
+    int maxWidth = 0;
+    qint64 totalHeight = 0;
+    for (const auto& img : images) {
+        maxWidth = qMax(maxWidth, img.width());
+        totalHeight += img.height();
+    }
+
+    if (maxWidth <= 0 || totalHeight <= 0) {
+        emit errorOccurred(QStringLiteral("图片尺寸无效。"));
+        return;
+    }
+
+    // 安全上限：防止超大拼接图导致内存问题
+    if (totalHeight > 65536 || maxWidth > 16384) {
+        emit errorOccurred(QStringLiteral("拼接后图片尺寸过大，请减少图片数量。"));
+        return;
+    }
+
+    // 创建拼接画布（白色背景）
+    QImage stitched(maxWidth, static_cast<int>(totalHeight), QImage::Format_ARGB32);
+    stitched.fill(Qt::white);
+
+    QPainter painter(&stitched);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    int y = 0;
+    for (const auto& img : images) {
+        // 水平居中绘制
+        int x = (maxWidth - img.width()) / 2;
+        painter.drawImage(x, y, img);
+        y += img.height();
+    }
+    painter.end();
+
+    // 保存到临时文件
+    QTemporaryFile tempFile(QDir::tempPath() + "/notera_stitch_XXXXXX.png");
+    if (!tempFile.open()) {
+        emit errorOccurred(QStringLiteral("创建临时文件失败。"));
+        return;
+    }
+    if (!stitched.save(tempFile.fileName(), "PNG")) {
+        emit errorOccurred(QStringLiteral("保存拼接图片失败。"));
+        return;
+    }
+    tempFile.close();
+
+    // 导入拼接后的图片
+    importFile(tempFile.fileName(), QStringLiteral("拼接乐谱 %1张").arg(images.size()));
 }
 
 void LibraryService::toggleFavorite(const QString& scoreId, const bool favorite)
