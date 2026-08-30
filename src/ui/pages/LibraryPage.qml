@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
+import Notera
 
 Rectangle {
     color: Theme.background
