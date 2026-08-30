@@ -25,5 +25,9 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    if (app.arguments().contains(QStringLiteral("--theme-smoke-test"))) {
+        QMetaObject::invokeMethod(engine.rootObjects().constFirst(), "runThemeSmokeTest", Qt::QueuedConnection);
+    }
+
     return app.exec();
 }
