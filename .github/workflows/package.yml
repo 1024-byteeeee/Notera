@@ -47,6 +47,14 @@ jobs:
       - name: Smoke test UI interactions
         run: build/macos-universal/Notera.app/Contents/MacOS/Notera --ui-smoke-test
 
+      - name: Upload UI verification screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Notera-macos-ui-screenshots
+          path: notera-*-smoke.png
+          if-no-files-found: warn
+
       - name: Create DMG
         run: cpack --config build/macos-universal/CPackConfig.cmake -G DragNDrop
 

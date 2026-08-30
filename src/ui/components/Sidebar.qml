@@ -18,7 +18,6 @@ Rectangle {
         property string targetPage: "library"
         property bool selected: false
         property bool contextEnabled: false
-        property int contextRequestCount: 0
         signal contextRequested()
 
         Layout.fillWidth: true
@@ -76,7 +75,6 @@ Rectangle {
             cursorShape: Qt.PointingHandCursor
             onClicked: function(mouse) {
                 if (mouse.button === Qt.RightButton) {
-                    navItem.contextRequestCount += 1
                     navItem.contextRequested()
                     return
                 }

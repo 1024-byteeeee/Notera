@@ -202,20 +202,14 @@ int main(int argc, char* argv[])
                 fail("import-button-geometry");
                 return;
             }
+            auto* const window = qobject_cast<QQuickWindow*>(root);
+            if (!window || !window->grabWindow().save(QStringLiteral("notera-library-smoke.png"))) {
+                fail("library-screenshot");
+                return;
+            }
 
-            const auto folderClicked = clickItem(root, QStringLiteral("folderNavItem"), Qt::RightButton);
-            if (!folderClicked || !popupIsOpen(root, QStringLiteral("folderContextMenu"))) {
-                const auto* const folderItem = findVisualItem(root, QStringLiteral("folderNavItem"));
-                const auto* const folderMenu = root->findChild<QObject*>(QStringLiteral("folderContextMenu"));
-                qWarning() << "Folder context diagnostics"
-                           << "clicked" << folderClicked
-                           << "contextEnabled" << (folderItem ? folderItem->property("contextEnabled") : QVariant())
-                           << "requests" << (folderItem ? folderItem->property("contextRequestCount") : QVariant())
-                           << "targetName" << (folderMenu ? folderMenu->property("targetName") : QVariant())
-                           << "visible" << (folderMenu ? folderMenu->property("visible") : QVariant())
-                           << "openedOnce" << (folderMenu ? folderMenu->property("openedOnce") : QVariant())
-                           << "size" << (folderMenu ? folderMenu->property("width") : QVariant())
-                           << (folderMenu ? folderMenu->property("height") : QVariant());
+            if (!clickItem(root, QStringLiteral("folderNavItem"), Qt::RightButton)
+                || !popupIsOpen(root, QStringLiteral("folderContextMenu"))) {
                 fail("folder-context-menu");
                 return;
             }
@@ -266,6 +260,10 @@ int main(int argc, char* argv[])
             if (!settingsContent || !themeSelector || settingsContent->width() <= 0.0
                 || themeSelector->width() < 240.0 || themeSelector->x() < 0.0) {
                 fail("settings-layout");
+                return;
+            }
+            if (!window->grabWindow().save(QStringLiteral("notera-settings-smoke.png"))) {
+                fail("settings-screenshot");
                 return;
             }
 
