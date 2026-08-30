@@ -1,3 +1,4 @@
+#include <QColor>
 #include <QGuiApplication>
 #include <QLocale>
 #include <QQmlApplicationEngine>
@@ -26,7 +27,16 @@ int main(int argc, char* argv[])
     }
 
     if (app.arguments().contains(QStringLiteral("--theme-smoke-test"))) {
-        QMetaObject::invokeMethod(engine.rootObjects().constFirst(), "runThemeSmokeTest", Qt::QueuedConnection);
+        auto* const root = engine.rootObjects().constFirst();
+        const auto originalMode = controller.themeMode();
+        controller.setThemeMode(1);
+        QCoreApplication::processEvents();
+        const auto lightBackground = root->property("themeBackground").value<QColor>();
+        controller.setThemeMode(2);
+        QCoreApplication::processEvents();
+        const auto darkBackground = root->property("themeBackground").value<QColor>();
+        controller.setThemeMode(originalMode);
+        return lightBackground.isValid() && darkBackground.isValid() && lightBackground != darkBackground ? 0 : 1;
     }
 
     return app.exec();

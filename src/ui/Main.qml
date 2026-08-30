@@ -10,6 +10,7 @@ ApplicationWindow {
     visible: true
     title: "Notera"
     color: Theme.background
+    readonly property color themeBackground: Theme.background
 
     SystemPalette {
         id: systemPalette
@@ -26,16 +27,6 @@ ApplicationWindow {
         target: Theme
         property: "systemDark"
         value: (systemPalette.window.r + systemPalette.window.g + systemPalette.window.b) / 3 < 0.5
-    }
-
-    function runThemeSmokeTest() {
-        const originalMode = appController.themeMode
-        appController.themeMode = 1
-        const lightBackground = Theme.background.toString()
-        appController.themeMode = 2
-        const darkBackground = Theme.background.toString()
-        appController.themeMode = originalMode
-        Qt.exit(lightBackground !== darkBackground ? 0 : 1)
     }
 
     AppShell {
