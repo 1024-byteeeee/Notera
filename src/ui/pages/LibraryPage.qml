@@ -7,6 +7,25 @@ import Notera
 Rectangle {
     color: Theme.background
 
+    // 同步筛选模式
+    Connections {
+        target: appController
+        function onLibraryFilterChanged() {
+            libraryService.filterMode = appController.libraryFilter
+        }
+    }
+    Component.onCompleted: libraryService.filterMode = appController.libraryFilter
+
+    readonly property string filterTitle: {
+        const f = appController.libraryFilter
+        if (f === "all") return "乐谱库"
+        if (f === "recent") return "最近使用"
+        if (f === "favorites") return "收藏"
+        if (f.startsWith("folder:")) return "文件夹"
+        if (f.startsWith("tag:")) return "标签"
+        return "乐谱库"
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: Theme.spacingXl
@@ -20,7 +39,7 @@ Rectangle {
             ColumnLayout {
                 spacing: 2
                 Label {
-                    text: "乐谱库"
+                    text: filterTitle
                     color: Theme.foreground
                     font.pixelSize: Theme.font2xl
                     font.weight: Font.Bold
@@ -28,7 +47,7 @@ Rectangle {
                 Label {
                     text: libraryService.scores.count > 0
                         ? libraryService.scores.count + " 份乐谱"
-                        : "导入你的第一份乐谱"
+                        : "这里还没有乐谱"
                     color: Theme.mutedForeground
                     font.pixelSize: Theme.fontSm
                 }
@@ -78,7 +97,6 @@ Rectangle {
                 height: Theme.controlHeight
                 radius: Theme.radiusMd
                 color: importBtnMouse.containsMouse ? Theme.accentHover : Theme.accent
-                border.width: 0
                 Behavior on color { ColorAnimation { duration: 120 } }
 
                 RowLayout {
@@ -209,7 +227,7 @@ Rectangle {
 
                             // 标题
                             Label {
-                                width: parent.width
+                                width: parent.width - 36
                                 text: title
                                 color: Theme.foreground
                                 font.pixelSize: Theme.fontMd
@@ -226,9 +244,10 @@ Rectangle {
                             }
                         }
 
-                        // 收藏按钮
+                        // 收藏按钮（z: 2 确保在卡片 MouseArea 之上）
                         Rectangle {
                             id: favBtn
+                            z: 2
                             width: 28
                             height: 28
                             radius: 8
@@ -253,8 +272,38 @@ Rectangle {
                                 onClicked: libraryService.toggleFavorite(scoreId, !favorite)
                             }
                         }
+
+                        // 删除按钮（hover 时显示）
+                        Rectangle {
+                            id: delBtn
+                            z: 2
+                            visible: cardMouse.containsMouse
+                            width: 28
+                            height: 28
+                            radius: 8
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.margins: 10
+                            color: delMouse.containsMouse ? Theme.dangerSoft : Theme.buttonHover
+                            Behavior on color { ColorAnimation { duration: 120 } }
+
+                            Label {
+                                anchors.centerIn: parent
+                                text: "🗑"
+                                font.pixelSize: 13
+                            }
+
+                            MouseArea {
+                                id: delMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: deleteDialog.openFor(scoreId, filePath, thumbnailPath)
+                            }
+                        }
                     }
 
+                    // 卡片交互层
                     MouseArea {
                         id: cardMouse
                         anchors.fill: parent
@@ -262,6 +311,9 @@ Rectangle {
                         cursorShape: Qt.PointingHandCursor
                         onDoubleClicked: appController.openScore(title, filePath, fileType, pageCount)
                         onPressAndHold: contextMenu.popup()
+                        onClicked: {
+                            // 单击不做任何事，避免和收藏/删除按钮冲突
+                        }
                     }
 
                     Menu {
@@ -298,7 +350,7 @@ Rectangle {
 
                 Label {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: libraryService.searchQuery.length > 0 ? "没有符合搜索条件的乐谱" : "乐谱库为空"
+                    text: libraryService.searchQuery.length > 0 ? "没有符合搜索条件的乐谱" : (appController.libraryFilter === "favorites" ? "还没有收藏的乐谱" : "乐谱库为空")
                     color: Theme.foreground
                     font.pixelSize: Theme.fontLg
                     font.weight: Font.DemiBold

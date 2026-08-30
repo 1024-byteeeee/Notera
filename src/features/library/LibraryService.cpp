@@ -46,6 +46,8 @@ LibraryService::LibraryService(QObject* parent)
     connect(&m_thumbnailGenerator, &ThumbnailGenerator::failed, this, [this](const QString&, const QString& message) {
         emit errorOccurred(message);
     });
+    reloadFolders();
+    reloadTags();
     reload();
 }
 
@@ -65,6 +67,59 @@ void LibraryService::setSearchQuery(const QString& searchQuery)
     m_searchQuery = searchQuery;
     emit searchQueryChanged();
     reload();
+}
+
+QString LibraryService::filterMode() const
+{
+    return m_filterMode;
+}
+
+void LibraryService::setFilterMode(const QString& mode)
+{
+    if (m_filterMode == mode) return;
+    m_filterMode = mode;
+    emit filterModeChanged();
+    reload();
+}
+
+QVariantList LibraryService::folders() const
+{
+    return m_folders;
+}
+
+QVariantList LibraryService::tags() const
+{
+    return m_tags;
+}
+
+void LibraryService::createFolder(const QString& name)
+{
+    if (name.trimmed().isEmpty()) {
+        emit errorOccurred(QStringLiteral("文件夹名称不能为空。"));
+        return;
+    }
+    QString error;
+    if (!m_repository.createFolder(name, &error)) {
+        emit errorOccurred(QStringLiteral("创建文件夹失败。"));
+        return;
+    }
+    reloadFolders();
+    emit noticeOccurred(QStringLiteral("已创建文件夹 %1").arg(name.trimmed()));
+}
+
+void LibraryService::createTag(const QString& name)
+{
+    if (name.trimmed().isEmpty()) {
+        emit errorOccurred(QStringLiteral("标签名称不能为空。"));
+        return;
+    }
+    QString error;
+    if (!m_repository.createTag(name, &error)) {
+        emit errorOccurred(QStringLiteral("创建标签失败。"));
+        return;
+    }
+    reloadTags();
+    emit noticeOccurred(QStringLiteral("已创建标签 %1").arg(name.trimmed()));
 }
 
 void LibraryService::importLocalFile(const QUrl& url)
@@ -136,12 +191,37 @@ void LibraryService::deleteScore(const QString& scoreId, const QString& filePath
 void LibraryService::reload()
 {
     QString error;
-    const auto scores = m_repository.list(m_searchQuery, &error);
+    QList<Score> scores;
+    if (m_filterMode == QStringLiteral("favorites")) {
+        scores = m_repository.listFavorites(m_searchQuery, &error);
+    } else if (m_filterMode == QStringLiteral("recent")) {
+        scores = m_repository.listRecent(m_searchQuery, &error);
+    } else if (m_filterMode.startsWith(QStringLiteral("folder:"))) {
+        scores = m_repository.listByFolder(m_filterMode.mid(7), m_searchQuery, &error);
+    } else if (m_filterMode.startsWith(QStringLiteral("tag:"))) {
+        scores = m_repository.listByTag(m_filterMode.mid(4), m_searchQuery, &error);
+    } else {
+        scores = m_repository.list(m_searchQuery, &error);
+    }
     if (!error.isEmpty()) {
         emit errorOccurred(QStringLiteral("加载乐谱库失败。"));
         return;
     }
     m_scores.replaceAll(scores);
+}
+
+void LibraryService::reloadFolders()
+{
+    QString error;
+    m_folders = m_repository.folders(&error);
+    emit foldersChanged();
+}
+
+void LibraryService::reloadTags()
+{
+    QString error;
+    m_tags = m_repository.tags(&error);
+    emit tagsChanged();
 }
 
 void LibraryService::importFile(const QString& sourcePath, const QString& titleOverride)

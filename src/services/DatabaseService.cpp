@@ -45,45 +45,76 @@ bool DatabaseService::applyMigrations(QString* error)
         return false;
     }
 
-    if (query.value(0).toInt() >= 1) {
-        return true;
+    const auto version = query.value(0).toInt();
+
+    // v1: initial schema
+    if (version < 1) {
+        if (!m_database.transaction()) {
+            *error = m_database.lastError().text();
+            return false;
+        }
+
+        const auto succeeded = query.exec(QStringLiteral(R"(
+            CREATE TABLE IF NOT EXISTS scores (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                composer TEXT,
+                file_name TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                file_type TEXT NOT NULL,
+                page_count INTEGER NOT NULL DEFAULT 1,
+                thumbnail_path TEXT,
+                favorite INTEGER NOT NULL DEFAULT 0,
+                last_page INTEGER NOT NULL DEFAULT 1,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                last_opened_at INTEGER
+            )
+        )"))
+            && query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS tags (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE)"))
+            && query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS score_tags (score_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (score_id, tag_id), FOREIGN KEY(score_id) REFERENCES scores(id) ON DELETE CASCADE, FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE)"))
+            && query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS annotations (id TEXT PRIMARY KEY, score_id TEXT NOT NULL, page INTEGER NOT NULL, type TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, FOREIGN KEY(score_id) REFERENCES scores(id) ON DELETE CASCADE)"))
+            && query.exec(QStringLiteral("PRAGMA user_version = 1"));
+
+        if (!succeeded) {
+            m_database.rollback();
+            *error = query.lastError().text();
+            return false;
+        }
+        if (!m_database.commit()) {
+            *error = m_database.lastError().text();
+            return false;
+        }
     }
 
-    if (!m_database.transaction()) {
-        *error = m_database.lastError().text();
-        return false;
+    // v2: folders
+    if (version < 2) {
+        if (!m_database.transaction()) {
+            *error = m_database.lastError().text();
+            return false;
+        }
+
+        const auto succeeded = query.exec(QStringLiteral(R"(
+            CREATE TABLE IF NOT EXISTS folders (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )
+        )"))
+            && query.exec(QStringLiteral("ALTER TABLE scores ADD COLUMN folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL"))
+            && query.exec(QStringLiteral("PRAGMA user_version = 2"));
+
+        if (!succeeded) {
+            m_database.rollback();
+            *error = query.lastError().text();
+            return false;
+        }
+        if (!m_database.commit()) {
+            *error = m_database.lastError().text();
+            return false;
+        }
     }
 
-    const auto succeeded = query.exec(QStringLiteral(R"(
-        CREATE TABLE IF NOT EXISTS scores (
-            id TEXT PRIMARY KEY,
-            title TEXT NOT NULL,
-            composer TEXT,
-            file_name TEXT NOT NULL,
-            file_path TEXT NOT NULL,
-            file_type TEXT NOT NULL,
-            page_count INTEGER NOT NULL DEFAULT 1,
-            thumbnail_path TEXT,
-            favorite INTEGER NOT NULL DEFAULT 0,
-            last_page INTEGER NOT NULL DEFAULT 1,
-            created_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL,
-            last_opened_at INTEGER
-        )
-    )"))
-        && query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS tags (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE)"))
-        && query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS score_tags (score_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (score_id, tag_id), FOREIGN KEY(score_id) REFERENCES scores(id) ON DELETE CASCADE, FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE)"))
-        && query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS annotations (id TEXT PRIMARY KEY, score_id TEXT NOT NULL, page INTEGER NOT NULL, type TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, FOREIGN KEY(score_id) REFERENCES scores(id) ON DELETE CASCADE)"))
-        && query.exec(QStringLiteral("PRAGMA user_version = 1"));
-
-    if (!succeeded) {
-        m_database.rollback();
-        *error = query.lastError().text();
-        return false;
-    }
-    if (!m_database.commit()) {
-        *error = m_database.lastError().text();
-        return false;
-    }
     return true;
 }

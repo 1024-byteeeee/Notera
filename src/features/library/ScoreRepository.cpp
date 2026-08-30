@@ -2,6 +2,8 @@
 
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QUuid>
+#include <QVariantMap>
 
 namespace {
 
@@ -30,6 +32,93 @@ QList<Score> ScoreRepository::list(const QString& searchQuery, QString* error) c
             WHERE score_tags.score_id = scores.id AND tags.name LIKE ?
         )
         ORDER BY favorite DESC, last_opened_at DESC, created_at DESC
+    )"));
+    query.addBindValue(needle);
+    query.addBindValue(needle);
+    query.addBindValue(needle);
+    if (!query.exec()) {
+        *error = query.lastError().text();
+        return {};
+    }
+
+    QList<Score> scores;
+    while (query.next()) {
+        Score score;
+        score.id = query.value(0).toString();
+        score.title = query.value(1).toString();
+        score.composer = query.value(2).toString();
+        score.fileName = query.value(3).toString();
+        score.filePath = query.value(4).toString();
+        score.fileType = query.value(5).toString();
+        score.pageCount = query.value(6).toInt();
+        score.thumbnailPath = query.value(7).toString();
+        score.favorite = query.value(8).toBool();
+        score.lastPage = query.value(9).toInt();
+        score.createdAt = QDateTime::fromMSecsSinceEpoch(query.value(10).toLongLong());
+        score.updatedAt = QDateTime::fromMSecsSinceEpoch(query.value(11).toLongLong());
+        score.lastOpenedAt = QDateTime::fromMSecsSinceEpoch(query.value(12).toLongLong());
+        scores.append(std::move(score));
+    }
+    return scores;
+}
+
+QList<Score> ScoreRepository::listFavorites(const QString& searchQuery, QString* error) const
+{
+    QSqlQuery query(m_database);
+    const auto needle = QStringLiteral("%%1%").arg(searchQuery);
+    query.prepare(QStringLiteral(R"(
+        SELECT id, title, composer, file_name, file_path, file_type, page_count, thumbnail_path,
+               favorite, last_page, created_at, updated_at, last_opened_at
+        FROM scores
+        WHERE favorite = 1
+          AND (title LIKE ? OR composer LIKE ? OR EXISTS (
+            SELECT 1 FROM score_tags JOIN tags ON tags.id = score_tags.tag_id
+            WHERE score_tags.score_id = scores.id AND tags.name LIKE ?
+          ))
+        ORDER BY last_opened_at DESC, created_at DESC
+    )"));
+    query.addBindValue(needle);
+    query.addBindValue(needle);
+    query.addBindValue(needle);
+    if (!query.exec()) {
+        *error = query.lastError().text();
+        return {};
+    }
+
+    QList<Score> scores;
+    while (query.next()) {
+        Score score;
+        score.id = query.value(0).toString();
+        score.title = query.value(1).toString();
+        score.composer = query.value(2).toString();
+        score.fileName = query.value(3).toString();
+        score.filePath = query.value(4).toString();
+        score.fileType = query.value(5).toString();
+        score.pageCount = query.value(6).toInt();
+        score.thumbnailPath = query.value(7).toString();
+        score.favorite = query.value(8).toBool();
+        score.lastPage = query.value(9).toInt();
+        score.createdAt = QDateTime::fromMSecsSinceEpoch(query.value(10).toLongLong());
+        score.updatedAt = QDateTime::fromMSecsSinceEpoch(query.value(11).toLongLong());
+        score.lastOpenedAt = QDateTime::fromMSecsSinceEpoch(query.value(12).toLongLong());
+        scores.append(std::move(score));
+    }
+    return scores;
+}
+
+QList<Score> ScoreRepository::listRecent(const QString& searchQuery, QString* error) const
+{
+    QSqlQuery query(m_database);
+    const auto needle = QStringLiteral("%%1%").arg(searchQuery);
+    query.prepare(QStringLiteral(R"(
+        SELECT id, title, composer, file_name, file_path, file_type, page_count, thumbnail_path,
+               favorite, last_page, created_at, updated_at, last_opened_at
+        FROM scores
+        WHERE title LIKE ? OR composer LIKE ? OR EXISTS (
+            SELECT 1 FROM score_tags JOIN tags ON tags.id = score_tags.tag_id
+            WHERE score_tags.score_id = scores.id AND tags.name LIKE ?
+        )
+        ORDER BY last_opened_at IS NULL, last_opened_at DESC, created_at DESC
     )"));
     query.addBindValue(needle);
     query.addBindValue(needle);
@@ -130,6 +219,150 @@ bool ScoreRepository::remove(const QString& scoreId, QString* error) const
     query.prepare(QStringLiteral("DELETE FROM scores WHERE id = ?"));
     query.addBindValue(scoreId);
     if (query.exec() && query.numRowsAffected() == 1) return true;
+    *error = query.lastError().text();
+    return false;
+}
+
+QList<Score> ScoreRepository::listByFolder(const QString& folderId, const QString& searchQuery, QString* error) const
+{
+    QSqlQuery query(m_database);
+    const auto needle = QStringLiteral("%%1%").arg(searchQuery);
+    query.prepare(QStringLiteral(R"(
+        SELECT id, title, composer, file_name, file_path, file_type, page_count, thumbnail_path,
+               favorite, last_page, created_at, updated_at, last_opened_at
+        FROM scores
+        WHERE folder_id = ?
+          AND (title LIKE ? OR composer LIKE ? OR EXISTS (
+            SELECT 1 FROM score_tags JOIN tags ON tags.id = score_tags.tag_id
+            WHERE score_tags.score_id = scores.id AND tags.name LIKE ?
+          ))
+        ORDER BY favorite DESC, last_opened_at DESC, created_at DESC
+    )"));
+    query.addBindValue(folderId);
+    query.addBindValue(needle);
+    query.addBindValue(needle);
+    query.addBindValue(needle);
+    if (!query.exec()) {
+        *error = query.lastError().text();
+        return {};
+    }
+
+    QList<Score> scores;
+    while (query.next()) {
+        Score score;
+        score.id = query.value(0).toString();
+        score.title = query.value(1).toString();
+        score.composer = query.value(2).toString();
+        score.fileName = query.value(3).toString();
+        score.filePath = query.value(4).toString();
+        score.fileType = query.value(5).toString();
+        score.pageCount = query.value(6).toInt();
+        score.thumbnailPath = query.value(7).toString();
+        score.favorite = query.value(8).toBool();
+        score.lastPage = query.value(9).toInt();
+        score.createdAt = QDateTime::fromMSecsSinceEpoch(query.value(10).toLongLong());
+        score.updatedAt = QDateTime::fromMSecsSinceEpoch(query.value(11).toLongLong());
+        score.lastOpenedAt = QDateTime::fromMSecsSinceEpoch(query.value(12).toLongLong());
+        scores.append(std::move(score));
+    }
+    return scores;
+}
+
+QList<Score> ScoreRepository::listByTag(const QString& tagId, const QString& searchQuery, QString* error) const
+{
+    QSqlQuery query(m_database);
+    const auto needle = QStringLiteral("%%1%").arg(searchQuery);
+    query.prepare(QStringLiteral(R"(
+        SELECT s.id, s.title, s.composer, s.file_name, s.file_path, s.file_type, s.page_count, s.thumbnail_path,
+               s.favorite, s.last_page, s.created_at, s.updated_at, s.last_opened_at
+        FROM scores s
+        JOIN score_tags st ON st.score_id = s.id
+        WHERE st.tag_id = ?
+          AND (s.title LIKE ? OR s.composer LIKE ? OR EXISTS (
+            SELECT 1 FROM score_tags st2 JOIN tags t ON t.id = st2.tag_id
+            WHERE st2.score_id = s.id AND t.name LIKE ?
+          ))
+        ORDER BY s.favorite DESC, s.last_opened_at DESC, s.created_at DESC
+    )"));
+    query.addBindValue(tagId);
+    query.addBindValue(needle);
+    query.addBindValue(needle);
+    query.addBindValue(needle);
+    if (!query.exec()) {
+        *error = query.lastError().text();
+        return {};
+    }
+
+    QList<Score> scores;
+    while (query.next()) {
+        Score score;
+        score.id = query.value(0).toString();
+        score.title = query.value(1).toString();
+        score.composer = query.value(2).toString();
+        score.fileName = query.value(3).toString();
+        score.filePath = query.value(4).toString();
+        score.fileType = query.value(5).toString();
+        score.pageCount = query.value(6).toInt();
+        score.thumbnailPath = query.value(7).toString();
+        score.favorite = query.value(8).toBool();
+        score.lastPage = query.value(9).toInt();
+        score.createdAt = QDateTime::fromMSecsSinceEpoch(query.value(10).toLongLong());
+        score.updatedAt = QDateTime::fromMSecsSinceEpoch(query.value(11).toLongLong());
+        score.lastOpenedAt = QDateTime::fromMSecsSinceEpoch(query.value(12).toLongLong());
+        scores.append(std::move(score));
+    }
+    return scores;
+}
+
+QVariantList ScoreRepository::folders(QString* error) const
+{
+    QSqlQuery query(m_database);
+    if (!query.exec(QStringLiteral("SELECT id, name FROM folders ORDER BY name COLLATE NOCASE"))) {
+        *error = query.lastError().text();
+        return {};
+    }
+    QVariantList result;
+    while (query.next()) {
+        result.append(QVariantMap{{"id", query.value(0).toString()}, {"name", query.value(1).toString()}});
+    }
+    return result;
+}
+
+bool ScoreRepository::createFolder(const QString& name, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("INSERT INTO folders (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)"));
+    query.addBindValue(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    query.addBindValue(name.trimmed());
+    const auto now = QDateTime::currentMSecsSinceEpoch();
+    query.addBindValue(now);
+    query.addBindValue(now);
+    if (query.exec()) return true;
+    *error = query.lastError().text();
+    return false;
+}
+
+QVariantList ScoreRepository::tags(QString* error) const
+{
+    QSqlQuery query(m_database);
+    if (!query.exec(QStringLiteral("SELECT id, name FROM tags ORDER BY name COLLATE NOCASE"))) {
+        *error = query.lastError().text();
+        return {};
+    }
+    QVariantList result;
+    while (query.next()) {
+        result.append(QVariantMap{{"id", query.value(0).toString()}, {"name", query.value(1).toString()}});
+    }
+    return result;
+}
+
+bool ScoreRepository::createTag(const QString& name, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)"));
+    query.addBindValue(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    query.addBindValue(name.trimmed());
+    if (query.exec()) return true;
     *error = query.lastError().text();
     return false;
 }

@@ -93,3 +93,17 @@ void ApplicationController::setCurrentPage(const QString& page)
     m_currentPage = page;
     emit currentPageChanged();
 }
+
+QString ApplicationController::libraryFilter() const
+{
+    return m_libraryFilter;
+}
+
+void ApplicationController::setLibraryFilter(const QString& filter)
+{
+    if (m_libraryFilter == filter) {
+        return;
+    }
+    m_libraryFilter = filter;
+    emit libraryFilterChanged();
+}

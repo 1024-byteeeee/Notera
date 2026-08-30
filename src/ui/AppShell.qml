@@ -17,8 +17,6 @@ Item {
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        currentPage: appController.currentPage
-        onPageSelected: appController.currentPage = page
     }
 
     StackLayout {

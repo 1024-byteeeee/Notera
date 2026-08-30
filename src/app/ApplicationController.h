@@ -9,6 +9,7 @@ class ApplicationController final : public QObject
     Q_OBJECT
     Q_PROPERTY(QString currentPage READ currentPage WRITE setCurrentPage NOTIFY currentPageChanged)
     Q_PROPERTY(int themeMode READ themeMode WRITE setThemeMode NOTIFY themeModeChanged)
+    Q_PROPERTY(QString libraryFilter READ libraryFilter WRITE setLibraryFilter NOTIFY libraryFilterChanged)
     Q_PROPERTY(QString currentScoreTitle READ currentScoreTitle NOTIFY currentScoreChanged)
     Q_PROPERTY(QUrl currentFileUrl READ currentFileUrl NOTIFY currentScoreChanged)
     Q_PROPERTY(QString currentFileType READ currentFileType NOTIFY currentScoreChanged)
@@ -20,6 +21,8 @@ public:
 
     [[nodiscard]] QString currentPage() const;
     void setCurrentPage(const QString& page);
+    [[nodiscard]] QString libraryFilter() const;
+    void setLibraryFilter(const QString& filter);
     [[nodiscard]] int themeMode() const;
     void setThemeMode(int themeMode);
     [[nodiscard]] QString currentScoreTitle() const;
@@ -33,11 +36,13 @@ public:
 signals:
     void currentPageChanged();
     void themeModeChanged();
+    void libraryFilterChanged();
     void currentScoreChanged();
     void autoScrollSpeedChanged();
 
 private:
     QString m_currentPage {QStringLiteral("library")};
+    QString m_libraryFilter {QStringLiteral("all")};
     int m_themeMode {0};
     QString m_currentScoreTitle;
     QUrl m_currentFileUrl;
