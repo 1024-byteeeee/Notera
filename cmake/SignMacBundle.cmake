@@ -20,7 +20,7 @@ file(GLOB_RECURSE signable_dylibs LIST_DIRECTORIES false
     "${bundle_path}/Contents/PlugIns/*.dylib"
     "${bundle_path}/Contents/Resources/qml/*.dylib"
 )
-file(GLOB_RECURSE signable_frameworks LIST_DIRECTORIES true
+file(GLOB signable_frameworks LIST_DIRECTORIES true
     "${bundle_path}/Contents/Frameworks/*.framework"
 )
 
