@@ -44,7 +44,7 @@ jobs:
 
       - name: Verify signed application bundle
         run: |
-          bundle_path=$(find build/macos-universal/_CPack_Packages -type d -name Notera.app -print -quit)
+          bundle_path=$(find build/macos-universal/packages/_CPack_Packages -type d -name Notera.app -print -quit)
           test -n "$bundle_path"
           codesign --verify --deep --strict --verbose=2 "$bundle_path"
 
