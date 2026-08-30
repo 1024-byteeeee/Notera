@@ -16,7 +16,6 @@ Rectangle {
         required property string navId
         property string symbol: ""
         property string targetPage: "library"
-        property string mouseObjectName: ""
         property bool selected: false
         property bool contextEnabled: false
         property int contextRequestCount: 0
@@ -68,7 +67,6 @@ Rectangle {
 
         MouseArea {
             id: navMouse
-            objectName: navItem.mouseObjectName
             anchors.fill: parent
             acceptedButtons: navItem.contextEnabled
                 ? Qt.LeftButton | Qt.RightButton
@@ -206,12 +204,12 @@ Rectangle {
                 Repeater {
                     model: libraryService.folders
                     delegate: NavItem {
+                        objectName: "folderNavItem"
                         required property string itemId
                         required property string name
                         label: name
                         navId: "folder:" + itemId
                         symbol: "▱"
-                        mouseObjectName: "folderNavMouse"
                         contextEnabled: true
                         selected: appController.currentPage === "library" && appController.libraryFilter === navId
                         onContextRequested: {
@@ -253,12 +251,12 @@ Rectangle {
                 Repeater {
                     model: libraryService.tags
                     delegate: NavItem {
+                        objectName: "tagNavItem"
                         required property string itemId
                         required property string name
                         label: name
                         navId: "tag:" + itemId
                         symbol: "#"
-                        mouseObjectName: "tagNavMouse"
                         contextEnabled: true
                         selected: appController.currentPage === "library" && appController.libraryFilter === navId
                         onContextRequested: {
@@ -355,6 +353,7 @@ Rectangle {
 
     AppMenu {
         id: tagMenu
+        objectName: "tagContextMenu"
         property string targetId: ""
         property string targetName: ""
         AppMenuItem {

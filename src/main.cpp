@@ -179,14 +179,12 @@ int main(int argc, char* argv[])
                 return;
             }
 
-            const auto folderClicked = clickItem(root, QStringLiteral("folderNavMouse"), Qt::RightButton);
+            const auto folderClicked = clickItem(root, QStringLiteral("folderNavItem"), Qt::RightButton);
             if (!folderClicked || !popupIsOpen(root, QStringLiteral("folderContextMenu"))) {
-                const auto* const folderMouse = root->findChild<QObject*>(QStringLiteral("folderNavMouse"));
-                const auto* const folderItem = folderMouse ? folderMouse->parent() : nullptr;
+                const auto* const folderItem = root->findChild<QObject*>(QStringLiteral("folderNavItem"));
                 const auto* const folderMenu = root->findChild<QObject*>(QStringLiteral("folderContextMenu"));
                 qWarning() << "Folder context diagnostics"
                            << "clicked" << folderClicked
-                           << "acceptedButtons" << (folderMouse ? folderMouse->property("acceptedButtons") : QVariant())
                            << "contextEnabled" << (folderItem ? folderItem->property("contextEnabled") : QVariant())
                            << "requests" << (folderItem ? folderItem->property("contextRequestCount") : QVariant())
                            << "targetName" << (folderMenu ? folderMenu->property("targetName") : QVariant())
@@ -198,6 +196,13 @@ int main(int argc, char* argv[])
                 return;
             }
             closePopup(root, QStringLiteral("folderContextMenu"));
+
+            if (!clickItem(root, QStringLiteral("tagNavItem"), Qt::RightButton)
+                || !popupIsOpen(root, QStringLiteral("tagContextMenu"))) {
+                fail("tag-context-menu");
+                return;
+            }
+            closePopup(root, QStringLiteral("tagContextMenu"));
 
             controller.setCurrentPage(QStringLiteral("library"));
             if (!clickItem(root, QStringLiteral("scoreCardMouse"), Qt::RightButton)
