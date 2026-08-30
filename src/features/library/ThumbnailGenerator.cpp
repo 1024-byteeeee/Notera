@@ -15,7 +15,7 @@ ThumbnailGenerator::ThumbnailGenerator(QObject* parent)
 
 void ThumbnailGenerator::generate(const QString& scoreId, const QString& scorePath, const QString& fileType)
 {
-    QtConcurrent::run([this, scoreId, scorePath, fileType] {
+    m_tasks.addFuture(QtConcurrent::run([this, scoreId, scorePath, fileType] {
         QImage image;
         if (fileType == QStringLiteral("pdf")) {
             QPdfDocument document;
@@ -37,5 +37,5 @@ void ThumbnailGenerator::generate(const QString& scoreId, const QString& scorePa
             return;
         }
         QMetaObject::invokeMethod(this, [this, scoreId, thumbnailPath] { emit generated(scoreId, thumbnailPath); }, Qt::QueuedConnection);
-    });
+    }));
 }

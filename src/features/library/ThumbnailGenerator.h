@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QFutureSynchronizer>
 #include <QObject>
 #include <QString>
 
@@ -14,4 +15,7 @@ public:
 signals:
     void generated(QString scoreId, QString thumbnailPath);
     void failed(QString scoreId, QString message);
+
+private:
+    QFutureSynchronizer<void> m_tasks;
 };
