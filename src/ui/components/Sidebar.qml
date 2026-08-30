@@ -130,7 +130,7 @@ Rectangle {
             font.pixelSize: Theme.fontXs
             font.weight: Font.DemiBold
             font.capitalization: Font.AllUppercase
-            letterSpacing: 0.8
+            font.letterSpacing: 0.8
             Layout.leftMargin: 8
             Layout.topMargin: 8
             Layout.bottomMargin: 4
@@ -149,7 +149,7 @@ Rectangle {
             font.pixelSize: Theme.fontXs
             font.weight: Font.DemiBold
             font.capitalization: Font.AllUppercase
-            letterSpacing: 0.8
+            font.letterSpacing: 0.8
             Layout.leftMargin: 8
             Layout.topMargin: 8
             Layout.bottomMargin: 4
