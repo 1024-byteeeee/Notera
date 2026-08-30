@@ -69,11 +69,30 @@ void LibraryService::setSearchQuery(const QString& searchQuery)
 
 void LibraryService::importLocalFile(const QUrl& url)
 {
-    if (!url.isValid() || !url.isLocalFile()) {
+    if (!url.isValid()) {
         emit errorOccurred(QStringLiteral("请选择电脑上的文件。"));
         return;
     }
-    importFile(url.toLocalFile());
+
+    QString localPath;
+    if (url.isLocalFile()) {
+        localPath = url.toLocalFile();
+    } else if (url.scheme().isEmpty()) {
+        // QML FileDialog / DropArea 在部分平台下可能传入纯路径而非 file:// URL
+        localPath = url.path();
+        if (localPath.isEmpty()) {
+            localPath = url.toString();
+        }
+        if (!QFileInfo::exists(localPath)) {
+            emit errorOccurred(QStringLiteral("请选择电脑上的文件。"));
+            return;
+        }
+    } else {
+        emit errorOccurred(QStringLiteral("请选择电脑上的文件。"));
+        return;
+    }
+
+    importFile(localPath);
 }
 
 void LibraryService::toggleFavorite(const QString& scoreId, const bool favorite)
