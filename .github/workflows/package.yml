@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Required by this repository's Node.js 20 policy. GitHub currently warns
+  # that Node 20 is deprecated for JavaScript actions.
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
 jobs:
   macos-dmg:
     name: macOS universal DMG
@@ -16,6 +21,11 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -37,7 +47,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Notera-macos-universal-dmg
-          path: build/macos-universal/*.dmg
+          path: build/macos-universal/packages/*.dmg
           if-no-files-found: error
 
   windows-msi:
@@ -46,6 +56,11 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - name: Install WiX Toolset
         shell: powershell
@@ -69,11 +84,11 @@ jobs:
 
       - name: Create MSI
         shell: powershell
-        run: cpack --config build/windows-x64/CPackConfig.cmake -G WIX
+        run: cpack --config build/windows-x64/CPackConfig.cmake -C Release -G WIX
 
       - name: Upload MSI
         uses: actions/upload-artifact@v4
         with:
           name: Notera-windows-x64-msi
-          path: build/windows-x64/*.msi
+          path: build/windows-x64/packages/*.msi
           if-no-files-found: error
