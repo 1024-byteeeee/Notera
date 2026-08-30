@@ -69,24 +69,23 @@ Rectangle {
             id: navMouse
             objectName: navItem.mouseObjectName
             anchors.fill: parent
-            acceptedButtons: Qt.LeftButton
+            acceptedButtons: navItem.contextEnabled
+                ? Qt.LeftButton | Qt.RightButton
+                : Qt.LeftButton
             hoverEnabled: true
+            preventStealing: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: {
+            onClicked: function(mouse) {
+                if (mouse.button === Qt.RightButton) {
+                    navItem.contextRequested()
+                    return
+                }
                 if (navItem.targetPage === "library") {
                     appController.libraryFilter = navItem.navId
                     appController.currentPage = "library"
                 } else {
                     appController.currentPage = navItem.targetPage
                 }
-            }
-        }
-
-        TapHandler {
-            enabled: navItem.contextEnabled
-            acceptedButtons: Qt.RightButton
-            onTapped: function(eventPoint, button) {
-                if (button === Qt.RightButton) navItem.contextRequested()
             }
         }
     }
