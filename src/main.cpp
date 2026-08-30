@@ -7,6 +7,7 @@
 #include <QPointingDevice>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QQuickStyle>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QStandardPaths>
@@ -68,6 +69,7 @@ int main(int argc, char* argv[])
     if (isSmokeTest) {
         QStandardPaths::setTestModeEnabled(true);
     }
+    QQuickStyle::setStyle(QStringLiteral("Basic"));
 
     ApplicationController controller;
     LibraryService libraryService;
@@ -197,7 +199,7 @@ int main(int argc, char* argv[])
                 fail();
                 return;
             }
-            const auto favoriteAfter = libraryService.scores()->data(firstIndex, favoriteRole).toBool();
+            const auto favoriteAfter = libraryService.scores()->data(libraryService.scores()->index(0, 0), favoriteRole).toBool();
             if (favoriteBefore == favoriteAfter) {
                 fail();
                 return;

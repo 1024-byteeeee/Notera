@@ -3,51 +3,52 @@ import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
 import Notera
+import "../components"
 
 Rectangle {
+    id: root
+    objectName: "libraryPage"
     color: Theme.background
 
-    // 同步筛选模式
-    Connections {
-        target: appController
-        function onLibraryFilterChanged() {
-            libraryService.filterMode = appController.libraryFilter
-        }
-    }
-    Component.onCompleted: libraryService.filterMode = appController.libraryFilter
-
     readonly property string filterTitle: {
-        const f = appController.libraryFilter
-        if (f === "all") return "乐谱库"
-        if (f === "recent") return "最近使用"
-        if (f === "favorites") return "收藏"
-        if (f.startsWith("folder:")) return "文件夹"
-        if (f.startsWith("tag:")) return "标签"
+        const filter = appController.libraryFilter
+        if (filter === "all") return "乐谱库"
+        if (filter === "recent") return "最近使用"
+        if (filter === "favorites") return "收藏"
+        if (filter.startsWith("folder:")) return "文件夹"
+        if (filter.startsWith("tag:")) return "标签"
         return "乐谱库"
     }
+
+    Connections {
+        target: appController
+        function onLibraryFilterChanged() { libraryService.filterMode = appController.libraryFilter }
+    }
+    Connections {
+        target: libraryService
+        function onImportRequested() { fileDialog.open() }
+    }
+    Component.onCompleted: libraryService.filterMode = appController.libraryFilter
 
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: Theme.spacingXl
         spacing: Theme.spacingLg
 
-        // ── 顶部工具栏 ───────────────────────────────────
         RowLayout {
             Layout.fillWidth: true
             spacing: Theme.spacingMd
 
             ColumnLayout {
-                spacing: 2
+                spacing: 3
                 Label {
-                    text: filterTitle
+                    text: root.filterTitle
                     color: Theme.foreground
                     font.pixelSize: Theme.font2xl
                     font.weight: Font.Bold
                 }
                 Label {
-                    text: libraryService.scores.count > 0
-                        ? libraryService.scores.count + " 份乐谱"
-                        : "这里还没有乐谱"
+                    text: libraryService.scores.count > 0 ? libraryService.scores.count + " 份乐谱" : "这里还没有乐谱"
                     color: Theme.mutedForeground
                     font.pixelSize: Theme.fontSm
                 }
@@ -55,86 +56,71 @@ Rectangle {
 
             Item { Layout.fillWidth: true }
 
-            // 搜索框
             Rectangle {
-                Layout.preferredWidth: 220
-                height: Theme.controlHeight
+                Layout.preferredWidth: 240
+                Layout.preferredHeight: 38
                 radius: Theme.radiusMd
                 color: Theme.inputBackground
-                border.color: searchField.activeFocus ? Theme.inputFocusBorder : Theme.inputBorder
                 border.width: 1
-                Behavior on border.color { ColorAnimation { duration: 150 } }
+                border.color: searchField.activeFocus ? Theme.inputFocusBorder : Theme.inputBorder
 
                 RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: 12
-                    anchors.rightMargin: 10
+                    anchors.rightMargin: 8
                     spacing: 8
-
-                    Label { text: "⌕"; color: Theme.mutedForeground; font.pixelSize: 14 }
-
+                    Label { text: "⌕"; color: Theme.mutedForeground; font.pixelSize: 16 }
                     TextField {
                         id: searchField
                         Layout.fillWidth: true
-                        background: Rectangle { color: "transparent" }
-                        placeholderText: "搜索…"
-                        placeholderTextColor: Theme.inputPlaceholder
                         color: Theme.foreground
+                        placeholderText: "搜索乐谱"
+                        placeholderTextColor: Theme.inputPlaceholder
                         font.pixelSize: Theme.fontMd
                         selectByMouse: true
                         text: libraryService.searchQuery
                         onTextChanged: libraryService.searchQuery = text
+                        background: Item { }
                     }
                 }
             }
 
-            // 导入按钮
-            Rectangle {
-                height: Theme.controlHeight
-                radius: Theme.radiusMd
-                color: importBtnMouse.containsMouse ? Theme.accentHover : Theme.accent
-                Behavior on color { ColorAnimation { duration: 120 } }
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 16
-                    anchors.rightMargin: 16
-                    spacing: 7
-
-                    Label { text: "+"; color: Theme.accentForeground; font.pixelSize: 16; font.weight: Font.Bold }
-                    Label { text: "导入"; color: Theme.accentForeground; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
-                }
-
-                MouseArea {
-                    id: importBtnMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: fileDialog.open()
-                }
+            AppButton {
+                objectName: "importButton"
+                Layout.preferredWidth: 108
+                text: "导入"
+                symbol: "+"
+                primary: true
+                onClicked: fileDialog.open()
             }
         }
 
-        // ── 乐谱网格 ─────────────────────────────────────
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            color: Theme.surface
             radius: Theme.radiusLg
-            border.color: Theme.border
+            color: Theme.surface
             border.width: 1
+            border.color: dropArea.containsDrag ? Theme.accent : Theme.border
 
             GridView {
                 id: grid
                 anchors.fill: parent
-                anchors.margins: 20
+                anchors.margins: 16
                 visible: count > 0
                 clip: true
-                cellWidth: 210
-                cellHeight: 296
+                boundsBehavior: Flickable.StopAtBounds
+                cellWidth: {
+                    const columns = Math.max(1, Math.floor(width / 218))
+                    return Math.floor(width / columns)
+                }
+                cellHeight: 304
                 model: libraryService.scores
 
+                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
                 delegate: Item {
+                    id: scoreDelegate
                     required property string scoreId
                     required property string title
                     required property string composer
@@ -147,83 +133,80 @@ Rectangle {
                     width: grid.cellWidth
                     height: grid.cellHeight
 
-                    // 卡片背景
                     Rectangle {
                         id: card
-                        anchors.fill: parent
-                        anchors.margins: 8
-                        color: cardTapHandler.hovered ? Theme.cardHover : Theme.cardBackground
-                        border.color: cardTapHandler.hovered ? Theme.strongBorder : Theme.cardBorder
-                        border.width: 1
+                        width: Math.min(218, parent.width - 12)
+                        height: 288
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: parent.top
+                        anchors.topMargin: 6
                         radius: Theme.radiusMd
-                        Behavior on color { ColorAnimation { duration: 150 } }
-                        Behavior on border.color { ColorAnimation { duration: 150 } }
+                        color: cardMouse.containsMouse ? Theme.cardHover : Theme.cardBackground
+                        border.width: 1
+                        border.color: cardMouse.containsMouse ? Theme.strongBorder : Theme.cardBorder
 
-                        Column {
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                        Behavior on border.color { ColorAnimation { duration: 100 } }
+
+                        ColumnLayout {
                             anchors.fill: parent
-                            anchors.margins: 14
-                            spacing: 10
+                            anchors.margins: 13
+                            spacing: 9
 
-                            // 缩略图
                             Rectangle {
-                                width: parent.width
-                                height: 184
-                                color: Theme.sunkenSurface
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 196
                                 radius: Theme.radiusSm
-                                clip: true
-                                border.color: Theme.border
+                                color: Theme.sunkenSurface
                                 border.width: 1
+                                border.color: Theme.border
+                                clip: true
 
                                 Image {
                                     anchors.fill: parent
                                     anchors.margins: 4
-                                    source: thumbnailPath.length > 0 ? "file://" + thumbnailPath : ""
-                                    fillMode: Image.PreserveAspectFit
+                                    source: scoreDelegate.thumbnailPath.length > 0 ? "file://" + scoreDelegate.thumbnailPath : ""
                                     asynchronous: true
                                     smooth: true
+                                    fillMode: Image.PreserveAspectFit
                                 }
                                 Label {
                                     anchors.centerIn: parent
-                                    visible: thumbnailPath.length === 0
+                                    visible: scoreDelegate.thumbnailPath.length === 0
                                     text: "♫"
                                     color: Theme.faintForeground
-                                    font.pixelSize: 36
+                                    font.pixelSize: 38
                                 }
-
-                                // 页数角标
                                 Rectangle {
-                                    visible: thumbnailPath.length > 0
                                     anchors.right: parent.right
                                     anchors.bottom: parent.bottom
                                     anchors.margins: 6
-                                    width: pageLabel.width + 12
-                                    height: 20
+                                    implicitWidth: pageBadge.implicitWidth + 12
+                                    implicitHeight: 20
                                     radius: 5
-                                    color: "#000000aa"
+                                    color: "#000000b8"
                                     Label {
-                                        id: pageLabel
+                                        id: pageBadge
                                         anchors.centerIn: parent
-                                        text: pageCount + " 页"
-                                        color: "#ffffff"
+                                        text: scoreDelegate.pageCount + " 页"
+                                        color: "white"
                                         font.pixelSize: 10
                                         font.weight: Font.Medium
                                     }
                                 }
                             }
 
-                            // 标题
                             Label {
-                                width: parent.width - 8
-                                text: title
+                                Layout.fillWidth: true
+                                text: scoreDelegate.title
                                 color: Theme.foreground
                                 font.pixelSize: Theme.fontMd
                                 font.weight: Font.DemiBold
                                 elide: Text.ElideRight
                             }
-                            // 作曲者
                             Label {
-                                width: parent.width
-                                text: composer.length > 0 ? composer : "未知作曲者"
+                                Layout.fillWidth: true
+                                text: scoreDelegate.composer.length > 0 ? scoreDelegate.composer : "未知作曲者"
                                 color: Theme.mutedForeground
                                 font.pixelSize: Theme.fontSm
                                 elide: Text.ElideRight
@@ -231,92 +214,129 @@ Rectangle {
                         }
                     }
 
-                    // 收藏按钮（delegate 层级，z:2 确保在最上）
-                    Rectangle {
-                        id: favBtn
-                        z: 2
-                        width: 30
-                        height: 30
-                        radius: 8
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.margins: 14
-                        color: favorite ? Theme.accentSoft : (favMouse.containsMouse ? Theme.buttonHover : "transparent")
-                        Behavior on color { ColorAnimation { duration: 120 } }
-
-                        Label {
-                            anchors.centerIn: parent
-                            text: favorite ? "★" : "☆"
-                            color: favorite ? Theme.accent : Theme.mutedForeground
-                            font.pixelSize: 15
-                        }
-
-                        MouseArea {
-                            id: favMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: libraryService.toggleFavorite(scoreId, !favorite)
-                        }
-                    }
-
-                    // 卡片点击处理器（单击进入，右键菜单）
-                    TapHandler {
-                        id: cardTapHandler
+                    MouseArea {
+                        id: cardMouse
+                        objectName: "scoreCardMouse"
+                        anchors.fill: card
+                        z: 1
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        gesturePolicy: TapHandler.ReleaseWithinBounds
-                        onTapped: function(eventPoint) {
-                            if (eventPoint.button === Qt.RightButton) {
-                                contextMenu.popup()
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: function(mouse) {
+                            if (mouse.button === Qt.RightButton) {
+                                scoreMenu.popup()
                             } else {
-                                appController.openScore(title, filePath, fileType, pageCount)
+                                appController.openScore(scoreDelegate.title, scoreDelegate.filePath,
+                                    scoreDelegate.fileType, scoreDelegate.pageCount)
                             }
                         }
                     }
 
-                    Menu {
-                        id: contextMenu
-                        MenuItem { text: favorite ? "取消收藏" : "添加到收藏"; onTriggered: libraryService.toggleFavorite(scoreId, !favorite) }
-                        MenuItem { text: "重命名"; onTriggered: renameDialog.openFor(scoreId, title) }
-                        MenuSeparator { }
-                        MenuItem { text: "删除"; onTriggered: deleteDialog.openFor(scoreId, filePath, thumbnailPath) }
+                    IconButton {
+                        objectName: "favoriteButton"
+                        z: 2
+                        anchors.right: card.right
+                        anchors.top: card.top
+                        anchors.margins: 18
+                        symbol: scoreDelegate.favorite ? "★" : "☆"
+                        selected: scoreDelegate.favorite
+                        Accessible.name: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
+                        onClicked: libraryService.toggleFavorite(scoreDelegate.scoreId, !scoreDelegate.favorite)
+                    }
+
+                    AppMenu {
+                        id: scoreMenu
+                        objectName: "scoreContextMenu"
+                        AppMenuItem {
+                            text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
+                            onTriggered: libraryService.toggleFavorite(scoreDelegate.scoreId, !scoreDelegate.favorite)
+                        }
+                        AppMenuItem {
+                            text: "重命名"
+                            onTriggered: {
+                                renameDialog.scoreId = scoreDelegate.scoreId
+                                renameDialog.value = scoreDelegate.title
+                                renameDialog.open()
+                            }
+                        }
+                        AppMenuSeparator { }
+                        AppMenuItem {
+                            text: "删除乐谱"
+                            danger: true
+                            onTriggered: {
+                                deleteDialog.scoreId = scoreDelegate.scoreId
+                                deleteDialog.filePath = scoreDelegate.filePath
+                                deleteDialog.thumbnailPath = scoreDelegate.thumbnailPath
+                                deleteDialog.message = "将“" + scoreDelegate.title + "”从 Notera 乐谱库中删除。此操作无法撤销。"
+                                deleteDialog.open()
+                            }
+                        }
                     }
                 }
             }
 
-            // 空状态
-            Column {
+            ColumnLayout {
                 anchors.centerIn: parent
                 visible: grid.count === 0
-                spacing: 14
+                spacing: 10
 
                 Rectangle {
-                    width: 72; height: 72; radius: 20
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: 72
+                    Layout.preferredHeight: 72
+                    radius: 22
                     color: Theme.elevatedSurface
-                    border.color: Theme.border
                     border.width: 1
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    Label { anchors.centerIn: parent; text: "♪"; color: Theme.mutedForeground; font.pixelSize: 32 }
+                    border.color: Theme.border
+                    Label { anchors.centerIn: parent; text: "♫"; color: Theme.mutedForeground; font.pixelSize: 32 }
                 }
-
                 Label {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: libraryService.searchQuery.length > 0 ? "没有符合搜索条件的乐谱" : (appController.libraryFilter === "favorites" ? "还没有收藏的乐谱" : "乐谱库为空")
+                    Layout.alignment: Qt.AlignHCenter
+                    text: libraryService.searchQuery.length > 0 ? "没有符合条件的乐谱"
+                        : appController.libraryFilter === "favorites" ? "还没有收藏的乐谱" : "乐谱库为空"
                     color: Theme.foreground
                     font.pixelSize: Theme.fontLg
                     font.weight: Font.DemiBold
                 }
                 Label {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: libraryService.searchQuery.length > 0 ? "换个关键词试试" : "点击右上角导入，或拖拽 PDF / 图片到此处"
+                    Layout.alignment: Qt.AlignHCenter
+                    text: libraryService.searchQuery.length > 0 ? "换个关键词试试" : "导入 PDF 或图片，开始建立你的乐谱库"
                     color: Theme.mutedForeground
                     font.pixelSize: Theme.fontSm
                 }
+                AppButton {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 6
+                    visible: libraryService.searchQuery.length === 0 && appController.libraryFilter === "all"
+                    text: "导入第一份乐谱"
+                    symbol: "+"
+                    primary: true
+                    onClicked: fileDialog.open()
+                }
             }
 
-            // 拖拽区域
-            DropArea {
+            Rectangle {
                 anchors.fill: parent
+                anchors.margins: 8
+                visible: dropArea.containsDrag
+                radius: Theme.radiusLg
+                color: Theme.accentSoft
+                border.width: 2
+                border.color: Theme.accent
+                z: 10
+                Label {
+                    anchors.centerIn: parent
+                    text: "松开即可导入乐谱"
+                    color: Theme.selectedText
+                    font.pixelSize: Theme.fontLg
+                    font.weight: Font.DemiBold
+                }
+            }
+
+            DropArea {
+                id: dropArea
+                anchors.fill: parent
+                z: 11
                 onDropped: function(drop) {
                     for (let index = 0; index < drop.urls.length; ++index)
                         libraryService.importLocalFile(drop.urls[index])
@@ -325,41 +345,31 @@ Rectangle {
         }
     }
 
-    // ── 对话框 ─────────────────────────────────────────
     FileDialog {
         id: fileDialog
-        title: "导入乐谱"
+        title: "导入本地乐谱"
         fileMode: FileDialog.OpenFiles
-        nameFilters: ["乐谱文件 (*.pdf *.jpg *.jpeg *.png *.bmp *.gif *.webp *.tif *.tiff)", "所有文件 (*)"]
+        nameFilters: ["支持的乐谱 (*.pdf *.jpg *.jpeg *.png *.bmp *.gif *.webp *.tif *.tiff)", "所有文件 (*)"]
         onAccepted: {
             for (let index = 0; index < selectedFiles.length; ++index)
                 libraryService.importLocalFile(selectedFiles[index])
         }
     }
 
-    Dialog {
+    AppDialog {
         id: renameDialog
         property string scoreId: ""
         title: "重命名乐谱"
-        modal: true
-        anchors.centerIn: parent
-        standardButtons: Dialog.Ok | Dialog.Cancel
-        function openFor(id, name) { scoreId = id; nameInput.text = name; open() }
-        onAccepted: libraryService.renameScore(scoreId, nameInput.text)
-        TextField { id: nameInput; width: 320; placeholderText: "乐谱名称" }
+        placeholderText: "输入乐谱名称"
+        onSubmitted: function(text) { libraryService.renameScore(scoreId, text) }
     }
 
-    Dialog {
+    ConfirmDialog {
         id: deleteDialog
         property string scoreId: ""
         property string filePath: ""
         property string thumbnailPath: ""
         title: "删除乐谱？"
-        modal: true
-        anchors.centerIn: parent
-        standardButtons: Dialog.Yes | Dialog.No
-        function openFor(id, file, thumbnail) { scoreId = id; filePath = file; thumbnailPath = thumbnail; open() }
         onAccepted: libraryService.deleteScore(scoreId, filePath, thumbnailPath)
-        Label { text: "导入的文件副本及其元数据将被永久删除。"; wrapMode: Text.WordWrap; width: 300 }
     }
 }

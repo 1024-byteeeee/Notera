@@ -27,6 +27,8 @@ qt_add_executable(Notera
     src/features/library/Score.h
     src/features/library/ScoreListModel.h
     src/features/library/ScoreListModel.cpp
+    src/features/library/NamedListModel.h
+    src/features/library/NamedListModel.cpp
     src/features/library/ScoreRepository.h
     src/features/library/ScoreRepository.cpp
     src/features/library/ThumbnailGenerator.h
@@ -42,6 +44,13 @@ qt_add_qml_module(Notera
         src/ui/Main.qml
         src/ui/AppShell.qml
         src/ui/Theme.qml
+        src/ui/components/AppButton.qml
+        src/ui/components/IconButton.qml
+        src/ui/components/AppDialog.qml
+        src/ui/components/ConfirmDialog.qml
+        src/ui/components/AppMenu.qml
+        src/ui/components/AppMenuItem.qml
+        src/ui/components/AppMenuSeparator.qml
         src/ui/components/Sidebar.qml
         src/ui/pages/LibraryPage.qml
         src/ui/pages/ReaderPage.qml

@@ -210,7 +210,7 @@ Rectangle {
                 Label {
                     visible: appController.currentFileUrl.toString().length === 0
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: "请从乐谱库双击打开一份乐谱"
+                    text: "请从乐谱库单击打开一份乐谱"
                     color: Theme.mutedForeground
                     font.pixelSize: Theme.fontLg
                 }

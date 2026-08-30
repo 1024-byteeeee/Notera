@@ -1,0 +1,35 @@
+import QtQuick
+import QtQuick.Controls
+import Notera
+
+Button {
+    id: control
+
+    property string symbol: ""
+    property bool selected: false
+    property bool danger: false
+
+    implicitWidth: 32
+    implicitHeight: 32
+    padding: 0
+    hoverEnabled: true
+
+    contentItem: Label {
+        text: control.symbol
+        color: control.danger ? Theme.danger : (control.selected ? Theme.accent : Theme.mutedForeground)
+        font.pixelSize: 16
+        font.weight: Font.DemiBold
+        horizontalAlignment: Text.AlignHCenter
+        verticalAlignment: Text.AlignVCenter
+    }
+
+    background: Rectangle {
+        radius: Theme.radiusSm
+        color: control.down ? Theme.buttonPressed
+            : control.hovered ? (control.danger ? Theme.dangerSoft : Theme.buttonHover)
+            : control.selected ? Theme.accentSoft : "transparent"
+        border.width: control.activeFocus ? 1 : 0
+        border.color: Theme.inputFocusBorder
+        Behavior on color { ColorAnimation { duration: 100 } }
+    }
+}

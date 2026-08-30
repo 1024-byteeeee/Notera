@@ -2,8 +2,7 @@
 
 #include <QObject>
 #include <QUrl>
-#include <QVariantList>
-
+#include "features/library/NamedListModel.h"
 #include "features/library/ScoreListModel.h"
 #include "features/library/ScoreRepository.h"
 #include "features/library/ThumbnailGenerator.h"
@@ -15,8 +14,8 @@ class LibraryService final : public QObject
     Q_PROPERTY(ScoreListModel* scores READ scores CONSTANT)
     Q_PROPERTY(QString searchQuery READ searchQuery WRITE setSearchQuery NOTIFY searchQueryChanged)
     Q_PROPERTY(QString filterMode READ filterMode WRITE setFilterMode NOTIFY filterModeChanged)
-    Q_PROPERTY(QVariantList folders READ folders NOTIFY foldersChanged)
-    Q_PROPERTY(QVariantList tags READ tags NOTIFY tagsChanged)
+    Q_PROPERTY(NamedListModel* folders READ folders CONSTANT)
+    Q_PROPERTY(NamedListModel* tags READ tags CONSTANT)
 
 public:
     explicit LibraryService(QObject* parent = nullptr);
@@ -26,8 +25,8 @@ public:
     void setSearchQuery(const QString& searchQuery);
     [[nodiscard]] QString filterMode() const;
     void setFilterMode(const QString& mode);
-    [[nodiscard]] QVariantList folders() const;
-    [[nodiscard]] QVariantList tags() const;
+    [[nodiscard]] NamedListModel* folders();
+    [[nodiscard]] NamedListModel* tags();
 
     Q_INVOKABLE void importLocalFile(const QUrl& url);
     Q_INVOKABLE void toggleFavorite(const QString& scoreId, bool favorite);
@@ -39,6 +38,7 @@ public:
     Q_INVOKABLE void createTag(const QString& name);
     Q_INVOKABLE void renameTag(const QString& tagId, const QString& name);
     Q_INVOKABLE void deleteTag(const QString& tagId);
+    Q_INVOKABLE void requestImport();
 
 signals:
     void searchQueryChanged();
@@ -47,6 +47,7 @@ signals:
     void tagsChanged();
     void errorOccurred(QString message);
     void noticeOccurred(QString message);
+    void importRequested();
 
 private:
     void reload();
@@ -57,9 +58,9 @@ private:
     DatabaseService m_databaseService;
     ScoreRepository m_repository;
     ScoreListModel m_scores;
+    NamedListModel m_folders;
+    NamedListModel m_tags;
     ThumbnailGenerator m_thumbnailGenerator;
     QString m_searchQuery;
     QString m_filterMode {QStringLiteral("all")};
-    QVariantList m_folders;
-    QVariantList m_tags;
 };

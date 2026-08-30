@@ -27,6 +27,8 @@ LibraryService::LibraryService(QObject* parent)
     : QObject(parent)
     , m_repository(m_databaseService.database())
     , m_scores(this)
+    , m_folders(this)
+    , m_tags(this)
     , m_thumbnailGenerator(this)
 {
     QString error;
@@ -82,14 +84,14 @@ void LibraryService::setFilterMode(const QString& mode)
     reload();
 }
 
-QVariantList LibraryService::folders() const
+NamedListModel* LibraryService::folders()
 {
-    return m_folders;
+    return &m_folders;
 }
 
-QVariantList LibraryService::tags() const
+NamedListModel* LibraryService::tags()
 {
-    return m_tags;
+    return &m_tags;
 }
 
 void LibraryService::createFolder(const QString& name)
@@ -184,6 +186,11 @@ void LibraryService::deleteTag(const QString& tagId)
     emit noticeOccurred(QStringLiteral("标签已删除"));
 }
 
+void LibraryService::requestImport()
+{
+    emit importRequested();
+}
+
 void LibraryService::importLocalFile(const QUrl& url)
 {
     if (!url.isValid()) {
@@ -275,14 +282,22 @@ void LibraryService::reload()
 void LibraryService::reloadFolders()
 {
     QString error;
-    m_folders = m_repository.folders(&error);
+    m_folders.replaceAll(m_repository.folders(&error));
+    if (!error.isEmpty()) {
+        emit errorOccurred(QStringLiteral("加载文件夹失败。"));
+        return;
+    }
     emit foldersChanged();
 }
 
 void LibraryService::reloadTags()
 {
     QString error;
-    m_tags = m_repository.tags(&error);
+    m_tags.replaceAll(m_repository.tags(&error));
+    if (!error.isEmpty()) {
+        emit errorOccurred(QStringLiteral("加载标签失败。"));
+        return;
+    }
     emit tagsChanged();
 }
 
