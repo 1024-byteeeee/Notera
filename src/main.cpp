@@ -22,9 +22,33 @@
 
 namespace {
 
+QQuickItem* findVisualItem(QQuickItem* parent, const QString& objectName)
+{
+    if (!parent) {
+        return nullptr;
+    }
+    if (parent->objectName() == objectName) {
+        return parent;
+    }
+    for (auto* const child : parent->childItems()) {
+        if (auto* const match = findVisualItem(child, objectName)) {
+            return match;
+        }
+    }
+    return nullptr;
+}
+
+QQuickItem* findVisualItem(QObject* root, const QString& objectName)
+{
+    if (auto* const window = qobject_cast<QQuickWindow*>(root)) {
+        return findVisualItem(window->contentItem(), objectName);
+    }
+    return findVisualItem(qobject_cast<QQuickItem*>(root), objectName);
+}
+
 bool clickItem(QObject* root, const QString& objectName, const Qt::MouseButton button)
 {
-    auto* const item = root->findChild<QQuickItem*>(objectName);
+    auto* const item = findVisualItem(root, objectName);
     if (!item || !item->isVisible() || item->width() <= 0.0 || item->height() <= 0.0 || !item->window()) {
         return false;
     }
@@ -181,7 +205,7 @@ int main(int argc, char* argv[])
 
             const auto folderClicked = clickItem(root, QStringLiteral("folderNavItem"), Qt::RightButton);
             if (!folderClicked || !popupIsOpen(root, QStringLiteral("folderContextMenu"))) {
-                const auto* const folderItem = root->findChild<QObject*>(QStringLiteral("folderNavItem"));
+                const auto* const folderItem = findVisualItem(root, QStringLiteral("folderNavItem"));
                 const auto* const folderMenu = root->findChild<QObject*>(QStringLiteral("folderContextMenu"));
                 qWarning() << "Folder context diagnostics"
                            << "clicked" << folderClicked
