@@ -1,8 +1,12 @@
 #include <QColor>
+#include <QDir>
 #include <QGuiApplication>
+#include <QImage>
 #include <QLocale>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QTemporaryFile>
+#include <QTimer>
 
 #include "app/ApplicationController.h"
 #include "features/library/LibraryService.h"
@@ -37,6 +41,33 @@ int main(int argc, char* argv[])
         const auto darkBackground = root->property("themeBackground").value<QColor>();
         controller.setThemeMode(originalMode);
         return lightBackground.isValid() && darkBackground.isValid() && lightBackground != darkBackground ? 0 : 1;
+    }
+
+    QTemporaryFile readerSmokeFile;
+    if (app.arguments().contains(QStringLiteral("--reader-smoke-test"))) {
+        readerSmokeFile.setFileTemplate(QDir::tempPath() + QStringLiteral("/notera-reader-XXXXXX.png"));
+        if (!readerSmokeFile.open()) {
+            return 1;
+        }
+        const auto imagePath = readerSmokeFile.fileName();
+        readerSmokeFile.close();
+        QImage image(400, 2400, QImage::Format_RGB32);
+        image.fill(Qt::white);
+        if (!image.save(imagePath)) {
+            return 1;
+        }
+        controller.openScore(QStringLiteral("自动滚动测试"), imagePath, QStringLiteral("png"), 1);
+        auto* const root = engine.rootObjects().constFirst();
+        QTimer::singleShot(250, root, [root] {
+            if (auto* const readerPage = root->findChild<QObject*>(QStringLiteral("readerPage"))) {
+                readerPage->setProperty("scrollSpeed", 160.0);
+                readerPage->setProperty("autoScrolling", true);
+            }
+        });
+        QTimer::singleShot(1250, root, [root] {
+            const auto* const flickable = root->findChild<QObject*>(QStringLiteral("readerFlick"));
+            QCoreApplication::exit(flickable && flickable->property("contentY").toDouble() > 0.0 ? 0 : 1);
+        });
     }
 
     return app.exec();

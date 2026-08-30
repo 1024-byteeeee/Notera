@@ -23,6 +23,7 @@ Rectangle {
                 onTextChanged: libraryService.searchQuery = text
             }
             Button { text: "导入"; onClicked: fileDialog.open() }
+            Button { text: "网络导入"; onClicked: urlDialog.open() }
         }
 
         Rectangle {
@@ -102,7 +103,7 @@ Rectangle {
 
                         TapHandler {
                             acceptedButtons: Qt.LeftButton
-                            onDoubleTapped: appController.currentPage = "reader"
+                            onDoubleTapped: appController.openScore(title, filePath, fileType, pageCount)
                         }
                         TapHandler {
                             acceptedButtons: Qt.RightButton
@@ -139,8 +140,25 @@ Rectangle {
         id: fileDialog
         title: "导入乐谱"
         fileMode: FileDialog.OpenFiles
-        nameFilters: ["乐谱文件 (*.pdf *.jpg *.jpeg *.png)"]
+        nameFilters: ["所有文件 (*)"]
         onAccepted: libraryService.importUrls(selectedFiles)
+    }
+
+    Dialog {
+        id: urlDialog
+        title: "从网络导入"
+        modal: true
+        anchors.centerIn: parent
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: {
+            libraryService.importUrl(urlInput.text)
+            urlInput.clear()
+        }
+        TextField {
+            id: urlInput
+            width: 420
+            placeholderText: "输入 HTTP 或 HTTPS 文件地址"
+        }
     }
 
     Dialog {

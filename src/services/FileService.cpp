@@ -8,7 +8,7 @@
 
 namespace {
 
-constexpr auto SupportedSuffixes = {"pdf", "jpg", "jpeg", "png"};
+constexpr auto PreviewableImageSuffixes = {"jpg", "jpeg", "png", "bmp", "gif", "webp", "tif", "tiff"};
 
 } // namespace
 
@@ -22,7 +22,15 @@ QString canonicalSuffix(const QString& sourcePath)
 bool isSupportedScoreFile(const QString& sourcePath)
 {
     const auto suffix = canonicalSuffix(sourcePath);
-    return std::any_of(SupportedSuffixes.begin(), SupportedSuffixes.end(), [&](const auto* item) {
+    return suffix == QStringLiteral("pdf") || std::any_of(PreviewableImageSuffixes.begin(), PreviewableImageSuffixes.end(), [&](const auto* item) {
+        return suffix == QLatin1String(item);
+    });
+}
+
+bool isPreviewableImage(const QString& sourcePath)
+{
+    const auto suffix = canonicalSuffix(sourcePath);
+    return std::any_of(PreviewableImageSuffixes.begin(), PreviewableImageSuffixes.end(), [&](const auto* item) {
         return suffix == QLatin1String(item);
     });
 }
@@ -35,8 +43,9 @@ QString copyScoreIntoLibrary(const QString& sourcePath, const QString& scoreId, 
         return {};
     }
 
-    const auto destination = AppDataPaths::libraryDirectory() + QLatin1Char('/') + scoreId + QLatin1Char('.')
-        + canonicalSuffix(sourcePath);
+    const auto suffix = canonicalSuffix(sourcePath);
+    const auto destination = AppDataPaths::libraryDirectory() + QLatin1Char('/') + scoreId
+        + (suffix.isEmpty() ? QString() : QLatin1Char('.') + suffix);
     if (!QFile::copy(sourcePath, destination)) {
         *error = QStringLiteral("Notera 无法将乐谱复制到乐谱库。");
         return {};

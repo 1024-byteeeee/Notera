@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Qt6 6.6 REQUIRED COMPONENTS Concurrent Quick QuickControls2 QuickDialogs2 Pdf Sql)
+find_package(Qt6 6.6 REQUIRED COMPONENTS Concurrent Network Quick QuickControls2 QuickDialogs2 Pdf Sql)
 
 qt_standard_project_setup(REQUIRES 6.6)
 
@@ -56,6 +56,7 @@ target_link_libraries(Notera
         Qt6::QuickControls2
         Qt6::QuickDialogs2
         Qt6::Concurrent
+        Qt6::Network
         Qt6::Pdf
         Qt6::Sql
 )

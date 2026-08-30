@@ -1,5 +1,6 @@
 #include "app/ApplicationController.h"
 
+#include <algorithm>
 #include <QSettings>
 
 ApplicationController::ApplicationController(QObject* parent)
@@ -9,6 +10,10 @@ ApplicationController::ApplicationController(QObject* parent)
     m_themeMode = settings.value(QStringLiteral("appearance/themeMode"), 0).toInt();
     if (m_themeMode < 0 || m_themeMode > 2) {
         m_themeMode = 0;
+    }
+    m_autoScrollSpeed = settings.value(QStringLiteral("reader/autoScrollSpeed"), 45.0).toDouble();
+    if (m_autoScrollSpeed < 15.0 || m_autoScrollSpeed > 160.0) {
+        m_autoScrollSpeed = 45.0;
     }
 }
 
@@ -26,6 +31,52 @@ void ApplicationController::setThemeMode(const int themeMode)
     m_themeMode = themeMode;
     QSettings().setValue(QStringLiteral("appearance/themeMode"), themeMode);
     emit themeModeChanged();
+}
+
+QString ApplicationController::currentScoreTitle() const
+{
+    return m_currentScoreTitle;
+}
+
+QUrl ApplicationController::currentFileUrl() const
+{
+    return m_currentFileUrl;
+}
+
+QString ApplicationController::currentFileType() const
+{
+    return m_currentFileType;
+}
+
+int ApplicationController::currentScorePageCount() const
+{
+    return m_currentScorePageCount;
+}
+
+double ApplicationController::autoScrollSpeed() const
+{
+    return m_autoScrollSpeed;
+}
+
+void ApplicationController::setAutoScrollSpeed(const double speed)
+{
+    const auto boundedSpeed = std::clamp(speed, 15.0, 160.0);
+    if (qFuzzyCompare(m_autoScrollSpeed, boundedSpeed)) {
+        return;
+    }
+    m_autoScrollSpeed = boundedSpeed;
+    QSettings().setValue(QStringLiteral("reader/autoScrollSpeed"), boundedSpeed);
+    emit autoScrollSpeedChanged();
+}
+
+void ApplicationController::openScore(const QString& title, const QString& filePath, const QString& fileType, const int pageCount)
+{
+    m_currentScoreTitle = title;
+    m_currentFileUrl = QUrl::fromLocalFile(filePath);
+    m_currentFileType = fileType.toLower();
+    m_currentScorePageCount = pageCount;
+    emit currentScoreChanged();
+    setCurrentPage(QStringLiteral("reader"));
 }
 
 QString ApplicationController::currentPage() const
