@@ -1,4 +1,5 @@
 #include <QColor>
+#include <QDebug>
 #include <QDir>
 #include <QGuiApplication>
 #include <QImage>
@@ -161,23 +162,26 @@ int main(int argc, char* argv[])
 
         auto* const root = engine.rootObjects().constFirst();
         QTimer::singleShot(300, root, [root, &controller, &libraryService] {
-            const auto fail = [] { QCoreApplication::exit(1); };
+            const auto fail = [](const char* step) {
+                qWarning() << "UI smoke test failed at" << step;
+                QCoreApplication::exit(1);
+            };
             auto* const importButton = root->findChild<QQuickItem*>(QStringLiteral("importButton"));
             if (!importButton || !importButton->isVisible() || importButton->width() < 96.0) {
-                fail();
+                fail("import-button-geometry");
                 return;
             }
 
             if (!clickItem(root, QStringLiteral("newFolderButton"), Qt::LeftButton)
                 || !popupIsOpen(root, QStringLiteral("folderEditorDialog"))) {
-                fail();
+                fail("new-folder-dialog");
                 return;
             }
             closePopup(root, QStringLiteral("folderEditorDialog"));
 
             if (!clickItem(root, QStringLiteral("folderNavMouse"), Qt::RightButton)
                 || !popupIsOpen(root, QStringLiteral("folderContextMenu"))) {
-                fail();
+                fail("folder-context-menu");
                 return;
             }
             closePopup(root, QStringLiteral("folderContextMenu"));
@@ -186,7 +190,7 @@ int main(int argc, char* argv[])
             if (!clickItem(root, QStringLiteral("scoreCardMouse"), Qt::RightButton)
                 || controller.currentPage() != QStringLiteral("library")
                 || !popupIsOpen(root, QStringLiteral("scoreContextMenu"))) {
-                fail();
+                fail("score-context-menu");
                 return;
             }
             closePopup(root, QStringLiteral("scoreContextMenu"));
@@ -196,18 +200,18 @@ int main(int argc, char* argv[])
             const auto favoriteBefore = libraryService.scores()->data(firstIndex, favoriteRole).toBool();
             if (!clickItem(root, QStringLiteral("favoriteButton"), Qt::LeftButton)
                 || controller.currentPage() != QStringLiteral("library")) {
-                fail();
+                fail("favorite-button-page");
                 return;
             }
             const auto favoriteAfter = libraryService.scores()->data(libraryService.scores()->index(0, 0), favoriteRole).toBool();
             if (favoriteBefore == favoriteAfter) {
-                fail();
+                fail("favorite-button-state");
                 return;
             }
 
             if (!clickItem(root, QStringLiteral("scoreCardMouse"), Qt::LeftButton)
                 || controller.currentPage() != QStringLiteral("reader")) {
-                fail();
+                fail("score-single-click");
                 return;
             }
 
@@ -217,7 +221,7 @@ int main(int argc, char* argv[])
             const auto* const themeSelector = root->findChild<QQuickItem*>(QStringLiteral("themeSelector"));
             if (!settingsContent || !themeSelector || settingsContent->width() <= 0.0
                 || themeSelector->width() < 240.0 || themeSelector->x() < 0.0) {
-                fail();
+                fail("settings-layout");
                 return;
             }
             QCoreApplication::exit(0);
