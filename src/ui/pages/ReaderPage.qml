@@ -233,11 +233,18 @@ Rectangle {
             contentHeight: documentColumn.height
             boundsBehavior: Flickable.StopAtBounds
 
-            onWheel: function(wheel) {
-                if (wheel.modifiers & Qt.ControlModifier) {
-                    wheel.accepted = true
-                    const delta = wheel.angleDelta.y / 1200
-                    root.zoomLevel = Math.max(0.4, Math.min(3.0, root.zoomLevel + delta))
+            // Ctrl+滚轮缩放（普通滚轮仍用于滚动）
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                propagateComposedEvents: true
+                z: 5
+                onWheel: function(wheel) {
+                    if (wheel.modifiers & Qt.ControlModifier) {
+                        wheel.accepted = true
+                        const delta = wheel.angleDelta.y / 1200
+                        root.zoomLevel = Math.max(0.4, Math.min(3.0, root.zoomLevel + delta))
+                    }
                 }
             }
 
