@@ -5,9 +5,10 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QImage>
+#include <QImageReader>
 #include <QPainter>
 #include <QPdfDocument>
-#include <QTemporaryFile>
+#include <QStandardPaths>
 #include <QUrl>
 #include <QUuid>
 
@@ -224,40 +225,38 @@ void LibraryService::importLocalFile(const QUrl& url)
     importFile(localPath);
 }
 
-void LibraryService::importAndStitchImages(const QVariantList& urls)
+void LibraryService::importAndStitchImages(const QList<QUrl>& urls)
 {
     if (urls.size() < 2) {
         emit errorOccurred(QStringLiteral("拼接导入需要至少选择两张图片。"));
         return;
     }
 
-    // 辅助：把 QVariant（可能是 QUrl 或 QString）解析为本地路径
-    auto resolveLocalPath = [](const QVariant& variant) -> QString {
-        // 先尝试 QUrl
-        QUrl url = variant.toUrl();
-        if (url.isValid() && url.isLocalFile()) {
-            return url.toLocalFile();
+    // 把 QUrl 解析为本地路径
+    auto resolveLocalPath = [](const QUrl& url) -> QString {
+        if (url.isLocalFile()) return url.toLocalFile();
+        if (url.scheme().isEmpty()) {
+            QString p = url.path();
+            if (p.isEmpty()) p = url.toString();
+            return p;
         }
-        // 再尝试纯字符串路径
-        QString str = variant.toString();
-        if (str.isEmpty()) return {};
-        if (str.startsWith(QStringLiteral("file://"), Qt::CaseInsensitive)) {
-            return QUrl(str).toLocalFile();
-        }
-        return str;
+        return {};
     };
 
-    // 解析并加载所有图片
+    // 用 QImageReader 加载（支持更多格式 + 详细错误）
     QList<QImage> images;
-    for (const auto& variant : urls) {
-        const QString localPath = resolveLocalPath(variant);
+    for (const auto& url : urls) {
+        const QString localPath = resolveLocalPath(url);
         if (localPath.isEmpty() || !QFileInfo::exists(localPath)) {
-            emit errorOccurred(QStringLiteral("无法读取图片文件：%1").arg(variant.toString()));
+            emit errorOccurred(QStringLiteral("文件不存在：%1").arg(url.toString()));
             return;
         }
-        QImage img(localPath);
+        QImageReader reader(localPath);
+        reader.setAutoTransform(true);
+        QImage img = reader.read();
         if (img.isNull()) {
-            emit errorOccurred(QStringLiteral("无法加载图片：%1").arg(QFileInfo(localPath).fileName()));
+            emit errorOccurred(QStringLiteral("无法加载图片 %1：%2")
+                .arg(QFileInfo(localPath).fileName(), reader.errorString()));
             return;
         }
         images.append(img);
@@ -276,9 +275,9 @@ void LibraryService::importAndStitchImages(const QVariantList& urls)
         return;
     }
 
-    // 安全上限：防止超大拼接图导致内存问题
+    // 安全上限
     if (totalHeight > 65536 || maxWidth > 16384) {
-        emit errorOccurred(QStringLiteral("拼接后图片尺寸过大，请减少图片数量。"));
+        emit errorOccurred(QStringLiteral("拼接后图片尺寸过大（最大 16384×65536），请减少图片数量。"));
         return;
     }
 
@@ -290,27 +289,26 @@ void LibraryService::importAndStitchImages(const QVariantList& urls)
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
     int y = 0;
     for (const auto& img : images) {
-        // 水平居中绘制
         int x = (maxWidth - img.width()) / 2;
         painter.drawImage(x, y, img);
         y += img.height();
     }
     painter.end();
 
-    // 保存到临时文件
-    QTemporaryFile tempFile(QDir::tempPath() + "/notera_stitch_XXXXXX.png");
-    if (!tempFile.open()) {
-        emit errorOccurred(QStringLiteral("创建临时文件失败。"));
-        return;
-    }
-    if (!stitched.save(tempFile.fileName(), "PNG")) {
+    // 保存到临时文件（用固定路径，避免 QTemporaryFile 自动删除）
+    const QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    const QString tempPath = QStringLiteral("%1/notera_stitch_%2.png")
+        .arg(tempDir, QUuid::createUuid().toString(QUuid::WithoutBraces));
+    if (!stitched.save(tempPath, "PNG")) {
         emit errorOccurred(QStringLiteral("保存拼接图片失败。"));
         return;
     }
-    tempFile.close();
 
     // 导入拼接后的图片
-    importFile(tempFile.fileName(), QStringLiteral("拼接乐谱 %1张").arg(images.size()));
+    importFile(tempPath, QStringLiteral("拼接乐谱 %1张").arg(images.size()));
+
+    // 清理临时文件
+    QFile::remove(tempPath);
 }
 
 void LibraryService::toggleFavorite(const QString& scoreId, const bool favorite)
