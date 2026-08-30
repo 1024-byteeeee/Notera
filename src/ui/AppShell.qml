@@ -8,8 +8,8 @@ import "pages"
 Item {
     Connections {
         target: libraryService
-        function onErrorOccurred(message) { toast.show(message) }
-        function onNoticeOccurred(message) { toast.show(message) }
+        function onErrorOccurred(message) { toast.show(message, false) }
+        function onNoticeOccurred(message) { toast.show(message, true) }
     }
 
     Sidebar {
@@ -17,6 +17,7 @@ Item {
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
+        currentPage: appController.currentPage
         onPageSelected: appController.currentPage = page
     }
 
@@ -33,35 +34,57 @@ Item {
         SettingsPage { }
     }
 
+    // Toast 通知
     Rectangle {
         id: toast
         property alias text: toastLabel.text
-        function show(message) {
+        property bool isSuccess: true
+
+        function show(message, success) {
             text = message
+            isSuccess = success
+            opacity = 1
             visible = true
             hideTimer.restart()
         }
 
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 28
+        anchors.bottomMargin: 32
         visible: false
-        color: Theme.elevatedSurface
-        border.color: Theme.border
-        radius: 6
-        implicitWidth: toastLabel.implicitWidth + 28
-        implicitHeight: toastLabel.implicitHeight + 18
-        z: 10
+        opacity: 0
+        color: isSuccess ? Theme.elevatedSurface : Theme.dangerSoft
+        border.color: isSuccess ? Theme.strongBorder : Theme.danger
+        border.width: 1
+        radius: Theme.radiusMd
+        implicitWidth: Math.min(toastLabel.implicitWidth + 44, 420)
+        implicitHeight: toastLabel.implicitHeight + 22
+        z: 100
+
+        Behavior on opacity { NumberAnimation { duration: 200 } }
 
         Label {
             id: toastLabel
             anchors.centerIn: parent
-            color: Theme.foreground
+            color: toast.isSuccess ? Theme.foreground : Theme.danger
+            font.pixelSize: Theme.fontMd
+            font.weight: Font.Medium
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
+            width: parent.width - 36
         }
 
         Timer {
             id: hideTimer
-            interval: 3600
+            interval: 2800
+            onTriggered: {
+                toast.opacity = 0
+                hideCompleteTimer.start()
+            }
+        }
+        Timer {
+            id: hideCompleteTimer
+            interval: 220
             onTriggered: toast.visible = false
         }
     }

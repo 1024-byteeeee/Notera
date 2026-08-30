@@ -22,44 +22,133 @@ Rectangle {
         }
     }
 
+    // 工具按钮组件
+    component ToolButton: Rectangle {
+        required property string btnText
+        property bool btnEnabled: true
+        property bool btnActive: false
+        signal btnClicked()
+
+        height: Theme.controlHeight
+        radius: Theme.radiusMd
+        color: !btnEnabled ? Theme.buttonDisabled
+             : btnActive ? Theme.selectedBackground
+             : btnMouse.containsMouse ? Theme.buttonHover : Theme.buttonBackground
+        border.width: 1
+        border.color: !btnEnabled ? "transparent"
+                    : btnActive ? Theme.selectedBorder
+                    : btnMouse.containsMouse ? Theme.strongBorder : Theme.buttonBorder
+        Behavior on color { ColorAnimation { duration: 120 } }
+        opacity: btnEnabled ? 1 : 0.4
+
+        Label {
+            anchors.centerIn: parent
+            text: parent.btnText
+            color: !btnEnabled ? Theme.buttonDisabledText
+                 : btnActive ? Theme.selectedText : Theme.buttonText
+            font.pixelSize: Theme.fontSm
+            font.weight: btnActive ? Font.DemiBold : Font.Medium
+        }
+
+        MouseArea {
+            id: btnMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            enabled: parent.btnEnabled
+            cursorShape: Qt.PointingHandCursor
+            onClicked: parent.btnClicked()
+        }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
 
+        // ── 顶部工具栏 ───────────────────────────────────
         Rectangle {
             Layout.fillWidth: true
-            implicitHeight: 64
+            implicitHeight: 60
             color: Theme.surface
+            border.color: Theme.border
+            border.width: 1
+
             RowLayout {
                 anchors.fill: parent
-                anchors.margins: 12
-                Button { text: "← 乐谱库"; onClicked: { root.autoScrolling = false; appController.currentPage = "library" } }
+                anchors.margins: 14
+                spacing: 10
+
+                // 返回按钮
+                ToolButton {
+                    btnText: "← 乐谱库"
+                    Layout.preferredWidth: 100
+                    onBtnClicked: { root.autoScrolling = false; appController.currentPage = "library" }
+                }
+
+                // 标题
                 Label {
                     Layout.fillWidth: true
                     text: appController.currentScoreTitle.length > 0 ? appController.currentScoreTitle : "阅读器"
                     color: Theme.foreground
-                    font.pixelSize: 17
+                    font.pixelSize: Theme.fontLg
+                    font.weight: Font.DemiBold
                     horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideRight
                 }
-                Button {
-                    text: root.autoScrolling ? "暂停滚动" : "自动滚动"
-                    enabled: root.isPdf || root.isImage
-                    onClicked: root.autoScrolling = !root.autoScrolling
+
+                // 自动滚动按钮
+                ToolButton {
+                    btnText: root.autoScrolling ? "⏸ 暂停滚动" : "▶ 自动滚动"
+                    btnEnabled: root.isPdf || root.isImage
+                    btnActive: root.autoScrolling
+                    Layout.preferredWidth: 118
+                    onBtnClicked: root.autoScrolling = !root.autoScrolling
                 }
-                Label { text: "速度"; color: Theme.mutedForeground }
-                Slider {
-                    from: 15
-                    to: 160
-                    value: root.scrollSpeed
-                    stepSize: 5
-                    implicitWidth: 130
-                    onMoved: appController.autoScrollSpeed = value
+
+                // 速度控制
+                Rectangle {
+                    Layout.preferredWidth: 200
+                    height: Theme.controlHeight
+                    radius: Theme.radiusMd
+                    color: Theme.buttonBackground
+                    border.color: Theme.buttonBorder
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 8
+
+                        Label {
+                            text: "速度"
+                            color: Theme.mutedForeground
+                            font.pixelSize: Theme.fontSm
+                        }
+
+                        Slider {
+                            id: speedSlider
+                            Layout.fillWidth: true
+                            from: 15
+                            to: 160
+                            value: root.scrollSpeed
+                            stepSize: 5
+                            onMoved: appController.autoScrollSpeed = value
+                        }
+
+                        Label {
+                            text: Math.round(root.scrollSpeed)
+                            color: Theme.foreground
+                            font.pixelSize: Theme.fontSm
+                            font.weight: Font.Medium
+                            Layout.preferredWidth: 28
+                            horizontalAlignment: Text.AlignRight
+                        }
+                    }
                 }
-                Label { text: Math.round(root.scrollSpeed) + " 像素/秒"; color: Theme.mutedForeground; Layout.minimumWidth: 82 }
             }
         }
 
+        // ── 阅读区域 ─────────────────────────────────────
         Flickable {
             id: readerFlick
             objectName: "readerFlick"
@@ -73,9 +162,9 @@ Rectangle {
             Column {
                 id: documentColumn
                 width: readerFlick.width
-                spacing: 18
-                topPadding: 18
-                bottomPadding: 18
+                spacing: 20
+                topPadding: 24
+                bottomPadding: 24
 
                 PdfDocument {
                     id: pdfDocument
@@ -87,10 +176,14 @@ Rectangle {
                     delegate: Rectangle {
                         required property int index
                         readonly property size pageSize: pdfDocument.pagePointSize(index)
-                        width: Math.min(documentColumn.width - 36, 1100)
+                        width: Math.min(documentColumn.width - 48, 1100)
                         height: pageSize.width > 0 ? width * pageSize.height / pageSize.width : 800
                         x: (documentColumn.width - width) / 2
                         color: "white"
+                        radius: Theme.radiusSm
+                        border.color: Theme.border
+                        border.width: 1
+
                         PdfPageImage {
                             anchors.fill: parent
                             document: pdfDocument
@@ -105,12 +198,13 @@ Rectangle {
 
                 Image {
                     visible: root.isImage
-                    width: visible ? Math.min(documentColumn.width - 36, 1400) : 0
+                    width: visible ? Math.min(documentColumn.width - 48, 1400) : 0
                     height: visible ? (sourceSize.width > 0 ? width * sourceSize.height / sourceSize.width : 700) : 0
                     x: (documentColumn.width - width) / 2
                     source: root.isImage ? appController.currentFileUrl : ""
                     asynchronous: true
                     fillMode: Image.PreserveAspectFit
+                    smooth: true
                 }
 
                 Label {
@@ -118,7 +212,7 @@ Rectangle {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: "请从乐谱库双击打开一份乐谱"
                     color: Theme.mutedForeground
-                    font.pixelSize: 18
+                    font.pixelSize: Theme.fontLg
                 }
 
                 Label {
@@ -129,21 +223,28 @@ Rectangle {
                     wrapMode: Text.WordWrap
                     text: "文件已安全导入资料库，但当前版本暂不支持预览此格式：" + (appController.currentFileType.length > 0 ? appController.currentFileType : "未知")
                     color: Theme.mutedForeground
-                    font.pixelSize: 18
+                    font.pixelSize: Theme.fontMd
                 }
             }
 
-            ScrollBar.vertical: ScrollBar { }
+            ScrollBar.vertical: ScrollBar {
+                policy: ScrollBar.AsNeeded
+            }
         }
 
+        // ── 底部状态栏 ───────────────────────────────────
         Rectangle {
             Layout.fillWidth: true
-            implicitHeight: 42
+            implicitHeight: 36
             color: Theme.surface
+            border.color: Theme.border
+            border.width: 1
+
             Label {
                 anchors.centerIn: parent
                 text: root.isPdf ? "共 " + pdfDocument.pageCount + " 页" : (root.isImage ? "图片乐谱" : "附件")
-                color: Theme.foreground
+                color: Theme.mutedForeground
+                font.pixelSize: Theme.fontSm
             }
         }
     }
