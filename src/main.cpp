@@ -310,6 +310,11 @@ int main(int argc, char* argv[])
                 return;
             }
             QCoreApplication::processEvents();
+            const auto* const sidebar = root->findChild<QQuickItem*>(QStringLiteral("sidebar"));
+            if (!sidebar || sidebar->isVisible()) {
+                fail("reader-focus-layout");
+                return;
+            }
             if (!window->grabWindow().save(QStringLiteral("notera-reader-smoke.png"))) {
                 fail("reader-screenshot");
                 return;

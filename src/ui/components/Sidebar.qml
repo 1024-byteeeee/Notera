@@ -5,6 +5,7 @@ import Notera
 
 Rectangle {
     id: root
+    objectName: "sidebar"
     width: Theme.sidebarWidth
     color: Theme.surface
     border.color: Theme.border

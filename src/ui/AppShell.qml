@@ -14,13 +14,14 @@ Item {
 
     Sidebar {
         id: sidebar
+        visible: appController.currentPage !== "reader"
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
     }
 
     StackLayout {
-        anchors.left: sidebar.right
+        anchors.left: appController.currentPage === "reader" ? parent.left : sidebar.right
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.bottom: parent.bottom
