@@ -182,19 +182,22 @@ QList<Score> ScoreRepository::listAtFolder(const QString& folderId, const QStrin
 {
     QSqlQuery query(m_database);
     const auto needle = QStringLiteral("%%1%").arg(searchQuery);
-    query.prepare(QStringLiteral(R"(
+    const auto folderCondition = folderId.isEmpty()
+        ? QStringLiteral("folder_id IS NULL")
+        : QStringLiteral("folder_id = ?");
+    const auto sql = QStringLiteral(R"(
         SELECT id, title, composer, file_name, file_path, file_type, page_count, thumbnail_path,
                favorite, last_page, created_at, updated_at, last_opened_at
         FROM scores
-        WHERE ((? = '' AND folder_id IS NULL) OR folder_id = ?)
+        WHERE (%1)
           AND (title LIKE ? OR composer LIKE ? OR EXISTS (
             SELECT 1 FROM score_tags JOIN tags ON tags.id = score_tags.tag_id
             WHERE score_tags.score_id = scores.id AND tags.name LIKE ?
           ))
         ORDER BY favorite DESC, last_opened_at DESC, created_at DESC
-    )"));
-    query.addBindValue(folderId);
-    query.addBindValue(folderId);
+    )").arg(folderCondition);
+    query.prepare(sql);
+    if (!folderId.isEmpty()) query.addBindValue(folderId);
     query.addBindValue(needle);
     query.addBindValue(needle);
     query.addBindValue(needle);
@@ -429,13 +432,15 @@ QVariantList ScoreRepository::folders(QString* error) const
 QVariantList ScoreRepository::childFolders(const QString& parentId, QString* error) const
 {
     QSqlQuery query(m_database);
+    const auto condition = parentId.isEmpty()
+        ? QStringLiteral("parent_id IS NULL")
+        : QStringLiteral("parent_id = ?");
     query.prepare(QStringLiteral(R"(
         SELECT id, name, created_at FROM folders
-        WHERE ((? = '' AND parent_id IS NULL) OR parent_id = ?)
+        WHERE %1
         ORDER BY name COLLATE NOCASE
-    )"));
-    query.addBindValue(parentId);
-    query.addBindValue(parentId);
+    )").arg(condition));
+    if (!parentId.isEmpty()) query.addBindValue(parentId);
     if (!query.exec()) {
         *error = query.lastError().text();
         return {};
@@ -530,8 +535,8 @@ bool ScoreRepository::createFolder(const QString& name, const QString& parentId,
     query.addBindValue(name.trimmed());
     const auto now = QDateTime::currentMSecsSinceEpoch();
     query.addBindValue(now);
-    query.addBindValue(parentId.isEmpty() ? QVariant {} : QVariant {parentId});
     query.addBindValue(now);
+    query.addBindValue(parentId.isEmpty() ? QVariant {} : QVariant {parentId});
     if (query.exec()) return true;
     *error = query.lastError().text();
     return false;

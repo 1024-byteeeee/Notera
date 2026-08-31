@@ -252,11 +252,15 @@ Rectangle {
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: function(mouse) {
+                        onPressed: function(mouse) {
                             if (mouse.button === Qt.RightButton) {
                                 if (scoreDelegate.itemType === "folder") folderCardMenu.popup()
                                 else scoreMenu.popup()
-                            } else if (scoreDelegate.itemType === "folder") {
+                            }
+                        }
+                        onClicked: function(mouse) {
+                            if (mouse.button === Qt.RightButton) return
+                            if (scoreDelegate.itemType === "folder") {
                                 libraryService.enterFolder(scoreDelegate.itemId)
                             } else {
                                 appController.openScore(scoreDelegate.title, scoreDelegate.filePath,
