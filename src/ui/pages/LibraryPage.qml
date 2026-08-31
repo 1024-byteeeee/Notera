@@ -318,6 +318,7 @@ Rectangle {
                     // 收藏按钮 - 悬浮放大五角星，无框
                     Item {
                         id: favoriteBtn
+                        objectName: scoreDelegate.itemType === "score" ? "favoriteButton" : ""
                         visible: scoreDelegate.itemType === "score"
                         z: 2
                         anchors.right: card.right
@@ -325,7 +326,7 @@ Rectangle {
                         anchors.margins: 14
                         width: 28
                         height: 28
-                        property bool hovered: false
+                        readonly property bool hovered: favoriteHover.hovered
 
                         Label {
                             anchors.centerIn: parent
@@ -335,14 +336,14 @@ Rectangle {
                             font.weight: Font.DemiBold
                             Behavior on font.pixelSize { NumberAnimation { duration: 120 } }
                         }
-                        MouseArea {
-                            id: favoriteMouse
-                            objectName: scoreDelegate.itemType === "score" ? "favoriteButton" : ""
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onEntered: favoriteBtn.hovered = true
-                            onExited: favoriteBtn.hovered = false
-                            onClicked: libraryService.toggleFavorite(scoreDelegate.scoreId, !scoreDelegate.favorite)
+                        HoverHandler {
+                            id: favoriteHover
+                            cursorShape: Qt.PointingHandCursor
+                        }
+                        TapHandler {
+                            acceptedButtons: Qt.LeftButton
+                            gesturePolicy: TapHandler.ReleaseWithinBounds
+                            onTapped: libraryService.toggleFavorite(scoreDelegate.scoreId, !scoreDelegate.favorite)
                         }
                     }
 
