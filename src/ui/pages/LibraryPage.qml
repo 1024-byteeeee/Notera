@@ -178,6 +178,7 @@ Rectangle {
                     readonly property bool tagSubmenuEnabled: tagSubmenu.enabled
                     readonly property int folderSubmenuItemCount: folderSubmenu.count
                     readonly property int tagSubmenuItemCount: tagSubmenu.count
+                    readonly property alias card: card
 
                     function closeContextMenu() {
                         scoreMenu.close()
