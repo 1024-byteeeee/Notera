@@ -19,6 +19,7 @@ Rectangle {
         property string targetPage: "library"
         property bool selected: false
         property bool contextEnabled: false
+        readonly property int hoverTransitionDuration: 100
         signal contextRequested()
 
         Layout.fillWidth: true
@@ -28,7 +29,7 @@ Rectangle {
         border.width: selected ? 1 : 0
         border.color: selected ? Theme.selectedBorder : "transparent"
 
-        Behavior on color { ColorAnimation { duration: 100 } }
+        Behavior on color { ColorAnimation { duration: navItem.hoverTransitionDuration } }
 
         Rectangle {
             visible: navItem.selected
@@ -140,6 +141,7 @@ Rectangle {
         }
 
         NavItem {
+            objectName: "libraryNavItem"
             label: "乐谱库"; navId: "all"; symbol: "♪"
             selected: appController.currentPage === "library" && appController.libraryFilter === "all"
         }

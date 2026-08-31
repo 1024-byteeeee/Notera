@@ -378,6 +378,7 @@ Rectangle {
                             Instantiator {
                                 model: libraryService.folders
                                 delegate: AppMenuItem {
+                                    objectName: "tagAssignmentMenuItem"
                                     required property string itemId
                                     required property string name
                                     text: name

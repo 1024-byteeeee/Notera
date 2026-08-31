@@ -199,20 +199,24 @@ int main(int argc, char* argv[])
     }
 
     QTemporaryFile uiSmokeFile;
+    QTemporaryFile uiSmokeSecondFile;
     if (arguments.contains(QStringLiteral("--ui-smoke-test"))) {
-        uiSmokeFile.setFileTemplate(QDir::tempPath() + QStringLiteral("/notera-ui-XXXXXX.png"));
-        if (!uiSmokeFile.open()) {
+        uiSmokeFile.setFileTemplate(QDir::tempPath() + QStringLiteral("/notera-ui-z-XXXXXX.png"));
+        uiSmokeSecondFile.setFileTemplate(QDir::tempPath() + QStringLiteral("/notera-ui-a-XXXXXX.png"));
+        if (!uiSmokeFile.open() || !uiSmokeSecondFile.open()) {
             return 1;
         }
         const auto imagePath = uiSmokeFile.fileName();
+        const auto secondImagePath = uiSmokeSecondFile.fileName();
         uiSmokeFile.close();
+        uiSmokeSecondFile.close();
         QImage image(900, 1280, QImage::Format_RGB32);
         image.fill(Qt::white);
-        if (!image.save(imagePath)) {
+        if (!image.save(imagePath) || !image.save(secondImagePath)) {
             return 1;
         }
         libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
-        libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
+        libraryService.importLocalFile(QUrl::fromLocalFile(secondImagePath));
         libraryService.createFolder(QStringLiteral("界面测试文件夹"));
         libraryService.createTag(QStringLiteral("界面测试标签"));
 
@@ -244,6 +248,7 @@ int main(int argc, char* argv[])
             }
 
             const auto* const entryCheckBox = findVisualItem(root, QStringLiteral("entryCheckBox"));
+            const auto* const favoriteButton = findVisualItem(root, QStringLiteral("favoriteButton"));
             if (!entryCheckBox || !entryCheckBox->isVisible()
                 || !clickItem(root, QStringLiteral("entryCheckBox"), Qt::LeftButton)
                 || libraryService.selection()->count() != 1) {
@@ -251,6 +256,23 @@ int main(int argc, char* argv[])
                 return;
             }
             libraryService.selection()->clear();
+            if (!favoriteButton
+                || std::abs(entryCheckBox->mapToScene(QPointF(entryCheckBox->width() / 2.0, entryCheckBox->height() / 2.0)).y()
+                    - favoriteButton->mapToScene(QPointF(favoriteButton->width() / 2.0, favoriteButton->height() / 2.0)).y()) > 1.0) {
+                fail("library-card-actions-alignment");
+                return;
+            }
+
+            const auto* const libraryNavItem = root->findChild<QObject*>(QStringLiteral("libraryNavItem"));
+            if (!libraryNavItem || !libraryNavItem->property("hoverTransitionDuration").isValid()
+                || libraryNavItem->property("hoverTransitionDuration").toInt() != 0) {
+                fail("sidebar-hover-transition");
+                return;
+            }
+            if (QGuiApplication::windowIcon().isNull()) {
+                fail("application-icon");
+                return;
+            }
 
             auto* const libraryPage = root->findChild<QObject*>(QStringLiteral("libraryPage"));
             auto* const librarySurface = findVisualItem(root, QStringLiteral("librarySurface"));
@@ -304,6 +326,14 @@ int main(int argc, char* argv[])
                 fail("score-context-menu");
                 return;
             }
+            const auto* const tagAssignmentItem = root->findChild<QObject*>(QStringLiteral("tagAssignmentMenuItem"));
+            const auto* const defaultIndicator = tagAssignmentItem
+                ? tagAssignmentItem->property("indicator").value<QObject*>() : nullptr;
+            if (!tagAssignmentItem || (defaultIndicator && defaultIndicator->property("visible").toBool()
+                && defaultIndicator->property("implicitWidth").toDouble() > 0.0)) {
+                fail("tag-menu-single-check-indicator");
+                return;
+            }
             QMetaObject::invokeMethod(scoreDelegate, "closeContextMenu");
 
             if (!clickItem(root, QStringLiteral("librarySurface"), Qt::RightButton)
@@ -326,6 +356,16 @@ int main(int argc, char* argv[])
             if (scoreId.isEmpty() || secondScoreId.isEmpty() || folderId.isEmpty()
                 || libraryService.scores()->rowCount() != 2) {
                 fail("score-folder-assignment");
+                return;
+            }
+            const auto firstSortedScoreId = libraryService.scores()->data(
+                libraryService.scores()->index(0, 0), scoreIdRole).toString();
+            const auto secondSortedScoreId = libraryService.scores()->data(
+                libraryService.scores()->index(1, 0), scoreIdRole).toString();
+            libraryService.toggleFavorite(secondSortedScoreId, true);
+            if (libraryService.scores()->data(libraryService.scores()->index(0, 0), scoreIdRole).toString()
+                != firstSortedScoreId) {
+                fail("library-favorite-sort-stability");
                 return;
             }
             libraryService.setFilterMode(QStringLiteral("all"));
