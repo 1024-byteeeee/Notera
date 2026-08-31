@@ -476,14 +476,21 @@ QList<Score> ScoreRepository::listByTag(const QString& tagId, const QString& sea
 QVariantList ScoreRepository::folders(QString* error) const
 {
     QSqlQuery query(m_database);
-    if (!query.exec(QStringLiteral("SELECT id, name, created_at FROM folders ORDER BY name COLLATE NOCASE"))) {
+    if (!query.exec(QStringLiteral(R"(
+        SELECT id, name, parent_id, created_at FROM folders
+        ORDER BY parent_id IS NULL DESC, name COLLATE NOCASE
+    )"))) {
         *error = query.lastError().text();
         return {};
     }
     QVariantList result;
     while (query.next()) {
-        result.append(QVariantMap{{"id", query.value(0).toString()}, {"name", query.value(1).toString()},
-            {"createdAt", query.value(2).toLongLong()}});
+        result.append(QVariantMap{
+            {"id", query.value(0).toString()},
+            {"name", query.value(1).toString()},
+            {"parentId", query.value(2).isNull() ? QString() : query.value(2).toString()},
+            {"createdAt", query.value(3).toLongLong()}
+        });
     }
     return result;
 }

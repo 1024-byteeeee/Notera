@@ -1,9 +1,12 @@
 #include "platform/AppDataPaths.h"
 
 #include <QDir>
+#include <QSettings>
 #include <QStandardPaths>
 
 namespace {
+
+QString g_customRoot;
 
 QString childDirectory(const QString& name)
 {
@@ -16,11 +19,26 @@ QString childDirectory(const QString& name)
 
 namespace AppDataPaths {
 
+QString defaultRoot()
+{
+    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+}
+
 QString root()
 {
-    const auto path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QString path = g_customRoot.isEmpty()
+        ? QSettings().value(QStringLiteral("storage/dataDirectory"), QString()).toString()
+        : g_customRoot;
+    if (path.isEmpty()) {
+        path = defaultRoot();
+    }
     QDir().mkpath(path);
     return path;
+}
+
+void setCustomRoot(const QString& path)
+{
+    g_customRoot = path;
 }
 
 QString databaseDirectory()

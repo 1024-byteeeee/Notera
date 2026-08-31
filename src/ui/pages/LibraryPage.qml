@@ -131,6 +131,7 @@ Rectangle {
                 objectName: "stitchButton"
                 Layout.preferredWidth: 120
                 text: "拼接导入"
+                primary: true
                 onClicked: stitchDialog.open()
             }
 

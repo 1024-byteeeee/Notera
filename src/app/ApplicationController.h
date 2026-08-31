@@ -17,6 +17,8 @@ class ApplicationController final : public QObject
     Q_PROPERTY(QString currentScoreFolderId READ currentScoreFolderId NOTIFY currentScoreChanged)
     Q_PROPERTY(int currentScorePageCount READ currentScorePageCount NOTIFY currentScoreChanged)
     Q_PROPERTY(double autoScrollSpeed READ autoScrollSpeed WRITE setAutoScrollSpeed NOTIFY autoScrollSpeedChanged)
+    Q_PROPERTY(double defaultScrollSpeed READ defaultScrollSpeed WRITE setDefaultScrollSpeed NOTIFY defaultScrollSpeedChanged)
+    Q_PROPERTY(QString dataDirectory READ dataDirectory NOTIFY dataDirectoryChanged)
 
 public:
     explicit ApplicationController(QObject* parent = nullptr);
@@ -35,6 +37,10 @@ public:
     [[nodiscard]] int currentScorePageCount() const;
     [[nodiscard]] double autoScrollSpeed() const;
     void setAutoScrollSpeed(double speed);
+    [[nodiscard]] double defaultScrollSpeed() const;
+    void setDefaultScrollSpeed(double speed);
+    [[nodiscard]] QString dataDirectory() const;
+    Q_INVOKABLE bool migrateDataDirectory(const QString& newPath, QString* error = nullptr);
     Q_INVOKABLE void openScore(const QString& scoreId, const QString& title, const QString& filePath,
         const QString& fileType, int pageCount, const QString& folderId);
 
@@ -45,6 +51,8 @@ signals:
     void currentScoreChanged();
     void scoreOpened(QString scoreId);
     void autoScrollSpeedChanged();
+    void defaultScrollSpeedChanged();
+    void dataDirectoryChanged();
 
 private:
     QString m_currentPage {QStringLiteral("library")};
@@ -57,4 +65,5 @@ private:
     QString m_currentScoreFolderId;
     int m_currentScorePageCount {0};
     double m_autoScrollSpeed {45.0};
+    double m_defaultScrollSpeed {45.0};
 };

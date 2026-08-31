@@ -19,6 +19,7 @@ Rectangle {
         property string targetPage: "library"
         property bool selected: false
         property bool contextEnabled: false
+        property int indent: 0
         readonly property int hoverTransitionDuration: 0
         signal contextRequested()
 
@@ -42,7 +43,7 @@ Rectangle {
 
         RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: navItem.selected ? 16 : 18
+            anchors.leftMargin: (navItem.selected ? 16 : 18) + navItem.indent
             anchors.rightMargin: 12
             spacing: 10
 
@@ -133,6 +134,15 @@ Rectangle {
             }
         }
 
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 1
+            Layout.leftMargin: 6
+            Layout.rightMargin: 6
+            Layout.bottomMargin: 8
+            color: Theme.border
+        }
+
         NavItem {
             objectName: "libraryNavItem"
             label: "乐谱库"; navId: "all"; symbol: "♪"
@@ -205,9 +215,11 @@ Rectangle {
                         objectName: "folderNavItem"
                         required property string itemId
                         required property string name
+                        required property string parentId
                         label: name
                         navId: "folder:" + itemId
                         symbol: ""
+                        indent: parentId.length > 0 ? 20 : 0
                         contextEnabled: true
                         selected: appController.currentPage === "library" && appController.libraryFilter === navId
                         onContextRequested: {

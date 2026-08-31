@@ -11,7 +11,8 @@ class NamedListModel final : public QAbstractListModel
 public:
     enum Role {
         ItemIdRole = Qt::UserRole + 1,
-        NameRole
+        NameRole,
+        ParentIdRole
     };
     Q_ENUM(Role)
 
@@ -31,6 +32,7 @@ private:
     struct Item {
         QString id;
         QString name;
+        QString parentId;
     };
 
     QList<Item> m_items;

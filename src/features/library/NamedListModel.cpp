@@ -27,13 +27,14 @@ QVariant NamedListModel::data(const QModelIndex& index, const int role) const
     switch (role) {
     case ItemIdRole: return item.id;
     case NameRole: return item.name;
+    case ParentIdRole: return item.parentId;
     default: return {};
     }
 }
 
 QHash<int, QByteArray> NamedListModel::roleNames() const
 {
-    return {{ItemIdRole, "itemId"}, {NameRole, "name"}};
+    return {{ItemIdRole, "itemId"}, {NameRole, "name"}, {ParentIdRole, "parentId"}};
 }
 
 void NamedListModel::replaceAll(const QVariantList& values)
@@ -44,8 +45,9 @@ void NamedListModel::replaceAll(const QVariantList& values)
         const auto map = value.toMap();
         const auto id = map.value(QStringLiteral("id")).toString();
         const auto name = map.value(QStringLiteral("name")).toString();
+        const auto parentId = map.value(QStringLiteral("parentId")).toString();
         if (!id.isEmpty() && !name.isEmpty()) {
-            items.append({id, name});
+            items.append({id, name, parentId});
         }
     }
 

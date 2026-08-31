@@ -1,6 +1,8 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
+import QtCore
 import Notera
 
 Rectangle {
@@ -206,8 +208,8 @@ Rectangle {
                                 from: 15
                                 to: 160
                                 stepSize: 5
-                                value: appController.autoScrollSpeed
-                                onMoved: appController.autoScrollSpeed = value
+                                value: appController.defaultScrollSpeed
+                                onMoved: appController.defaultScrollSpeed = value
 
                                 background: Rectangle {
                                     x: speedSlider.leftPadding
@@ -237,11 +239,51 @@ Rectangle {
 
                             Label {
                                 Layout.preferredWidth: 60
-                                text: Math.round(appController.autoScrollSpeed) + " px/s"
+                                text: Math.round(appController.defaultScrollSpeed) + " px/s"
                                 color: Theme.accent
                                 font.pixelSize: Theme.fontSm
                                 font.weight: Font.DemiBold
                                 horizontalAlignment: Text.AlignRight
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 72
+                        radius: Theme.radiusMd
+                        color: Theme.elevatedSurface
+                        border.width: 1
+                        border.color: Theme.border
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 18
+                            anchors.rightMargin: 18
+                            spacing: 12
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 3
+                                Label {
+                                    text: "数据存储位置"
+                                    color: Theme.foreground
+                                    font.pixelSize: Theme.fontMd
+                                    font.weight: Font.Medium
+                                }
+                                Label {
+                                    text: appController.dataDirectory
+                                    color: Theme.mutedForeground
+                                    font.pixelSize: Theme.fontXs
+                                    elide: Text.ElideMiddle
+                                    maximumLineCount: 1
+                                    Layout.fillWidth: true
+                                }
+                            }
+
+                            AppButton {
+                                text: "更改"
+                                onClicked: dataDirDialog.open()
                             }
                         }
                     }
@@ -271,5 +313,40 @@ Rectangle {
                 }
             }
         }
+    }
+
+    FolderDialog {
+        id: dataDirDialog
+        title: "选择数据存储位置"
+        currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
+        onAccepted: {
+            const newPath = selectedFolder.toString().replace(/^file:\/\//, "")
+            migrateConfirmDialog.message = "将把所有数据迁移到：\n" + newPath + "\n\n迁移完成后需要重启应用才能生效。是否继续？"
+            migrateConfirmDialog.newPath = newPath
+            migrateConfirmDialog.open()
+        }
+    }
+
+    ConfirmDialog {
+        id: migrateConfirmDialog
+        property string newPath: ""
+        title: "迁移数据？"
+        confirmText: "开始迁移"
+        onAccepted: {
+            let error = ""
+            if (appController.migrateDataDirectory(newPath, error)) {
+                migrateResultDialog.message = "数据迁移成功！\n\n请重启应用以使用新的数据目录。"
+                migrateResultDialog.open()
+            } else {
+                migrateResultDialog.message = "迁移失败：\n" + (error || "未知错误")
+                migrateResultDialog.open()
+            }
+        }
+    }
+
+    ConfirmDialog {
+        id: migrateResultDialog
+        title: "迁移结果"
+        confirmText: "确定"
     }
 }
