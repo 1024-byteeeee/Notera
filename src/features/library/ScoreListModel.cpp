@@ -10,6 +10,11 @@ int ScoreListModel::rowCount(const QModelIndex& parent) const
     return parent.isValid() ? 0 : m_scores.size();
 }
 
+int ScoreListModel::count() const
+{
+    return m_scores.size();
+}
+
 QVariant ScoreListModel::data(const QModelIndex& index, const int role) const
 {
     if (!index.isValid() || index.row() < 0 || index.row() >= m_scores.size()) {
@@ -42,7 +47,11 @@ QHash<int, QByteArray> ScoreListModel::roleNames() const
 
 void ScoreListModel::replaceAll(QList<Score> scores)
 {
+    const auto previousCount = m_scores.size();
     beginResetModel();
     m_scores = std::move(scores);
     endResetModel();
+    if (m_scores.size() != previousCount) {
+        emit countChanged();
+    }
 }

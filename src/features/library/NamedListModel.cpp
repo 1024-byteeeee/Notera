@@ -12,6 +12,11 @@ int NamedListModel::rowCount(const QModelIndex& parent) const
     return parent.isValid() ? 0 : m_items.size();
 }
 
+int NamedListModel::count() const
+{
+    return m_items.size();
+}
+
 QVariant NamedListModel::data(const QModelIndex& index, const int role) const
 {
     if (!index.isValid() || index.row() < 0 || index.row() >= m_items.size()) {
@@ -44,7 +49,11 @@ void NamedListModel::replaceAll(const QVariantList& values)
         }
     }
 
+    const auto previousCount = m_items.size();
     beginResetModel();
     m_items = std::move(items);
     endResetModel();
+    if (m_items.size() != previousCount) {
+        emit countChanged();
+    }
 }

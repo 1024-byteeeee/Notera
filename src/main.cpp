@@ -252,26 +252,15 @@ int main(int argc, char* argv[])
 
             controller.setCurrentPage(QStringLiteral("library"));
             auto* const scoreDelegate = findVisualItem(root, QStringLiteral("scoreDelegate"));
-            const auto scoreContextClicked = clickItem(root, QStringLiteral("scoreCardMouse"), Qt::RightButton);
-            const auto scoreContextValid = scoreContextClicked
-                && controller.currentPage() == QStringLiteral("library")
-                && scoreDelegate
-                && scoreDelegate->property("contextMenuOpenedOnce").toBool()
-                && scoreDelegate->property("folderSubmenuEnabled").toBool()
-                && scoreDelegate->property("tagSubmenuEnabled").toBool()
-                && scoreDelegate->property("folderSubmenuItemCount").toInt() >= libraryService.folders()->rowCount() + 2
-                && scoreDelegate->property("tagSubmenuItemCount").toInt() >= libraryService.tags()->rowCount()
-                && !popupIsOpen(root, QStringLiteral("blankContextMenu"));
-            if (!scoreContextValid) {
-                qWarning() << "[DEBUG-menu-state]"
-                           << scoreContextClicked
-                           << (scoreDelegate ? scoreDelegate->property("contextMenuOpenedOnce") : QVariant {})
-                           << (scoreDelegate ? scoreDelegate->property("folderSubmenuEnabled") : QVariant {})
-                           << (scoreDelegate ? scoreDelegate->property("tagSubmenuEnabled") : QVariant {})
-                           << (scoreDelegate ? scoreDelegate->property("folderSubmenuItemCount") : QVariant {})
-                           << (scoreDelegate ? scoreDelegate->property("tagSubmenuItemCount") : QVariant {})
-                           << libraryService.folders()->rowCount()
-                           << libraryService.tags()->rowCount();
+            if (!clickItem(root, QStringLiteral("scoreCardMouse"), Qt::RightButton)
+                || controller.currentPage() != QStringLiteral("library")
+                || !scoreDelegate
+                || !scoreDelegate->property("contextMenuOpenedOnce").toBool()
+                || !scoreDelegate->property("folderSubmenuEnabled").toBool()
+                || !scoreDelegate->property("tagSubmenuEnabled").toBool()
+                || scoreDelegate->property("folderSubmenuItemCount").toInt() < libraryService.folders()->rowCount() + 2
+                || scoreDelegate->property("tagSubmenuItemCount").toInt() < libraryService.tags()->rowCount()
+                || popupIsOpen(root, QStringLiteral("blankContextMenu"))) {
                 fail("score-context-menu");
                 return;
             }
