@@ -193,15 +193,16 @@ Rectangle {
 
                     Rectangle {
                         id: card
+                        objectName: scoreDelegate.itemType === "score" ? "scoreCardMouse" : "folderCardMouse"
                         width: Math.min(218, parent.width - 12)
                         height: 288
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.top: parent.top
                         anchors.topMargin: 6
                         radius: Theme.radiusMd
-                        color: root.isSelected(scoreDelegate.itemId) ? Theme.accentSoft : (cardMouse.containsMouse ? Theme.cardHover : Theme.cardBackground)
+                        color: root.isSelected(scoreDelegate.itemId) ? Theme.accentSoft : (cardHover.hovered ? Theme.cardHover : Theme.cardBackground)
                         border.width: root.isSelected(scoreDelegate.itemId) ? 2 : 1
-                        border.color: root.isSelected(scoreDelegate.itemId) ? Theme.accent : (cardMouse.containsMouse ? Theme.strongBorder : Theme.cardBorder)
+                        border.color: root.isSelected(scoreDelegate.itemId) ? Theme.accent : (cardHover.hovered ? Theme.strongBorder : Theme.cardBorder)
 
                         Behavior on color { ColorAnimation { duration: 100 } }
                         Behavior on border.color { ColorAnimation { duration: 100 } }
@@ -254,24 +255,15 @@ Rectangle {
                                 elide: Text.ElideRight
                             }
                         }
-                    }
 
-                    MouseArea {
-                        id: cardMouse
-                        objectName: scoreDelegate.itemType === "score" ? "scoreCardMouse" : "folderCardMouse"
-                        anchors.fill: card
-                        z: 1
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onPressed: function(mouse) {
-                            if (mouse.button === Qt.RightButton) {
-                                if (scoreDelegate.itemType === "folder") folderCardMenu.popup()
-                                else scoreMenu.popup()
-                            }
+                        HoverHandler {
+                            id: cardHover
+                            cursorShape: Qt.PointingHandCursor
                         }
-                        onClicked: function(mouse) {
-                            if (mouse.button === Qt.RightButton) return
+                        TapHandler {
+                            acceptedButtons: Qt.LeftButton
+                            gesturePolicy: TapHandler.ReleaseWithinBounds
+                            onTapped: {
                             if (root.selectedCount > 0) {
                                 libraryService.selection.toggle(scoreDelegate.itemId)
                                 return
@@ -282,6 +274,15 @@ Rectangle {
                                 appController.openScore(scoreDelegate.scoreId, scoreDelegate.title, scoreDelegate.filePath,
                                     scoreDelegate.fileType, scoreDelegate.pageCount,
                                     libraryService.scoreFolderId(scoreDelegate.scoreId))
+                            }
+                            }
+                        }
+                        TapHandler {
+                            acceptedButtons: Qt.RightButton
+                            gesturePolicy: TapHandler.ReleaseWithinBounds
+                            onTapped: {
+                                if (scoreDelegate.itemType === "folder") folderCardMenu.popup()
+                                else scoreMenu.popup()
                             }
                         }
                     }
