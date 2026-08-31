@@ -19,6 +19,8 @@ Rectangle {
     property real pinchAnchorY: 0.5
     property real pinchViewportX: 0
     property real pinchViewportY: 0
+    property bool viewInitializationPending: false
+    property int viewInitializationToken: 0
 
     function clampScroll(value, contentSize, viewportSize) {
         return Math.max(0, Math.min(value, Math.max(0, contentSize - viewportSize)))
@@ -42,18 +44,60 @@ Rectangle {
         })
     }
 
-    function fitAndCenter() {
+    function applyDefaultView(initializationToken) {
         root.zoomLevel = 1.0
         Qt.callLater(function() {
+            if (initializationToken !== undefined
+                && (!root.viewInitializationPending || initializationToken !== root.viewInitializationToken)) {
+                return
+            }
             readerFlick.contentX = root.clampScroll((readerFlick.contentWidth - readerFlick.width) / 2,
                 readerFlick.contentWidth, readerFlick.width)
             readerFlick.contentY = 0
+            if (initializationToken !== undefined) {
+                root.viewInitializationPending = false
+            }
         })
     }
 
-    function resetZoom() { fitAndCenter() }
-    function zoomIn() { zoomAroundViewport(root.zoomLevel + 0.25, readerFlick.width / 2, readerFlick.height / 2) }
-    function zoomOut() { zoomAroundViewport(root.zoomLevel - 0.25, readerFlick.width / 2, readerFlick.height / 2) }
+    function beginViewInitialization() {
+        root.viewInitializationToken += 1
+        root.viewInitializationPending = true
+        root.autoScrolling = false
+        readerFlick.cancelFlick()
+        root.zoomLevel = 1.0
+        readerFlick.contentX = 0
+        readerFlick.contentY = 0
+        root.finishInitialViewIfReady(root.viewInitializationToken)
+    }
+
+    function finishInitialViewIfReady(token) {
+        const expectedToken = token === undefined ? root.viewInitializationToken : token
+        if (!root.viewInitializationPending || expectedToken !== root.viewInitializationToken
+            || appController.currentPage !== "reader") {
+            return
+        }
+        const contentReady = root.isImage ? scoreImage.status === Image.Ready
+            : root.isPdf ? pdfDocument.pageCount > 0 : true
+        if (!contentReady || readerFlick.width <= 0 || readerFlick.height <= 0) {
+            return
+        }
+        root.applyDefaultView(expectedToken)
+    }
+
+    function markUserInteraction() {
+        root.viewInitializationPending = false
+    }
+
+    function resetZoom() { root.markUserInteraction(); applyDefaultView() }
+    function zoomIn() {
+        root.markUserInteraction()
+        zoomAroundViewport(root.zoomLevel + 0.25, readerFlick.width / 2, readerFlick.height / 2)
+    }
+    function zoomOut() {
+        root.markUserInteraction()
+        zoomAroundViewport(root.zoomLevel - 0.25, readerFlick.width / 2, readerFlick.height / 2)
+    }
 
     function stopAtEnd() {
         const maximum = Math.max(0, readerFlick.contentHeight - readerFlick.height)
@@ -294,12 +338,27 @@ Rectangle {
             contentHeight: documentColumn.height
             boundsBehavior: Flickable.StopAtBounds
             pixelAligned: true
+            onWidthChanged: root.finishInitialViewIfReady()
+            onHeightChanged: root.finishInitialViewIfReady()
+            onMovementStarted: root.markUserInteraction()
+
+            WheelHandler {
+                acceptedModifiers: Qt.NoModifier
+                onWheel: function(event) {
+                    root.markUserInteraction()
+                    const delta = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y
+                    readerFlick.contentY = root.clampScroll(readerFlick.contentY - delta,
+                        readerFlick.contentHeight, readerFlick.height)
+                    event.accepted = true
+                }
+            }
 
             // 双指捏合缩放（触控板，不阻塞滚动）
             PinchHandler {
                 id: pinchZoom
                 onActiveChanged: function(active) {
                     if (active) {
+                        root.markUserInteraction()
                         root.pinchBaseZoom = root.zoomLevel
                         root.pinchViewportX = centroid.position.x
                         root.pinchViewportY = centroid.position.y
@@ -331,6 +390,7 @@ Rectangle {
                 PdfDocument {
                     id: pdfDocument
                     source: root.isPdf ? appController.currentFileUrl : ""
+                    onPageCountChanged: root.finishInitialViewIfReady()
                 }
 
                 Repeater {
@@ -359,6 +419,7 @@ Rectangle {
                 }
 
                 Image {
+                    id: scoreImage
                     visible: root.isImage
                     width: visible ? documentColumn.pageWidth : 0
                     height: visible ? (sourceSize.width > 0 ? width * sourceSize.height / sourceSize.width : 700) : 0
@@ -367,6 +428,7 @@ Rectangle {
                     asynchronous: true
                     fillMode: Image.PreserveAspectFit
                     smooth: true
+                    onStatusChanged: root.finishInitialViewIfReady()
                 }
 
                 Label {
@@ -424,8 +486,12 @@ Rectangle {
     Connections {
         target: appController
         function onCurrentScoreChanged() {
-            root.autoScrolling = false
-            root.fitAndCenter()
+            root.beginViewInitialization()
+        }
+        function onCurrentPageChanged() {
+            if (appController.currentPage === "reader") {
+                root.finishInitialViewIfReady()
+            }
         }
     }
 }
