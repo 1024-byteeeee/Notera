@@ -323,6 +323,36 @@ QVariantList ScoreRepository::scoreTags(const QString& scoreId, QString* error) 
     return result;
 }
 
+QString ScoreRepository::itemTypeById(const QString& id, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("SELECT 1 FROM scores WHERE id = ?"));
+    query.addBindValue(id);
+    if (query.exec() && query.next()) return QStringLiteral("score");
+    query.prepare(QStringLiteral("SELECT 1 FROM folders WHERE id = ?"));
+    query.addBindValue(id);
+    if (query.exec() && query.next()) return QStringLiteral("folder");
+    return {};
+}
+
+QString ScoreRepository::filePathById(const QString& scoreId, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("SELECT file_path FROM scores WHERE id = ?"));
+    query.addBindValue(scoreId);
+    if (query.exec() && query.next()) return query.value(0).toString();
+    return {};
+}
+
+QString ScoreRepository::thumbnailPathById(const QString& scoreId, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("SELECT thumbnail_path FROM scores WHERE id = ?"));
+    query.addBindValue(scoreId);
+    if (query.exec() && query.next()) return query.value(0).toString();
+    return {};
+}
+
 QList<Score> ScoreRepository::listByFolder(const QString& folderId, const QString& searchQuery, QString* error) const
 {
     QSqlQuery query(m_database);

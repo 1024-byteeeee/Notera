@@ -10,6 +10,27 @@ Rectangle {
     objectName: "libraryPage"
     color: Theme.background
 
+    property bool selectionMode: false
+    property var selectedIds: []
+    readonly property int selectedCount: selectedIds.length
+
+    function toggleSelect(id) {
+        const idx = selectedIds.indexOf(id)
+        if (idx >= 0) selectedIds.splice(idx, 1)
+        else selectedIds.push(id)
+        selectedIds = selectedIds // 触发变更
+    }
+    function selectAll() {
+        const ids = []
+        for (let i = 0; i < grid.count; i++) {
+            const item = grid.itemAtIndex(i)
+            if (item) ids.push(item.itemId)
+        }
+        selectedIds = ids
+    }
+    function clearSelection() { selectedIds = []; selectionMode = false }
+    function isSelected(id) { return selectedIds.indexOf(id) >= 0 }
+
     readonly property string filterTitle: {
         const filter = appController.libraryFilter
         if (filter === "all" || filter.startsWith("folder:")) return libraryService.currentFolderName
@@ -107,6 +128,16 @@ Rectangle {
                 text: "拼接导入"
                 onClicked: stitchDialog.open()
             }
+
+            AppButton {
+                objectName: "selectButton"
+                Layout.preferredWidth: 80
+                text: root.selectionMode ? "完成" : "选择"
+                onClicked: {
+                    if (root.selectionMode) root.clearSelection()
+                    else root.selectionMode = true
+                }
+            }
         }
 
         Rectangle {
@@ -126,6 +157,7 @@ Rectangle {
                 visible: count > 0
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
+                interactive: !root.selectionMode
                 cellWidth: {
                     const columns = Math.max(1, Math.floor(width / 218))
                     return Math.floor(width / columns)
@@ -169,12 +201,39 @@ Rectangle {
                         anchors.top: parent.top
                         anchors.topMargin: 6
                         radius: Theme.radiusMd
-                        color: cardMouse.containsMouse ? Theme.cardHover : Theme.cardBackground
-                        border.width: 1
-                        border.color: cardMouse.containsMouse ? Theme.strongBorder : Theme.cardBorder
+                        color: root.isSelected(scoreDelegate.itemId) ? Theme.accentSoft : (cardMouse.containsMouse ? Theme.cardHover : Theme.cardBackground)
+                        border.width: root.isSelected(scoreDelegate.itemId) ? 2 : 1
+                        border.color: root.isSelected(scoreDelegate.itemId) ? Theme.accent : (cardMouse.containsMouse ? Theme.strongBorder : Theme.cardBorder)
 
                         Behavior on color { ColorAnimation { duration: 100 } }
                         Behavior on border.color { ColorAnimation { duration: 100 } }
+
+                        // 左上角勾选框
+                        Rectangle {
+                            id: checkBox
+                            visible: root.selectionMode
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.margins: 10
+                            width: 22
+                            height: 22
+                            radius: 6
+                            color: root.isSelected(scoreDelegate.itemId) ? Theme.accent : Theme.surface
+                            border.width: 1.5
+                            border.color: root.isSelected(scoreDelegate.itemId) ? Theme.accent : Theme.strongBorder
+                            z: 3
+                            Label {
+                                anchors.centerIn: parent
+                                text: root.isSelected(scoreDelegate.itemId) ? "✓" : ""
+                                color: "white"
+                                font.pixelSize: 14
+                                font.weight: Font.Bold
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: root.toggleSelect(scoreDelegate.itemId)
+                            }
+                        }
 
                         ColumnLayout {
                             anchors.fill: parent
@@ -205,24 +264,6 @@ Rectangle {
                                     text: scoreDelegate.itemType === "folder" ? "▰" : "♫"
                                     color: scoreDelegate.itemType === "folder" ? Theme.accent : Theme.faintForeground
                                     font.pixelSize: scoreDelegate.itemType === "folder" ? 54 : 38
-                                }
-                                Rectangle {
-                                    anchors.right: parent.right
-                                    anchors.bottom: parent.bottom
-                                    anchors.margins: 6
-                                    visible: scoreDelegate.itemType === "score"
-                                    implicitWidth: pageBadge.implicitWidth + 12
-                                    implicitHeight: 20
-                                    radius: 5
-                                    color: "#000000b8"
-                                    Label {
-                                        id: pageBadge
-                                        anchors.centerIn: parent
-                                        text: scoreDelegate.pageCount + " 页"
-                                        color: "white"
-                                        font.pixelSize: 10
-                                        font.weight: Font.Medium
-                                    }
                                 }
                             }
 
@@ -260,26 +301,48 @@ Rectangle {
                         }
                         onClicked: function(mouse) {
                             if (mouse.button === Qt.RightButton) return
+                            if (root.selectionMode) {
+                                root.toggleSelect(scoreDelegate.itemId)
+                                return
+                            }
                             if (scoreDelegate.itemType === "folder") {
                                 libraryService.enterFolder(scoreDelegate.itemId)
                             } else {
-                                appController.openScore(scoreDelegate.title, scoreDelegate.filePath,
-                                    scoreDelegate.fileType, scoreDelegate.pageCount)
+                                appController.openScore(scoreDelegate.scoreId, scoreDelegate.title, scoreDelegate.filePath,
+                                    scoreDelegate.fileType, scoreDelegate.pageCount, libraryService.currentFolderId)
                             }
                         }
                     }
 
-                    IconButton {
-                        objectName: scoreDelegate.itemType === "score" ? "favoriteButton" : ""
+                    // 收藏按钮 - 悬浮放大五角星，无框
+                    Item {
+                        id: favoriteBtn
+                        visible: scoreDelegate.itemType === "score"
                         z: 2
                         anchors.right: card.right
                         anchors.top: card.top
-                        anchors.margins: 18
-                        symbol: scoreDelegate.favorite ? "★" : "☆"
-                        visible: scoreDelegate.itemType === "score"
-                        selected: scoreDelegate.favorite
-                        Accessible.name: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
-                        onClicked: libraryService.toggleFavorite(scoreDelegate.scoreId, !scoreDelegate.favorite)
+                        anchors.margins: 14
+                        width: 28
+                        height: 28
+                        property bool hovered: false
+
+                        Label {
+                            anchors.centerIn: parent
+                            text: scoreDelegate.favorite ? "★" : "☆"
+                            color: scoreDelegate.favorite ? Theme.accent : Theme.mutedForeground
+                            font.pixelSize: favoriteBtn.hovered ? 22 : 18
+                            font.weight: Font.DemiBold
+                            Behavior on font.pixelSize { NumberAnimation { duration: 120 } }
+                        }
+                        MouseArea {
+                            id: favoriteMouse
+                            objectName: scoreDelegate.itemType === "score" ? "favoriteButton" : ""
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onEntered: favoriteBtn.hovered = true
+                            onExited: favoriteBtn.hovered = false
+                            onClicked: libraryService.toggleFavorite(scoreDelegate.scoreId, !scoreDelegate.favorite)
+                        }
                     }
 
                     AppMenu {
@@ -398,6 +461,63 @@ Rectangle {
                 }
             }
 
+            // 框选层（仅选择模式下激活）
+            Rectangle {
+                id: selectionBox
+                visible: root.selectionMode && selecting
+                z: 10
+                color: Theme.accent + "22"
+                border.width: 1
+                border.color: Theme.accent
+                radius: 4
+            }
+
+            MouseArea {
+                id: rubberBand
+                visible: root.selectionMode
+                anchors.fill: parent
+                z: 9
+                property bool selecting: false
+                property real startX: 0
+                property real startY: 0
+
+                onPressed: function(mouse) {
+                    selecting = true
+                    startX = mouse.x
+                    startY = mouse.y
+                    selectionBox.x = mouse.x
+                    selectionBox.y = mouse.y
+                    selectionBox.width = 0
+                    selectionBox.height = 0
+                }
+                onPositionChanged: function(mouse) {
+                    if (!selecting) return
+                    selectionBox.x = Math.min(startX, mouse.x)
+                    selectionBox.y = Math.min(startY, mouse.y)
+                    selectionBox.width = Math.abs(mouse.x - startX)
+                    selectionBox.height = Math.abs(mouse.y - startY)
+                    // 实时更新选中状态
+                    for (let i = 0; i < grid.count; i++) {
+                        const item = grid.itemAtIndex(i)
+                        if (!item) continue
+                        const card = item.card
+                        const itemRect = Qt.rect(card.x + item.x + 16, card.y + item.y + 16, card.width, card.height)
+                        const selRect = Qt.rect(selectionBox.x, selectionBox.y, selectionBox.width, selectionBox.height)
+                        if (itemRect.intersects(selRect)) {
+                            if (!root.isSelected(item.itemId)) root.toggleSelect(item.itemId)
+                        }
+                    }
+                }
+                onReleased: function(mouse) {
+                    selecting = false
+                    selectionBox.visible = false
+                    // 如果只是点击（没有拖动），取消所有选中
+                    if (Math.abs(mouse.x - startX) < 5 && Math.abs(mouse.y - startY) < 5) {
+                        root.selectedIds = []
+                    }
+                }
+            }
+
             ColumnLayout {
                 anchors.centerIn: parent
                 visible: grid.count === 0
@@ -469,6 +589,63 @@ Rectangle {
             TapHandler {
                 acceptedButtons: Qt.RightButton
                 onTapped: blankContextMenu.popup()
+            }
+        }
+
+        // 底部批量操作栏
+        Rectangle {
+            visible: root.selectionMode
+            Layout.fillWidth: true
+            Layout.preferredHeight: 56
+            radius: Theme.radiusMd
+            color: Theme.elevatedSurface
+            border.width: 1
+            border.color: Theme.border
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 16
+                anchors.rightMargin: 16
+                spacing: 12
+
+                Label {
+                    text: root.selectedCount + " 项已选中"
+                    color: Theme.foreground
+                    font.pixelSize: Theme.fontMd
+                    font.weight: Font.DemiBold
+                }
+
+                Item { Layout.fillWidth: true }
+
+                AppButton {
+                    text: "全选"
+                    Layout.preferredWidth: 70
+                    onClicked: root.selectAll()
+                }
+
+                AppButton {
+                    text: "取消全选"
+                    Layout.preferredWidth: 84
+                    onClicked: root.selectedIds = []
+                }
+
+                AppButton {
+                    text: "删除"
+                    danger: true
+                    Layout.preferredWidth: 70
+                    enabled: root.selectedCount > 0
+                    onClicked: {
+                        batchDeleteDialog.selectedIds = root.selectedIds
+                        batchDeleteDialog.open()
+                    }
+                }
+
+                AppButton {
+                    text: "完成"
+                    primary: true
+                    Layout.preferredWidth: 70
+                    onClicked: root.clearSelection()
+                }
             }
         }
     }
@@ -554,5 +731,16 @@ Rectangle {
         property string thumbnailPath: ""
         title: "删除乐谱？"
         onAccepted: libraryService.deleteScore(scoreId, filePath, thumbnailPath)
+    }
+
+    ConfirmDialog {
+        id: batchDeleteDialog
+        property var selectedIds: []
+        title: "批量删除？"
+        message: "将删除选中的 " + batchDeleteDialog.selectedIds.length + " 个项目。此操作无法撤销。"
+        onAccepted: {
+            libraryService.deleteItems(batchDeleteDialog.selectedIds)
+            root.clearSelection()
+        }
     }
 }

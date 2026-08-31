@@ -454,6 +454,46 @@ void LibraryService::deleteScore(const QString& scoreId, const QString& filePath
     reload();
 }
 
+void LibraryService::deleteItems(const QVariantList& ids)
+{
+    QString error;
+    for (const auto& idVariant : ids) {
+        const auto id = idVariant.toString();
+        if (id.isEmpty()) continue;
+        const auto type = m_repository.itemTypeById(id, &error);
+        if (type == QStringLiteral("score")) {
+            const auto filePath = m_repository.filePathById(id, &error);
+            const auto thumbPath = m_repository.thumbnailPathById(id, &error);
+            FileService::removeFile(filePath, &error);
+            FileService::removeFile(thumbPath, &error);
+            m_repository.remove(id, &error);
+        } else if (type == QStringLiteral("folder")) {
+            m_repository.deleteFolder(id, &error);
+        }
+    }
+    reloadFolders();
+    reload();
+    emit noticeOccurred(QStringLiteral("已删除 %1 个项目").arg(ids.size()));
+}
+
+QVariantList LibraryService::scoresInFolder(const QString& folderId)
+{
+    QString error;
+    const auto scores = m_repository.listAtFolder(folderId, QString(), &error);
+    QVariantList result;
+    for (const auto& score : scores) {
+        result.append(QVariantMap{
+            {"id", score.id},
+            {"title", score.title},
+            {"filePath", score.filePath},
+            {"fileType", score.fileType},
+            {"pageCount", score.pageCount},
+            {"folderId", folderId}
+        });
+    }
+    return result;
+}
+
 void LibraryService::setScoreFolder(const QString& scoreId, const QString& folderId)
 {
     QString error;

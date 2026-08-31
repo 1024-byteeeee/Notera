@@ -71,6 +71,10 @@ target_link_libraries(Notera
         Qt6::Sql
 )
 
+if(APPLE)
+    target_link_options(Notera PRIVATE "-Wl,-weak_framework,AGL")
+endif()
+
 set_target_properties(Notera PROPERTIES
     MACOSX_BUNDLE_GUI_IDENTIFIER "com.notera.app"
     MACOSX_BUNDLE_BUNDLE_NAME "Notera"

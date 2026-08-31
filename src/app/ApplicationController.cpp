@@ -48,6 +48,16 @@ QString ApplicationController::currentFileType() const
     return m_currentFileType;
 }
 
+QString ApplicationController::currentScoreId() const
+{
+    return m_currentScoreId;
+}
+
+QString ApplicationController::currentScoreFolderId() const
+{
+    return m_currentScoreFolderId;
+}
+
 int ApplicationController::currentScorePageCount() const
 {
     return m_currentScorePageCount;
@@ -69,11 +79,14 @@ void ApplicationController::setAutoScrollSpeed(const double speed)
     emit autoScrollSpeedChanged();
 }
 
-void ApplicationController::openScore(const QString& title, const QString& filePath, const QString& fileType, const int pageCount)
+void ApplicationController::openScore(const QString& scoreId, const QString& title, const QString& filePath,
+    const QString& fileType, const int pageCount, const QString& folderId)
 {
+    m_currentScoreId = scoreId;
     m_currentScoreTitle = title;
     m_currentFileUrl = QUrl::fromLocalFile(filePath);
     m_currentFileType = fileType.toLower();
+    m_currentScoreFolderId = folderId;
     m_currentScorePageCount = pageCount;
     emit currentScoreChanged();
     setCurrentPage(QStringLiteral("reader"));

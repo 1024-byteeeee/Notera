@@ -44,6 +44,8 @@ public:
     Q_INVOKABLE void toggleFavorite(const QString& scoreId, bool favorite);
     Q_INVOKABLE void renameScore(const QString& scoreId, const QString& title);
     Q_INVOKABLE void deleteScore(const QString& scoreId, const QString& filePath, const QString& thumbnailPath);
+    Q_INVOKABLE void deleteItems(const QVariantList& ids);
+    Q_INVOKABLE QVariantList scoresInFolder(const QString& folderId);
     Q_INVOKABLE void setScoreFolder(const QString& scoreId, const QString& folderId);
     Q_INVOKABLE void addScoreTag(const QString& scoreId, const QString& tagId);
     Q_INVOKABLE void removeScoreTag(const QString& scoreId, const QString& tagId);

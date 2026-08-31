@@ -22,6 +22,44 @@ Rectangle {
     property real pinchViewportY: 0
     property bool viewInitializationPending: false
     property int viewInitializationToken: 0
+    property var folderScores: []
+    readonly property int currentScoreIndex: {
+        for (let i = 0; i < root.folderScores.length; i++) {
+            if (root.folderScores[i].id === appController.currentScoreId) return i
+        }
+        return -1
+    }
+    readonly property bool hasPrev: root.currentScoreIndex > 0
+    readonly property bool hasNext: root.currentScoreIndex >= 0 && root.currentScoreIndex < root.folderScores.length - 1
+
+    function refreshFolderScores() {
+        root.folderScores = libraryService.scoresInFolder(appController.currentScoreFolderId)
+    }
+    function goToPrevScore() {
+        if (!root.hasPrev) return
+        const s = root.folderScores[root.currentScoreIndex - 1]
+        appController.openScore(s.id, s.title, s.filePath, s.fileType, s.pageCount, s.folderId)
+    }
+    function goToNextScore() {
+        if (!root.hasNext) return
+        const s = root.folderScores[root.currentScoreIndex + 1]
+        appController.openScore(s.id, s.title, s.filePath, s.fileType, s.pageCount, s.folderId)
+    }
+
+    Connections {
+        target: appController
+        function onCurrentScoreChanged() { root.refreshFolderScores() }
+    }
+
+    Keys.onLeftPressed: function(event) {
+        if (event.modifiers & Qt.ControlModifier) return
+        root.goToPrevScore()
+    }
+    Keys.onRightPressed: function(event) {
+        if (event.modifiers & Qt.ControlModifier) return
+        root.goToNextScore()
+    }
+    focus: appController.currentPage === "reader"
 
     function clampScroll(value, contentSize, viewportSize) {
         return Math.max(0, Math.min(value, Math.max(0, contentSize - viewportSize)))
@@ -193,6 +231,24 @@ Rectangle {
                     btnText: "← 乐谱库"
                     Layout.preferredWidth: 100
                     onBtnClicked: { root.autoScrolling = false; appController.currentPage = "library" }
+                }
+
+                // 上一张
+                ToolButton {
+                    objectName: "prevScoreButton"
+                    btnText: "‹ 上一张"
+                    btnEnabled: root.hasPrev
+                    Layout.preferredWidth: 84
+                    onBtnClicked: root.goToPrevScore()
+                }
+
+                // 下一张
+                ToolButton {
+                    objectName: "nextScoreButton"
+                    btnText: "下一张 ›"
+                    btnEnabled: root.hasNext
+                    Layout.preferredWidth: 84
+                    onBtnClicked: root.goToNextScore()
                 }
 
                 // 标题

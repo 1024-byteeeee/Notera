@@ -184,7 +184,7 @@ int main(int argc, char* argv[])
         if (!image.save(imagePath)) {
             return 1;
         }
-        controller.openScore(QStringLiteral("自动滚动测试"), imagePath, QStringLiteral("png"), 1);
+        controller.openScore(QStringLiteral("test-score-1"), QStringLiteral("自动滚动测试"), imagePath, QStringLiteral("png"), 1, QString());
         auto* const root = engine.rootObjects().constFirst();
         QTimer::singleShot(250, root, [root] {
             if (auto* const readerPage = root->findChild<QObject*>(QStringLiteral("readerPage"))) {
@@ -369,8 +369,8 @@ int main(int argc, char* argv[])
             readerFlick->setProperty("scale", 0.75);
 
             controller.setCurrentPage(QStringLiteral("library"));
-            controller.openScore(QStringLiteral("再次打开测试"), controller.currentFileUrl().toLocalFile(),
-                controller.currentFileType(), 1);
+            controller.openScore(controller.currentScoreId(), QStringLiteral("再次打开测试"), controller.currentFileUrl().toLocalFile(),
+                controller.currentFileType(), 1, controller.currentScoreFolderId());
             QEventLoop reopenWait;
             QTimer::singleShot(250, &reopenWait, &QEventLoop::quit);
             reopenWait.exec();

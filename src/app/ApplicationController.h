@@ -13,6 +13,8 @@ class ApplicationController final : public QObject
     Q_PROPERTY(QString currentScoreTitle READ currentScoreTitle NOTIFY currentScoreChanged)
     Q_PROPERTY(QUrl currentFileUrl READ currentFileUrl NOTIFY currentScoreChanged)
     Q_PROPERTY(QString currentFileType READ currentFileType NOTIFY currentScoreChanged)
+    Q_PROPERTY(QString currentScoreId READ currentScoreId NOTIFY currentScoreChanged)
+    Q_PROPERTY(QString currentScoreFolderId READ currentScoreFolderId NOTIFY currentScoreChanged)
     Q_PROPERTY(int currentScorePageCount READ currentScorePageCount NOTIFY currentScoreChanged)
     Q_PROPERTY(double autoScrollSpeed READ autoScrollSpeed WRITE setAutoScrollSpeed NOTIFY autoScrollSpeedChanged)
 
@@ -28,10 +30,13 @@ public:
     [[nodiscard]] QString currentScoreTitle() const;
     [[nodiscard]] QUrl currentFileUrl() const;
     [[nodiscard]] QString currentFileType() const;
+    [[nodiscard]] QString currentScoreId() const;
+    [[nodiscard]] QString currentScoreFolderId() const;
     [[nodiscard]] int currentScorePageCount() const;
     [[nodiscard]] double autoScrollSpeed() const;
     void setAutoScrollSpeed(double speed);
-    Q_INVOKABLE void openScore(const QString& title, const QString& filePath, const QString& fileType, int pageCount);
+    Q_INVOKABLE void openScore(const QString& scoreId, const QString& title, const QString& filePath,
+        const QString& fileType, int pageCount, const QString& folderId);
 
 signals:
     void currentPageChanged();
@@ -47,6 +52,8 @@ private:
     QString m_currentScoreTitle;
     QUrl m_currentFileUrl;
     QString m_currentFileType;
+    QString m_currentScoreId;
+    QString m_currentScoreFolderId;
     int m_currentScorePageCount {0};
     double m_autoScrollSpeed {45.0};
 };
