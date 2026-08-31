@@ -139,6 +139,31 @@ Rectangle {
                             value: root.scrollSpeed
                             stepSize: 5
                             onMoved: appController.autoScrollSpeed = value
+
+                            background: Rectangle {
+                                x: speedSlider.leftPadding
+                                y: speedSlider.topPadding + speedSlider.availableHeight / 2 - height / 2
+                                width: speedSlider.availableWidth
+                                height: 4
+                                radius: 2
+                                color: Theme.sunkenSurface
+                                Rectangle {
+                                    width: speedSlider.visualPosition * parent.width
+                                    height: parent.height
+                                    radius: 2
+                                    color: Theme.accent
+                                }
+                            }
+                            handle: Rectangle {
+                                x: speedSlider.leftPadding + speedSlider.visualPosition * (speedSlider.availableWidth - width)
+                                y: speedSlider.topPadding + speedSlider.availableHeight / 2 - height / 2
+                                implicitWidth: 16
+                                implicitHeight: 16
+                                radius: 8
+                                color: Theme.surface
+                                border.width: 2
+                                border.color: Theme.accent
+                            }
                         }
 
                         Label {

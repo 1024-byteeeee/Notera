@@ -37,6 +37,7 @@ public:
     Q_INVOKABLE void addScoreTag(const QString& scoreId, const QString& tagId);
     Q_INVOKABLE void removeScoreTag(const QString& scoreId, const QString& tagId);
     Q_INVOKABLE QVariantList scoreTags(const QString& scoreId);
+    Q_INVOKABLE bool scoreHasTag(const QString& scoreId, const QString& tagId);
     Q_INVOKABLE void createFolder(const QString& name);
     Q_INVOKABLE void renameFolder(const QString& folderId, const QString& name);
     Q_INVOKABLE void deleteFolder(const QString& folderId);

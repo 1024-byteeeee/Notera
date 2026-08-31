@@ -113,6 +113,7 @@ Rectangle {
                 }
             }
             Label {
+                objectName: "brandLabel"
                 text: "Notera"
                 color: Theme.foreground
                 font.pixelSize: 19

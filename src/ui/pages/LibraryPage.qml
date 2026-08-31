@@ -104,6 +104,7 @@ Rectangle {
         }
 
         Rectangle {
+            objectName: "librarySurface"
             Layout.fillWidth: true
             Layout.fillHeight: true
             radius: Theme.radiusLg
@@ -286,8 +287,10 @@ Rectangle {
                             Repeater {
                                 model: libraryService.folders
                                 delegate: AppMenuItem {
-                                    text: modelData.name
-                                    onTriggered: libraryService.setScoreFolder(scoreDelegate.scoreId, modelData.id)
+                                    required property string itemId
+                                    required property string name
+                                    text: name
+                                    onTriggered: libraryService.setScoreFolder(scoreDelegate.scoreId, itemId)
                                 }
                             }
                         }
@@ -298,14 +301,16 @@ Rectangle {
                             Repeater {
                                 model: libraryService.tags
                                 delegate: AppMenuItem {
-                                    text: modelData.name
+                                    required property string itemId
+                                    required property string name
+                                    text: name
                                     checkable: true
-                                    checked: false
+                                    checked: libraryService.scoreHasTag(scoreDelegate.scoreId, itemId)
                                     onTriggered: {
                                         if (checked) {
-                                            libraryService.addScoreTag(scoreDelegate.scoreId, modelData.id)
+                                            libraryService.addScoreTag(scoreDelegate.scoreId, itemId)
                                         } else {
-                                            libraryService.removeScoreTag(scoreDelegate.scoreId, modelData.id)
+                                            libraryService.removeScoreTag(scoreDelegate.scoreId, itemId)
                                         }
                                     }
                                 }
@@ -396,59 +401,35 @@ Rectangle {
                 }
             }
 
-            // 空白区域右键菜单（z:-1 让卡片右键菜单优先）
-            MouseArea {
-                anchors.fill: parent
+            TapHandler {
                 acceptedButtons: Qt.RightButton
-                z: -1
-                onClicked: function(mouse) {
-                    if (mouse.button === Qt.RightButton) {
-                        blankContextMenu.popup()
-                    }
-                }
+                onTapped: blankContextMenu.popup()
             }
         }
     }
 
     // 空白区域右键菜单
-    Menu {
+    AppMenu {
         id: blankContextMenu
-        MenuItem { text: "新建文件夹"; onTriggered: newFolderDialog.open() }
-        MenuItem { text: "新建标签"; onTriggered: newTagDialog.open() }
-        MenuSeparator { }
-        MenuItem { text: "导入乐谱"; onTriggered: fileDialog.open() }
+        objectName: "blankContextMenu"
+        AppMenuItem { text: "新建文件夹"; onTriggered: newFolderDialog.open() }
+        AppMenuItem { text: "新建标签"; onTriggered: newTagDialog.open() }
+        AppMenuSeparator { }
+        AppMenuItem { text: "导入乐谱"; onTriggered: fileDialog.open() }
     }
 
-    // 新建文件夹对话框
-    Dialog {
+    AppDialog {
         id: newFolderDialog
         title: "新建文件夹"
-        modal: true
-        anchors.centerIn: parent
-        standardButtons: Dialog.Ok | Dialog.Cancel
-        onAccepted: libraryService.createFolder(folderNameInput.text)
-        TextField {
-            id: folderNameInput
-            width: 280
-            placeholderText: "输入文件夹名称"
-            focus: true
-        }
+        placeholderText: "输入文件夹名称"
+        onSubmitted: function(text) { libraryService.createFolder(text) }
     }
 
-    // 新建标签对话框
-    Dialog {
+    AppDialog {
         id: newTagDialog
         title: "新建标签"
-        modal: true
-        anchors.centerIn: parent
-        standardButtons: Dialog.Ok | Dialog.Cancel
-        onAccepted: libraryService.createTag(tagNameInput.text)
-        TextField {
-            id: tagNameInput
-            width: 280
-            placeholderText: "输入标签名称"
-            focus: true
-        }
+        placeholderText: "输入标签名称"
+        onSubmitted: function(text) { libraryService.createTag(text) }
     }
 
     FileDialog {

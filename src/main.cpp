@@ -14,6 +14,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QStandardPaths>
+#include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QTimer>
 
@@ -96,6 +97,7 @@ int main(int argc, char* argv[])
     const auto arguments = app.arguments();
     const auto isSmokeTest = arguments.contains(QStringLiteral("--theme-smoke-test"))
         || arguments.contains(QStringLiteral("--import-smoke-test"))
+        || arguments.contains(QStringLiteral("--stitch-smoke-test"))
         || arguments.contains(QStringLiteral("--reader-smoke-test"))
         || arguments.contains(QStringLiteral("--ui-smoke-test"));
     if (isSmokeTest) {
@@ -122,6 +124,26 @@ int main(int argc, char* argv[])
         }
         const auto previousCount = libraryService.scores()->rowCount();
         libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
+        return libraryService.scores()->rowCount() == previousCount + 1 ? 0 : 1;
+    }
+
+    if (arguments.contains(QStringLiteral("--stitch-smoke-test"))) {
+        QTemporaryDir directory(QDir::tempPath() + QStringLiteral("/notera-stitch-XXXXXX"));
+        if (!directory.isValid()) {
+            return 1;
+        }
+        const auto firstPath = directory.filePath(QStringLiteral("first.png"));
+        const auto secondPath = directory.filePath(QStringLiteral("second.png"));
+        QImage first(320, 480, QImage::Format_RGB32);
+        QImage second(400, 360, QImage::Format_RGB32);
+        first.fill(Qt::white);
+        second.fill(Qt::lightGray);
+        if (!first.save(firstPath) || !second.save(secondPath)) {
+            return 1;
+        }
+        const auto previousCount = libraryService.scores()->rowCount();
+        libraryService.importAndStitchImages({QUrl::fromLocalFile(firstPath).toString(),
+            QUrl::fromLocalFile(secondPath).toString()});
         return libraryService.scores()->rowCount() == previousCount + 1 ? 0 : 1;
     }
 
@@ -227,11 +249,46 @@ int main(int argc, char* argv[])
             if (!clickItem(root, QStringLiteral("scoreCardMouse"), Qt::RightButton)
                 || controller.currentPage() != QStringLiteral("library")
                 || !scoreDelegate
-                || !scoreDelegate->property("contextMenuOpenedOnce").toBool()) {
+                || !scoreDelegate->property("contextMenuOpenedOnce").toBool()
+                || popupIsOpen(root, QStringLiteral("blankContextMenu"))) {
                 fail("score-context-menu");
                 return;
             }
             QMetaObject::invokeMethod(scoreDelegate, "closeContextMenu");
+
+            if (!clickItem(root, QStringLiteral("librarySurface"), Qt::RightButton)
+                || !popupIsOpen(root, QStringLiteral("blankContextMenu"))) {
+                fail("blank-context-menu");
+                return;
+            }
+            closePopup(root, QStringLiteral("blankContextMenu"));
+
+            const auto scoreIdRole = libraryService.scores()->roleNames().key("scoreId", -1);
+            const auto folderIdRole = libraryService.folders()->roleNames().key("itemId", -1);
+            const auto tagIdRole = libraryService.tags()->roleNames().key("itemId", -1);
+            const auto scoreId = libraryService.scores()->data(libraryService.scores()->index(0, 0), scoreIdRole).toString();
+            const auto folderId = libraryService.folders()->data(libraryService.folders()->index(0, 0), folderIdRole).toString();
+            const auto tagId = libraryService.tags()->data(libraryService.tags()->index(0, 0), tagIdRole).toString();
+            libraryService.setScoreFolder(scoreId, folderId);
+            libraryService.setFilterMode(QStringLiteral("folder:") + folderId);
+            if (scoreId.isEmpty() || folderId.isEmpty() || libraryService.scores()->rowCount() != 1) {
+                fail("score-folder-assignment");
+                return;
+            }
+            libraryService.setFilterMode(QStringLiteral("all"));
+            libraryService.addScoreTag(scoreId, tagId);
+            libraryService.setFilterMode(QStringLiteral("tag:") + tagId);
+            if (tagId.isEmpty() || libraryService.scores()->rowCount() != 1
+                || !libraryService.scoreHasTag(scoreId, tagId)) {
+                fail("score-tag-assignment");
+                return;
+            }
+            libraryService.setFilterMode(QStringLiteral("all"));
+            libraryService.removeScoreTag(scoreId, tagId);
+            if (libraryService.scoreHasTag(scoreId, tagId)) {
+                fail("score-tag-removal");
+                return;
+            }
 
             const auto favoriteRole = libraryService.scores()->roleNames().key("favorite", -1);
             const auto firstIndex = libraryService.scores()->index(0, 0);
@@ -252,6 +309,11 @@ int main(int argc, char* argv[])
                 fail("score-single-click");
                 return;
             }
+            QCoreApplication::processEvents();
+            if (!window->grabWindow().save(QStringLiteral("notera-reader-smoke.png"))) {
+                fail("reader-screenshot");
+                return;
+            }
 
             controller.setCurrentPage(QStringLiteral("settings"));
             QCoreApplication::processEvents();
@@ -262,16 +324,36 @@ int main(int argc, char* argv[])
                 fail("settings-layout");
                 return;
             }
+            const auto* const settingsTitle = root->findChild<QQuickItem*>(QStringLiteral("settingsTitle"));
+            const auto* const brandLabel = root->findChild<QQuickItem*>(QStringLiteral("brandLabel"));
+            if (!settingsTitle || !brandLabel || settingsTitle->mapToScene(QPointF {}).y() < 24.0
+                || brandLabel->mapToScene(QPointF {}).y() < 12.0) {
+                fail("page-top-spacing");
+                return;
+            }
             if (!window->grabWindow().save(QStringLiteral("notera-settings-smoke.png"))) {
                 fail("settings-screenshot");
                 return;
             }
+            controller.setThemeMode(2);
+            QCoreApplication::processEvents();
+            if (root->property("themeBackground").value<QColor>().lightnessF() > 0.25
+                || !window->grabWindow().save(QStringLiteral("notera-settings-dark-smoke.png"))) {
+                fail("dark-theme-render");
+                return;
+            }
+            controller.setThemeMode(1);
+            QCoreApplication::processEvents();
 
             controller.setCurrentPage(QStringLiteral("library"));
             QCoreApplication::processEvents();
             if (!clickItem(root, QStringLiteral("newFolderButton"), Qt::LeftButton)
                 || !popupIsOpen(root, QStringLiteral("folderEditorDialog"))) {
                 fail("new-folder-dialog");
+                return;
+            }
+            if (!window->grabWindow().save(QStringLiteral("notera-dialog-smoke.png"))) {
+                fail("dialog-screenshot");
                 return;
             }
             QCoreApplication::exit(0);

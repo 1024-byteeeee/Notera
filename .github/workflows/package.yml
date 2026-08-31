@@ -69,6 +69,7 @@ jobs:
           bundle_path=$(find build/macos-universal/packages/_CPack_Packages -type d -name Notera.app -print -quit)
           "$bundle_path/Contents/MacOS/Notera" --theme-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --import-smoke-test
+          "$bundle_path/Contents/MacOS/Notera" --stitch-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --reader-smoke-test
           "$bundle_path/Contents/MacOS/Notera" >notera-startup.log 2>&1 &
           app_pid=$!

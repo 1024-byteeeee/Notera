@@ -22,15 +22,21 @@ Rectangle {
             id: settingsContent
             objectName: "settingsContent"
             x: Theme.spacingXl
-            y: 32
+            y: 0
             width: Math.max(0, flick.width - Theme.spacingXl * 2)
             spacing: Theme.spacingLg
+
+            Item {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 8
+            }
 
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 4
 
                 Label {
+                    objectName: "settingsTitle"
                     text: "设置"
                     color: Theme.foreground
                     font.pixelSize: Theme.font2xl
