@@ -186,37 +186,29 @@ static bool removeDirectoryRecursively(const QString& path)
     return dir.removeRecursively();
 }
 
-bool ApplicationController::migrateDataDirectory(const QString& newPath, QString* error)
+QString ApplicationController::migrateDataDirectory(const QString& newPath)
 {
     const auto oldPath = AppDataPaths::root();
     const auto cleanNewPath = QDir::cleanPath(newPath);
 
     if (cleanNewPath.isEmpty() || cleanNewPath == oldPath) {
-        if (error) {
-            *error = QObject::tr("路径无效或与当前路径相同。");
-        }
-        return false;
+        return QStringLiteral("路径无效或与当前路径相同。");
     }
 
     QDir newDir(cleanNewPath);
     if (newDir.exists() && !newDir.isEmpty()) {
-        if (error) {
-            *error = QObject::tr("目标目录不为空，请选择一个空目录或新建目录。");
-        }
-        return false;
+        return QStringLiteral("目标目录不为空，请选择一个空目录或新建目录。");
     }
 
     if (!newDir.mkpath(cleanNewPath)) {
-        if (error) {
-            *error = QObject::tr("无法创建目标目录。");
-        }
-        return false;
+        return QStringLiteral("无法创建目标目录。");
     }
 
     // 1. 复制所有数据到新目录
-    if (!copyDirectoryRecursively(oldPath, cleanNewPath, error)) {
+    QString copyError;
+    if (!copyDirectoryRecursively(oldPath, cleanNewPath, &copyError)) {
         removeDirectoryRecursively(cleanNewPath);
-        return false;
+        return copyError.isEmpty() ? QStringLiteral("复制文件失败。") : copyError;
     }
 
     // 2. 在新数据库中更新文件路径
@@ -250,5 +242,5 @@ bool ApplicationController::migrateDataDirectory(const QString& newPath, QString
     removeDirectoryRecursively(oldPath);
 
     emit dataDirectoryChanged();
-    return true;
+    return QString();
 }

@@ -40,7 +40,7 @@ public:
     [[nodiscard]] double defaultScrollSpeed() const;
     void setDefaultScrollSpeed(double speed);
     [[nodiscard]] QString dataDirectory() const;
-    Q_INVOKABLE bool migrateDataDirectory(const QString& newPath, QString* error = nullptr);
+    Q_INVOKABLE QString migrateDataDirectory(const QString& newPath);
     Q_INVOKABLE void openScore(const QString& scoreId, const QString& title, const QString& filePath,
         const QString& fileType, int pageCount, const QString& folderId);
 

@@ -320,7 +320,7 @@ Rectangle {
         title: "选择数据存储位置"
         currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
         onAccepted: {
-            const newPath = selectedFolder.toString().replace(/^file:\/\//, "")
+            const newPath = selectedFolder.toLocalFile()
             migrateConfirmDialog.message = "将把所有数据迁移到：\n" + newPath + "\n\n迁移完成后需要重启应用才能生效。是否继续？"
             migrateConfirmDialog.newPath = newPath
             migrateConfirmDialog.open()
@@ -333,12 +333,12 @@ Rectangle {
         title: "迁移数据？"
         confirmText: "开始迁移"
         onAccepted: {
-            let error = ""
-            if (appController.migrateDataDirectory(newPath, error)) {
+            const error = appController.migrateDataDirectory(newPath)
+            if (error === "" || error === undefined || error === null) {
                 migrateResultDialog.message = "数据迁移成功！\n\n请重启应用以使用新的数据目录。"
                 migrateResultDialog.open()
             } else {
-                migrateResultDialog.message = "迁移失败：\n" + (error || "未知错误")
+                migrateResultDialog.message = "迁移失败：\n" + error
                 migrateResultDialog.open()
             }
         }

@@ -22,6 +22,7 @@ public:
     [[nodiscard]] int count() const;
     [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
     [[nodiscard]] QHash<int, QByteArray> roleNames() const override;
+    Q_INVOKABLE QVariant get(int index) const;
 
     void replaceAll(const QVariantList& values);
 

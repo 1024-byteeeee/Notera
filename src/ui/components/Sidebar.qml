@@ -11,6 +11,63 @@ Rectangle {
     border.color: Theme.border
     border.width: 1
 
+    property var expandedFolderIds: ({})
+    property ListModel visibleFoldersModel: ListModel {}
+
+    function folderHasChildren(folderId) {
+        for (let i = 0; i < libraryService.folders.count; i++) {
+            if (libraryService.folders.get(i).parentId === folderId) {
+                return true
+            }
+        }
+        return false
+    }
+
+    function isFolderExpanded(folderId) {
+        return !!root.expandedFolderIds[folderId]
+    }
+
+    function toggleFolder(folderId) {
+        if (root.expandedFolderIds[folderId]) {
+            delete root.expandedFolderIds[folderId]
+        } else {
+            root.expandedFolderIds[folderId] = true
+        }
+        root.refreshVisibleFolders()
+    }
+
+    function refreshVisibleFolders() {
+        root.visibleFoldersModel.clear()
+        function addChildren(parentId, depth) {
+            for (let i = 0; i < libraryService.folders.count; i++) {
+                const f = libraryService.folders.get(i)
+                if (f.parentId === parentId) {
+                    root.visibleFoldersModel.append({
+                        itemId: f.itemId,
+                        name: f.name,
+                        parentId: f.parentId,
+                        depth: depth,
+                        hasChildren: root.folderHasChildren(f.itemId),
+                        expanded: root.isFolderExpanded(f.itemId)
+                    })
+                    if (root.isFolderExpanded(f.itemId)) {
+                        addChildren(f.itemId, depth + 1)
+                    }
+                }
+            }
+        }
+        addChildren("", 0)
+    }
+
+    Connections {
+        target: libraryService.folders
+        function onCountChanged() {
+            root.refreshVisibleFolders()
+        }
+    }
+
+    Component.onCompleted: root.refreshVisibleFolders()
+
     component NavItem: Rectangle {
         id: navItem
         required property string label
@@ -20,8 +77,11 @@ Rectangle {
         property bool selected: false
         property bool contextEnabled: false
         property int indent: 0
+        property bool hasChildren: false
+        property bool expanded: false
         readonly property int hoverTransitionDuration: 0
         signal contextRequested()
+        signal toggleExpand()
 
         Layout.fillWidth: true
         implicitHeight: 40
@@ -47,6 +107,20 @@ Rectangle {
             anchors.rightMargin: 12
             spacing: 10
 
+            Label {
+                Layout.preferredWidth: 16
+                visible: navItem.hasChildren
+                text: navItem.expanded ? "▾" : "▸"
+                color: navItem.selected ? Theme.selectedText : Theme.mutedForeground
+                font.pixelSize: 12
+                font.weight: Font.Bold
+                horizontalAlignment: Text.AlignHCenter
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: navItem.toggleExpand()
+                }
+            }
             Label {
                 Layout.preferredWidth: 18
                 visible: navItem.symbol.length > 0
@@ -210,18 +284,23 @@ Rectangle {
                 }
 
                 Repeater {
-                    model: libraryService.folders
+                    model: root.visibleFoldersModel
                     delegate: NavItem {
                         objectName: "folderNavItem"
                         required property string itemId
                         required property string name
-                        required property string parentId
+                        required property int depth
+                        required property bool hasChildren
+                        required property bool expanded
                         label: name
                         navId: "folder:" + itemId
                         symbol: ""
-                        indent: parentId.length > 0 ? 20 : 0
+                        indent: depth * 20
+                        hasChildren: hasChildren
+                        expanded: expanded
                         contextEnabled: true
                         selected: appController.currentPage === "library" && appController.libraryFilter === navId
+                        onToggleExpand: root.toggleFolder(itemId)
                         onContextRequested: {
                             folderMenu.targetId = itemId
                             folderMenu.targetName = name

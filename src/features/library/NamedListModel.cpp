@@ -37,6 +37,19 @@ QHash<int, QByteArray> NamedListModel::roleNames() const
     return {{ItemIdRole, "itemId"}, {NameRole, "name"}, {ParentIdRole, "parentId"}};
 }
 
+QVariant NamedListModel::get(const int index) const
+{
+    if (index < 0 || index >= m_items.size()) {
+        return {};
+    }
+    const auto& item = m_items.at(index);
+    return QVariantMap{
+        {"itemId", item.id},
+        {"name", item.name},
+        {"parentId", item.parentId}
+    };
+}
+
 void NamedListModel::replaceAll(const QVariantList& values)
 {
     QList<Item> items;
