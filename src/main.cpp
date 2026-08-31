@@ -351,6 +351,22 @@ int main(int argc, char* argv[])
                 return;
             }
 
+            if (!QMetaObject::invokeMethod(readerPage, "rotateRight")
+                || readerPage->property("viewRotation").toInt() != 90
+                || !QMetaObject::invokeMethod(readerPage, "resetReaderView")) {
+                fail("reader-rotation-controls");
+                return;
+            }
+            QCoreApplication::processEvents();
+            if (readerPage->property("viewRotation").toInt() != 0
+                || std::abs(readerPage->property("zoomLevel").toDouble() - 1.0) > 0.001) {
+                fail("reader-reset-view");
+                return;
+            }
+
+            readerFlick->setProperty("rotation", 17.0);
+            readerFlick->setProperty("scale", 0.75);
+
             controller.setCurrentPage(QStringLiteral("library"));
             controller.openScore(QStringLiteral("再次打开测试"), controller.currentFileUrl().toLocalFile(),
                 controller.currentFileType(), 1);
@@ -364,6 +380,8 @@ int main(int argc, char* argv[])
             if (controller.currentPage() != QStringLiteral("reader")
                 || std::abs(reopenedZoom - 1.0) > 0.001
                 || std::abs(reopenedContentY) > 1.0
+                || std::abs(readerFlick->property("rotation").toDouble()) > 0.001
+                || std::abs(readerFlick->property("scale").toDouble() - 1.0) > 0.001
                 || reopenedContentHeight <= reopenedViewportHeight) {
                 fail("reader-reopen-default-view");
                 return;
@@ -412,6 +430,18 @@ int main(int argc, char* argv[])
             }
             if (!window->grabWindow().save(QStringLiteral("notera-dialog-smoke.png"))) {
                 fail("dialog-screenshot");
+                return;
+            }
+
+            const auto* const browserGrid = root->findChild<QObject*>(QStringLiteral("browserGrid"));
+            if (!browserGrid || browserGrid->property("count").toInt() < 2) {
+                fail("library-folder-score-browser");
+                return;
+            }
+            const auto storedFilePath = controller.currentFileUrl().toLocalFile();
+            libraryService.deleteFolder(folderId);
+            if (libraryService.scores()->rowCount() != 0 || QFileInfo::exists(storedFilePath)) {
+                fail("folder-cascade-delete");
                 return;
             }
             QCoreApplication::exit(0);
