@@ -274,6 +274,45 @@ Rectangle {
                             }
                         }
                         AppMenuSeparator { }
+
+                        // 移动到文件夹子菜单
+                        Menu {
+                            title: "移动到文件夹"
+                            AppMenuItem {
+                                text: "无（移出文件夹）"
+                                onTriggered: libraryService.setScoreFolder(scoreDelegate.scoreId, "")
+                            }
+                            MenuSeparator { }
+                            Repeater {
+                                model: libraryService.folders
+                                delegate: AppMenuItem {
+                                    text: modelData.name
+                                    onTriggered: libraryService.setScoreFolder(scoreDelegate.scoreId, modelData.id)
+                                }
+                            }
+                        }
+
+                        // 标签子菜单（可多选切换）
+                        Menu {
+                            title: "标签"
+                            Repeater {
+                                model: libraryService.tags
+                                delegate: AppMenuItem {
+                                    text: modelData.name
+                                    checkable: true
+                                    checked: false  // TODO: 需要查询乐谱当前标签
+                                    onTriggered: {
+                                        if (checked) {
+                                            libraryService.addScoreTag(scoreDelegate.scoreId, modelData.id)
+                                        } else {
+                                            libraryService.removeScoreTag(scoreDelegate.scoreId, modelData.id)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        AppMenuSeparator { }
                         AppMenuItem {
                             text: "删除乐谱"
                             danger: true
@@ -428,7 +467,13 @@ Rectangle {
         title: "选择多张图片拼接导入（按选择顺序垂直拼接）"
         fileMode: FileDialog.OpenFiles
         nameFilters: ["图片文件 (*.jpg *.jpeg *.png *.bmp *.gif *.webp *.tif *.tiff)", "所有文件 (*)"]
-        onAccepted: libraryService.importAndStitchImages(selectedFiles)
+        onAccepted: {
+            var paths = []
+            for (var i = 0; i < selectedFiles.length; i++) {
+                paths.push(selectedFiles[i].toString())
+            }
+            libraryService.importAndStitchImages(paths)
+        }
     }
 
     AppDialog {

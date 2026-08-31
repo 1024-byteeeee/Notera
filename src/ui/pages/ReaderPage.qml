@@ -229,28 +229,32 @@ Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            contentWidth: width
+            contentWidth: documentColumn.width
             contentHeight: documentColumn.height
             boundsBehavior: Flickable.StopAtBounds
+            pixelAligned: true
 
-            // Ctrl+滚轮缩放（普通滚轮仍用于滚动）
-            MouseArea {
-                anchors.fill: parent
-                hoverEnabled: true
-                propagateComposedEvents: true
-                z: 5
+            // Ctrl+滚轮/触控板缩放（WheelHandler 不阻塞 Flickable 滚动）
+            WheelHandler {
+                id: zoomWheel
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                 onWheel: function(wheel) {
                     if (wheel.modifiers & Qt.ControlModifier) {
                         wheel.accepted = true
                         const delta = wheel.angleDelta.y / 1200
                         root.zoomLevel = Math.max(0.4, Math.min(3.0, root.zoomLevel + delta))
+                    } else {
+                        wheel.accepted = false
                     }
                 }
             }
 
             Column {
                 id: documentColumn
-                width: readerFlick.width
+                readonly property real maxPageWidth: root.isPdf ? 1100 : 1400
+                readonly property real basePageWidth: Math.min(readerFlick.width - 48, maxPageWidth)
+                readonly property real pageWidth: basePageWidth * root.zoomLevel
+                width: Math.max(readerFlick.width, pageWidth + 48)
                 spacing: 20
                 topPadding: 24
                 bottomPadding: 24
@@ -265,7 +269,7 @@ Rectangle {
                     delegate: Rectangle {
                         required property int index
                         readonly property size pageSize: pdfDocument.pagePointSize(index)
-                        width: Math.min(documentColumn.width - 48, 1100) * root.zoomLevel
+                        width: documentColumn.pageWidth
                         height: pageSize.width > 0 ? width * pageSize.height / pageSize.width : 800
                         x: (documentColumn.width - width) / 2
                         color: "white"
@@ -287,7 +291,7 @@ Rectangle {
 
                 Image {
                     visible: root.isImage
-                    width: visible ? Math.min(documentColumn.width - 48, 1400) * root.zoomLevel : 0
+                    width: visible ? documentColumn.pageWidth : 0
                     height: visible ? (sourceSize.width > 0 ? width * sourceSize.height / sourceSize.width : 700) : 0
                     x: (documentColumn.width - width) / 2
                     source: root.isImage ? appController.currentFileUrl : ""

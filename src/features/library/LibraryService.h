@@ -29,10 +29,14 @@ public:
     [[nodiscard]] NamedListModel* tags();
 
     Q_INVOKABLE void importLocalFile(const QUrl& url);
-    Q_INVOKABLE void importAndStitchImages(const QList<QUrl>& urls);
+    Q_INVOKABLE void importAndStitchImages(const QStringList& filePaths);
     Q_INVOKABLE void toggleFavorite(const QString& scoreId, bool favorite);
     Q_INVOKABLE void renameScore(const QString& scoreId, const QString& title);
     Q_INVOKABLE void deleteScore(const QString& scoreId, const QString& filePath, const QString& thumbnailPath);
+    Q_INVOKABLE void setScoreFolder(const QString& scoreId, const QString& folderId);
+    Q_INVOKABLE void addScoreTag(const QString& scoreId, const QString& tagId);
+    Q_INVOKABLE void removeScoreTag(const QString& scoreId, const QString& tagId);
+    Q_INVOKABLE QVariantList scoreTags(const QString& scoreId);
     Q_INVOKABLE void createFolder(const QString& name);
     Q_INVOKABLE void renameFolder(const QString& folderId, const QString& name);
     Q_INVOKABLE void deleteFolder(const QString& folderId);

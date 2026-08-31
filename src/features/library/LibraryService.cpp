@@ -225,40 +225,58 @@ void LibraryService::importLocalFile(const QUrl& url)
     importFile(localPath);
 }
 
-void LibraryService::importAndStitchImages(const QList<QUrl>& urls)
+void LibraryService::importAndStitchImages(const QStringList& filePaths)
 {
-    if (urls.size() < 2) {
+    qDebug() << "[stitch] called with" << filePaths.size() << "paths:" << filePaths;
+
+    if (filePaths.size() < 2) {
         emit errorOccurred(QStringLiteral("拼接导入需要至少选择两张图片。"));
         return;
     }
 
-    // 把 QUrl 解析为本地路径
-    auto resolveLocalPath = [](const QUrl& url) -> QString {
-        if (url.isLocalFile()) return url.toLocalFile();
-        if (url.scheme().isEmpty()) {
-            QString p = url.path();
-            if (p.isEmpty()) p = url.toString();
+    // 和 importLocalFile 完全一致的路径解析逻辑
+    auto resolveLocalPath = [](const QString& pathOrUrl) -> QString {
+        QUrl url(pathOrUrl);
+        qDebug() << "[stitch] resolve:" << pathOrUrl << "valid=" << url.isValid()
+                 << "localFile=" << url.isLocalFile() << "scheme=" << url.scheme();
+        if (url.isValid() && url.isLocalFile()) {
+            const QString p = url.toLocalFile();
+            qDebug() << "[stitch] resolved to local file:" << p << "exists=" << QFileInfo::exists(p);
             return p;
         }
+        if (QFileInfo::exists(pathOrUrl)) {
+            qDebug() << "[stitch] direct path exists:" << pathOrUrl;
+            return pathOrUrl;
+        }
+        if (url.scheme().isEmpty()) {
+            QString p = url.path();
+            qDebug() << "[stitch] scheme empty, path=" << p << "exists=" << QFileInfo::exists(p);
+            if (!p.isEmpty() && QFileInfo::exists(p)) return p;
+        }
+        qDebug() << "[stitch] FAILED to resolve:" << pathOrUrl;
         return {};
     };
 
     // 用 QImageReader 加载（支持更多格式 + 详细错误）
     QList<QImage> images;
-    for (const auto& url : urls) {
-        const QString localPath = resolveLocalPath(url);
-        if (localPath.isEmpty() || !QFileInfo::exists(localPath)) {
-            emit errorOccurred(QStringLiteral("文件不存在：%1").arg(url.toString()));
+    for (const auto& pathOrUrl : filePaths) {
+        const QString localPath = resolveLocalPath(pathOrUrl);
+        if (localPath.isEmpty()) {
+            emit errorOccurred(QStringLiteral("无法读取图片文件：%1").arg(pathOrUrl));
             return;
         }
+        qDebug() << "[stitch] loading:" << localPath;
         QImageReader reader(localPath);
         reader.setAutoTransform(true);
+        qDebug() << "[stitch] reader format:" << reader.format() << "size:" << reader.size();
         QImage img = reader.read();
         if (img.isNull()) {
+            qDebug() << "[stitch] FAILED to load:" << localPath << "error:" << reader.errorString();
             emit errorOccurred(QStringLiteral("无法加载图片 %1：%2")
                 .arg(QFileInfo(localPath).fileName(), reader.errorString()));
             return;
         }
+        qDebug() << "[stitch] loaded:" << img.width() << "x" << img.height();
         images.append(img);
     }
 
@@ -281,6 +299,8 @@ void LibraryService::importAndStitchImages(const QList<QUrl>& urls)
         return;
     }
 
+    qDebug() << "[stitch] canvas size:" << maxWidth << "x" << totalHeight;
+
     // 创建拼接画布（白色背景）
     QImage stitched(maxWidth, static_cast<int>(totalHeight), QImage::Format_ARGB32);
     stitched.fill(Qt::white);
@@ -299,16 +319,22 @@ void LibraryService::importAndStitchImages(const QList<QUrl>& urls)
     const QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
     const QString tempPath = QStringLiteral("%1/notera_stitch_%2.png")
         .arg(tempDir, QUuid::createUuid().toString(QUuid::WithoutBraces));
+    qDebug() << "[stitch] saving to:" << tempPath;
     if (!stitched.save(tempPath, "PNG")) {
+        qDebug() << "[stitch] FAILED to save";
         emit errorOccurred(QStringLiteral("保存拼接图片失败。"));
         return;
     }
+    qDebug() << "[stitch] saved, size:" << QFileInfo(tempPath).size() << "bytes";
 
     // 导入拼接后的图片
+    qDebug() << "[stitch] calling importFile...";
     importFile(tempPath, QStringLiteral("拼接乐谱 %1张").arg(images.size()));
+    qDebug() << "[stitch] importFile done";
 
     // 清理临时文件
     QFile::remove(tempPath);
+    qDebug() << "[stitch] temp file removed, all done";
 }
 
 void LibraryService::toggleFavorite(const QString& scoreId, const bool favorite)
@@ -347,6 +373,44 @@ void LibraryService::deleteScore(const QString& scoreId, const QString& filePath
         return;
     }
     reload();
+}
+
+void LibraryService::setScoreFolder(const QString& scoreId, const QString& folderId)
+{
+    QString error;
+    if (!m_repository.setFolder(scoreId, folderId, &error)) {
+        emit errorOccurred(QStringLiteral("设置文件夹失败。"));
+        return;
+    }
+    reload();
+    emit noticeOccurred(folderId.isEmpty() ? QStringLiteral("已移出文件夹") : QStringLiteral("已移动到文件夹"));
+}
+
+void LibraryService::addScoreTag(const QString& scoreId, const QString& tagId)
+{
+    QString error;
+    if (!m_repository.addTag(scoreId, tagId, &error)) {
+        emit errorOccurred(QStringLiteral("添加标签失败。"));
+        return;
+    }
+    reload();
+    emit noticeOccurred(QStringLiteral("已添加标签"));
+}
+
+void LibraryService::removeScoreTag(const QString& scoreId, const QString& tagId)
+{
+    QString error;
+    if (!m_repository.removeTag(scoreId, tagId, &error)) {
+        emit errorOccurred(QStringLiteral("移除标签失败。"));
+        return;
+    }
+    reload();
+}
+
+QVariantList LibraryService::scoreTags(const QString& scoreId)
+{
+    QString error;
+    return m_repository.scoreTags(scoreId, &error);
 }
 
 void LibraryService::reload()

@@ -20,6 +20,10 @@ public:
     [[nodiscard]] bool rename(const QString& scoreId, const QString& title, QString* error) const;
     [[nodiscard]] bool updateThumbnail(const QString& scoreId, const QString& thumbnailPath, QString* error) const;
     [[nodiscard]] bool remove(const QString& scoreId, QString* error) const;
+    [[nodiscard]] bool setFolder(const QString& scoreId, const QString& folderId, QString* error) const;
+    [[nodiscard]] bool addTag(const QString& scoreId, const QString& tagId, QString* error) const;
+    [[nodiscard]] bool removeTag(const QString& scoreId, const QString& tagId, QString* error) const;
+    [[nodiscard]] QVariantList scoreTags(const QString& scoreId, QString* error) const;
 
     [[nodiscard]] QVariantList folders(QString* error) const;
     [[nodiscard]] bool createFolder(const QString& name, QString* error) const;

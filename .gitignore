@@ -1,7 +1,9 @@
 /build/
 /.qt/
+/Qt/
 /.vs/
 /.vscode/
 *.user
 *.suo
 *.DS_Store
+aqtinstall.log

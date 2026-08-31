@@ -223,6 +223,56 @@ bool ScoreRepository::remove(const QString& scoreId, QString* error) const
     return false;
 }
 
+bool ScoreRepository::setFolder(const QString& scoreId, const QString& folderId, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("UPDATE scores SET folder_id = ?, updated_at = ? WHERE id = ?"));
+    query.addBindValue(folderId.isEmpty() ? QVariant(QVariant::String) : folderId);
+    query.addBindValue(QDateTime::currentMSecsSinceEpoch());
+    query.addBindValue(scoreId);
+    if (query.exec() && query.numRowsAffected() == 1) return true;
+    *error = query.lastError().text();
+    return false;
+}
+
+bool ScoreRepository::addTag(const QString& scoreId, const QString& tagId, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("INSERT OR IGNORE INTO score_tags (score_id, tag_id) VALUES (?, ?)"));
+    query.addBindValue(scoreId);
+    query.addBindValue(tagId);
+    if (query.exec()) return true;
+    *error = query.lastError().text();
+    return false;
+}
+
+bool ScoreRepository::removeTag(const QString& scoreId, const QString& tagId, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("DELETE FROM score_tags WHERE score_id = ? AND tag_id = ?"));
+    query.addBindValue(scoreId);
+    query.addBindValue(tagId);
+    if (query.exec()) return true;
+    *error = query.lastError().text();
+    return false;
+}
+
+QVariantList ScoreRepository::scoreTags(const QString& scoreId, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("SELECT tags.id, tags.name FROM score_tags JOIN tags ON tags.id = score_tags.tag_id WHERE score_tags.score_id = ? ORDER BY tags.name"));
+    query.addBindValue(scoreId);
+    if (!query.exec()) {
+        *error = query.lastError().text();
+        return {};
+    }
+    QVariantList result;
+    while (query.next()) {
+        result.append(QVariantMap{{"id", query.value(0)}, {"name", query.value(1)}});
+    }
+    return result;
+}
+
 QList<Score> ScoreRepository::listByFolder(const QString& folderId, const QString& searchQuery, QString* error) const
 {
     QSqlQuery query(m_database);
