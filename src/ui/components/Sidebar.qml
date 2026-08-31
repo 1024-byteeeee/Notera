@@ -124,6 +124,7 @@ Rectangle {
         }
 
         AppButton {
+            objectName: "sidebarImportButton"
             Layout.fillWidth: true
             Layout.bottomMargin: 12
             text: "导入乐谱"

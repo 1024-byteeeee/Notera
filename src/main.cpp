@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 
 #include <QColor>
 #include <QDebug>
@@ -220,7 +221,12 @@ int main(int argc, char* argv[])
                 QCoreApplication::exit(1);
             };
             auto* const importButton = root->findChild<QQuickItem*>(QStringLiteral("importButton"));
-            if (!importButton || !importButton->isVisible() || importButton->width() < 96.0) {
+            const auto* const stitchButton = root->findChild<QObject*>(QStringLiteral("stitchButton"));
+            const auto* const sidebarImportButton = root->findChild<QObject*>(QStringLiteral("sidebarImportButton"));
+            if (!importButton || !importButton->isVisible() || importButton->width() < 96.0
+                || importButton->property("symbol").toString().length() > 0
+                || !stitchButton || stitchButton->property("symbol").toString().length() > 0
+                || !sidebarImportButton || sidebarImportButton->property("symbol").toString().length() > 0) {
                 fail("import-button-geometry");
                 return;
             }
@@ -291,6 +297,11 @@ int main(int argc, char* argv[])
             }
 
             const auto favoriteRole = libraryService.scores()->roleNames().key("favorite", -1);
+            const auto createdDateRole = libraryService.scores()->roleNames().key("createdDate", -1);
+            if (createdDateRole < 0) {
+                fail("score-created-date-role");
+                return;
+            }
             const auto firstIndex = libraryService.scores()->index(0, 0);
             const auto favoriteBefore = libraryService.scores()->data(firstIndex, favoriteRole).toBool();
             if (!clickItem(root, QStringLiteral("favoriteButton"), Qt::LeftButton)
@@ -311,8 +322,22 @@ int main(int argc, char* argv[])
             }
             QCoreApplication::processEvents();
             const auto* const sidebar = root->findChild<QQuickItem*>(QStringLiteral("sidebar"));
+            auto* const readerPage = root->findChild<QObject*>(QStringLiteral("readerPage"));
+            auto* const readerFlick = root->findChild<QObject*>(QStringLiteral("readerFlick"));
             if (!sidebar || sidebar->isVisible()) {
                 fail("reader-focus-layout");
+                return;
+            }
+            const auto centerBefore = (readerFlick->property("contentX").toDouble()
+                + readerFlick->property("width").toDouble() / 2.0)
+                / readerFlick->property("contentWidth").toDouble();
+            QMetaObject::invokeMethod(readerPage, "zoomIn");
+            QCoreApplication::processEvents();
+            const auto centerAfter = (readerFlick->property("contentX").toDouble()
+                + readerFlick->property("width").toDouble() / 2.0)
+                / readerFlick->property("contentWidth").toDouble();
+            if (std::abs(centerBefore - centerAfter) > 0.02) {
+                fail("reader-centered-zoom");
                 return;
             }
             if (!window->grabWindow().save(QStringLiteral("notera-reader-smoke.png"))) {

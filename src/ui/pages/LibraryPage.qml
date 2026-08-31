@@ -278,6 +278,7 @@ Rectangle {
 
                         // 移动到文件夹子菜单
                         AppMenu {
+                            id: folderSubmenu
                             title: "移动到文件夹"
                             AppMenuItem {
                                 text: "无（移出文件夹）"
@@ -297,6 +298,7 @@ Rectangle {
 
                         // 标签子菜单（可多选切换）
                         AppMenu {
+                            id: tagSubmenu
                             title: "标签"
                             Repeater {
                                 model: libraryService.tags
