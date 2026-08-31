@@ -276,6 +276,19 @@ int main(int argc, char* argv[])
                 return;
             }
 
+            const auto entryTypeRole = libraryService.entries()->roleNames().key("itemType", -1);
+            const auto entryTitleRole = libraryService.entries()->roleNames().key("title", -1);
+            if (libraryService.entries()->rowCount() != 3
+                || libraryService.entries()->data(libraryService.entries()->index(0, 0), entryTypeRole).toString()
+                    != QStringLiteral("folder")
+                || !libraryService.entries()->data(libraryService.entries()->index(1, 0), entryTitleRole).toString()
+                    .startsWith(QStringLiteral("notera-ui-a-"))
+                || !libraryService.entries()->data(libraryService.entries()->index(2, 0), entryTitleRole).toString()
+                    .startsWith(QStringLiteral("notera-ui-z-"))) {
+                fail("library-folder-first-file-name-sort");
+                return;
+            }
+
             auto* const libraryPage = root->findChild<QObject*>(QStringLiteral("libraryPage"));
             auto* const librarySurface = findVisualItem(root, QStringLiteral("librarySurface"));
             auto* const selectionBox = findVisualItem(root, QStringLiteral("selectionBox"));
@@ -531,6 +544,18 @@ int main(int argc, char* argv[])
                 fail("library-folder-score-browser");
                 return;
             }
+            libraryService.setFilterMode(QStringLiteral("recent"));
+            QCoreApplication::processEvents();
+            const auto entryIdRole = libraryService.entries()->roleNames().key("itemId", -1);
+            if (libraryService.entries()->rowCount() != 3
+                || libraryService.entries()->data(libraryService.entries()->index(0, 0), entryTypeRole).toString()
+                    != QStringLiteral("folder")
+                || libraryService.entries()->data(libraryService.entries()->index(1, 0), entryIdRole).toString()
+                    != controller.currentScoreId()) {
+                fail("recent-folder-first-last-opened-sort");
+                return;
+            }
+            libraryService.goToLibraryRoot();
             const auto folderScores = libraryService.scoresInFolder(folderId);
             QStringList storedFilePaths;
             for (const auto& value : folderScores) {
