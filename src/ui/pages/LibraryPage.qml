@@ -133,6 +133,7 @@ Rectangle {
         }
 
         Rectangle {
+            id: librarySurface
             objectName: "librarySurface"
             Layout.fillWidth: true
             Layout.fillHeight: true
