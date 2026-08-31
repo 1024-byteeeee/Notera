@@ -276,13 +276,13 @@ Rectangle {
                         AppMenuSeparator { }
 
                         // 移动到文件夹子菜单
-                        Menu {
+                        AppMenu {
                             title: "移动到文件夹"
                             AppMenuItem {
                                 text: "无（移出文件夹）"
                                 onTriggered: libraryService.setScoreFolder(scoreDelegate.scoreId, "")
                             }
-                            MenuSeparator { }
+                            AppMenuSeparator { }
                             Repeater {
                                 model: libraryService.folders
                                 delegate: AppMenuItem {
@@ -293,14 +293,14 @@ Rectangle {
                         }
 
                         // 标签子菜单（可多选切换）
-                        Menu {
+                        AppMenu {
                             title: "标签"
                             Repeater {
                                 model: libraryService.tags
                                 delegate: AppMenuItem {
                                     text: modelData.name
                                     checkable: true
-                                    checked: false  // TODO: 需要查询乐谱当前标签
+                                    checked: false
                                     onTriggered: {
                                         if (checked) {
                                             libraryService.addScoreTag(scoreDelegate.scoreId, modelData.id)

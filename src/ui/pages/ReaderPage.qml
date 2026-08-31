@@ -14,6 +14,7 @@ Rectangle {
     property bool autoScrolling: false
     property real scrollSpeed: appController.autoScrollSpeed
     property real zoomLevel: 1.0
+    property real pinchBaseZoom: 1.0
 
     function resetZoom() { root.zoomLevel = 1.0 }
     function zoomIn() { root.zoomLevel = Math.min(3.0, root.zoomLevel + 0.25) }
@@ -234,18 +235,14 @@ Rectangle {
             boundsBehavior: Flickable.StopAtBounds
             pixelAligned: true
 
-            // Ctrl+滚轮/触控板缩放（WheelHandler 不阻塞 Flickable 滚动）
-            WheelHandler {
-                id: zoomWheel
-                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                onWheel: function(wheel) {
-                    if (wheel.modifiers & Qt.ControlModifier) {
-                        wheel.accepted = true
-                        const delta = wheel.angleDelta.y / 1200
-                        root.zoomLevel = Math.max(0.4, Math.min(3.0, root.zoomLevel + delta))
-                    } else {
-                        wheel.accepted = false
-                    }
+            // 双指捏合缩放（触控板，不阻塞滚动）
+            PinchHandler {
+                id: pinchZoom
+                onActiveChanged: function(active) {
+                    if (active) root.pinchBaseZoom = root.zoomLevel
+                }
+                onScaleChanged: function(scale) {
+                    root.zoomLevel = Math.max(0.4, Math.min(3.0, root.pinchBaseZoom * scale))
                 }
             }
 
