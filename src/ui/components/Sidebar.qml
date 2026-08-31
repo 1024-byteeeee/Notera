@@ -19,17 +19,15 @@ Rectangle {
         property string targetPage: "library"
         property bool selected: false
         property bool contextEnabled: false
-        readonly property int hoverTransitionDuration: 100
+        readonly property int hoverTransitionDuration: 0
         signal contextRequested()
 
         Layout.fillWidth: true
         implicitHeight: 40
         radius: Theme.radiusMd
-        color: selected ? Theme.selectedBackground : (navMouse.containsMouse ? Theme.buttonHover : "transparent")
+        color: selected ? Theme.selectedBackground : (navHover.hovered ? Theme.buttonHover : "transparent")
         border.width: selected ? 1 : 0
         border.color: selected ? Theme.selectedBorder : "transparent"
-
-        Behavior on color { ColorAnimation { duration: navItem.hoverTransitionDuration } }
 
         Rectangle {
             visible: navItem.selected
@@ -50,11 +48,18 @@ Rectangle {
 
             Label {
                 Layout.preferredWidth: 18
+                visible: navItem.symbol.length > 0
                 text: navItem.symbol
                 color: navItem.selected ? Theme.selectedText : Theme.mutedForeground
                 font.pixelSize: 15
                 font.weight: Font.DemiBold
                 horizontalAlignment: Text.AlignHCenter
+            }
+            FolderIcon {
+                visible: navItem.navId.startsWith("folder:")
+                Layout.preferredWidth: 18
+                Layout.preferredHeight: 18
+                iconColor: navItem.selected ? Theme.selectedText : Theme.mutedForeground
             }
             Label {
                 Layout.fillWidth: true
@@ -72,7 +77,7 @@ Rectangle {
             acceptedButtons: navItem.contextEnabled
                 ? Qt.LeftButton | Qt.RightButton
                 : Qt.LeftButton
-            hoverEnabled: true
+            hoverEnabled: false
             preventStealing: true
             cursorShape: Qt.PointingHandCursor
             onPressed: function(mouse) {
@@ -91,6 +96,10 @@ Rectangle {
                 }
             }
         }
+        HoverHandler {
+            id: navHover
+            cursorShape: Qt.PointingHandCursor
+        }
     }
 
     ColumnLayout {
@@ -104,18 +113,15 @@ Rectangle {
             Layout.bottomMargin: 12
             spacing: 10
 
-            Rectangle {
+            Image {
+                objectName: "appLogo"
                 Layout.preferredWidth: 34
                 Layout.preferredHeight: 34
-                radius: 10
-                color: Theme.accent
-                Label {
-                    anchors.centerIn: parent
-                    text: "N"
-                    color: Theme.accentForeground
-                    font.pixelSize: 17
-                    font.weight: Font.Bold
-                }
+                source: "qrc:/src/assets/notera-icon.png"
+                sourceSize.width: 68
+                sourceSize.height: 68
+                fillMode: Image.PreserveAspectFit
+                smooth: true
             }
             Label {
                 objectName: "brandLabel"
@@ -214,7 +220,7 @@ Rectangle {
                         required property string name
                         label: name
                         navId: "folder:" + itemId
-                        symbol: "▱"
+                        symbol: ""
                         contextEnabled: true
                         selected: appController.currentPage === "library" && appController.libraryFilter === navId
                         onContextRequested: {

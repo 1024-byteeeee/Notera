@@ -39,7 +39,21 @@ qt_add_executable(Notera
     src/features/library/ThumbnailGenerator.cpp
     src/features/library/LibraryService.h
     src/features/library/LibraryService.cpp
+    src/assets/Notera.icns
 )
+
+set_source_files_properties(src/assets/Notera.icns PROPERTIES
+    MACOSX_PACKAGE_LOCATION "Resources"
+)
+
+qt_add_resources(Notera "notera_assets"
+    PREFIX "/"
+    FILES src/assets/notera-icon.png
+)
+
+if(WIN32)
+    target_sources(Notera PRIVATE src/assets/notera.rc)
+endif()
 
 qt_add_qml_module(Notera
     URI Notera
@@ -55,6 +69,7 @@ qt_add_qml_module(Notera
         src/ui/components/AppMenu.qml
         src/ui/components/AppMenuItem.qml
         src/ui/components/AppMenuSeparator.qml
+        src/ui/components/FolderIcon.qml
         src/ui/components/Sidebar.qml
         src/ui/pages/LibraryPage.qml
         src/ui/pages/ReaderPage.qml
@@ -82,6 +97,7 @@ set_target_properties(Notera PROPERTIES
     MACOSX_BUNDLE_BUNDLE_NAME "Notera"
     MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_ICON_FILE "Notera.icns"
     WIN32_EXECUTABLE TRUE
 )
 
@@ -116,6 +132,7 @@ elseif(WIN32)
     # Requires WiX Toolset on the Windows packaging machine.
     set(CPACK_GENERATOR "WIX")
     set(CPACK_WIX_UPGRADE_GUID "C2A4B1D0-76FB-4D37-94B3-32D3A9FD44F1")
+    set(CPACK_WIX_PRODUCT_ICON "${CMAKE_CURRENT_SOURCE_DIR}/src/assets/Notera.ico")
 endif()
 
 include(CPack)

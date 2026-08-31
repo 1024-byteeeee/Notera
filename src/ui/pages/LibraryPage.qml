@@ -232,10 +232,17 @@ Rectangle {
                                 }
                                 Label {
                                     anchors.centerIn: parent
-                                    visible: scoreDelegate.itemType === "folder" || scoreDelegate.thumbnailPath.length === 0
-                                    text: scoreDelegate.itemType === "folder" ? "▰" : "♫"
-                                    color: scoreDelegate.itemType === "folder" ? Theme.accent : Theme.faintForeground
-                                    font.pixelSize: scoreDelegate.itemType === "folder" ? 54 : 38
+                                    visible: scoreDelegate.itemType !== "folder" && scoreDelegate.thumbnailPath.length === 0
+                                    text: "♫"
+                                    color: Theme.faintForeground
+                                    font.pixelSize: 38
+                                }
+                                FolderIcon {
+                                    anchors.centerIn: parent
+                                    visible: scoreDelegate.itemType === "folder"
+                                    width: 72
+                                    height: 58
+                                    iconColor: Theme.accent
                                 }
                             }
 
@@ -324,7 +331,8 @@ Rectangle {
                         z: 2
                         anchors.right: card.right
                         anchors.top: card.top
-                        anchors.margins: 14
+                        anchors.rightMargin: 7
+                        anchors.topMargin: 7
                         width: 28
                         height: 28
                         readonly property bool hovered: favoriteHover.hovered

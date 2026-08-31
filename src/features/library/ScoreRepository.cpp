@@ -31,7 +31,7 @@ QList<Score> ScoreRepository::list(const QString& searchQuery, QString* error) c
             SELECT 1 FROM score_tags JOIN tags ON tags.id = score_tags.tag_id
             WHERE score_tags.score_id = scores.id AND tags.name LIKE ?
         )
-        ORDER BY favorite DESC, last_opened_at DESC, created_at DESC
+        ORDER BY file_name COLLATE NOCASE, id
     )"));
     query.addBindValue(needle);
     query.addBindValue(needle);
@@ -75,7 +75,7 @@ QList<Score> ScoreRepository::listFavorites(const QString& searchQuery, QString*
             SELECT 1 FROM score_tags JOIN tags ON tags.id = score_tags.tag_id
             WHERE score_tags.score_id = scores.id AND tags.name LIKE ?
           ))
-        ORDER BY last_opened_at DESC, created_at DESC
+        ORDER BY file_name COLLATE NOCASE, id
     )"));
     query.addBindValue(needle);
     query.addBindValue(needle);
@@ -194,7 +194,7 @@ QList<Score> ScoreRepository::listAtFolder(const QString& folderId, const QStrin
             SELECT 1 FROM score_tags JOIN tags ON tags.id = score_tags.tag_id
             WHERE score_tags.score_id = scores.id AND tags.name LIKE ?
           ))
-        ORDER BY favorite DESC, last_opened_at DESC, created_at DESC
+        ORDER BY file_name COLLATE NOCASE, id
     )").arg(folderCondition);
     query.prepare(sql);
     if (!folderId.isEmpty()) query.addBindValue(folderId);
@@ -378,7 +378,7 @@ QList<Score> ScoreRepository::listByFolder(const QString& folderId, const QStrin
             SELECT 1 FROM score_tags JOIN tags ON tags.id = score_tags.tag_id
             WHERE score_tags.score_id = scores.id AND tags.name LIKE ?
           ))
-        ORDER BY favorite DESC, last_opened_at DESC, created_at DESC
+        ORDER BY file_name COLLATE NOCASE, id
     )"));
     query.addBindValue(folderId);
     query.addBindValue(needle);
@@ -424,7 +424,7 @@ QList<Score> ScoreRepository::listByTag(const QString& tagId, const QString& sea
             SELECT 1 FROM score_tags st2 JOIN tags t ON t.id = st2.tag_id
             WHERE st2.score_id = s.id AND t.name LIKE ?
           ))
-        ORDER BY s.favorite DESC, s.last_opened_at DESC, s.created_at DESC
+        ORDER BY s.file_name COLLATE NOCASE, s.id
     )"));
     query.addBindValue(tagId);
     query.addBindValue(needle);

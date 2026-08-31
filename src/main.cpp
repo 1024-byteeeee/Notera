@@ -7,6 +7,7 @@
 #include <QEventLoop>
 #include <QGuiApplication>
 #include <QImage>
+#include <QIcon>
 #include <QLocale>
 #include <QMouseEvent>
 #include <QPointingDevice>
@@ -95,6 +96,7 @@ int main(int argc, char* argv[])
     app.setOrganizationName(QStringLiteral("Notera"));
     app.setOrganizationDomain(QStringLiteral("notera.app"));
     app.setApplicationName(QStringLiteral("Notera"));
+    app.setWindowIcon(QIcon(QStringLiteral(":/src/assets/notera-icon.png")));
 
     const auto arguments = app.arguments();
     const auto isSmokeTest = arguments.contains(QStringLiteral("--theme-smoke-test"))
