@@ -33,6 +33,7 @@ LibraryService::LibraryService(QObject* parent)
     : QObject(parent)
     , m_repository(m_databaseService.database())
     , m_scores(this)
+    , m_entries(this)
     , m_folders(this)
     , m_tags(this)
     , m_thumbnailGenerator(this)
@@ -64,6 +65,11 @@ ScoreListModel* LibraryService::scores()
     return &m_scores;
 }
 
+LibraryEntryModel* LibraryService::entries()
+{
+    return &m_entries;
+}
+
 QString LibraryService::searchQuery() const
 {
     return m_searchQuery;
@@ -86,6 +92,18 @@ void LibraryService::setFilterMode(const QString& mode)
 {
     if (m_filterMode == mode) return;
     m_filterMode = mode;
+    if (mode == QStringLiteral("all")) {
+        m_currentFolderId.clear();
+        m_currentFolderName = QStringLiteral("乐谱库");
+        m_currentFolderBreadcrumb = QStringLiteral("乐谱库");
+        emit currentFolderChanged();
+    } else if (mode.startsWith(QStringLiteral("folder:"))) {
+        m_currentFolderId = mode.mid(7);
+        QString error;
+        m_currentFolderName = m_repository.folderName(m_currentFolderId, &error);
+        m_currentFolderBreadcrumb = m_repository.folderBreadcrumb(m_currentFolderId, &error);
+        emit currentFolderChanged();
+    }
     emit filterModeChanged();
     reload();
 }
@@ -100,6 +118,57 @@ NamedListModel* LibraryService::tags()
     return &m_tags;
 }
 
+QString LibraryService::currentFolderId() const { return m_currentFolderId; }
+QString LibraryService::currentFolderName() const { return m_currentFolderName; }
+QString LibraryService::currentFolderBreadcrumb() const { return m_currentFolderBreadcrumb; }
+bool LibraryService::canGoUp() const { return !m_currentFolderId.isEmpty(); }
+
+void LibraryService::enterFolder(const QString& folderId)
+{
+    if (folderId.isEmpty()) return;
+    QString error;
+    const auto name = m_repository.folderName(folderId, &error);
+    const auto breadcrumb = m_repository.folderBreadcrumb(folderId, &error);
+    if (!error.isEmpty() || name.isEmpty()) {
+        emit errorOccurred(QStringLiteral("无法打开文件夹。"));
+        return;
+    }
+    m_currentFolderId = folderId;
+    m_currentFolderName = name;
+    m_currentFolderBreadcrumb = breadcrumb;
+    m_filterMode = QStringLiteral("folder:") + folderId;
+    emit currentFolderChanged();
+    emit filterModeChanged();
+    reload();
+}
+
+void LibraryService::goUp()
+{
+    if (m_currentFolderId.isEmpty()) return;
+    QString error;
+    const auto parentId = m_repository.folderParent(m_currentFolderId, &error);
+    if (!error.isEmpty()) {
+        emit errorOccurred(QStringLiteral("无法返回上一级。"));
+        return;
+    }
+    if (parentId.isEmpty()) {
+        goToLibraryRoot();
+    } else {
+        enterFolder(parentId);
+    }
+}
+
+void LibraryService::goToLibraryRoot()
+{
+    m_currentFolderId.clear();
+    m_currentFolderName = QStringLiteral("乐谱库");
+    m_currentFolderBreadcrumb = QStringLiteral("乐谱库");
+    m_filterMode = QStringLiteral("all");
+    emit currentFolderChanged();
+    emit filterModeChanged();
+    reload();
+}
+
 void LibraryService::createFolder(const QString& name)
 {
     if (name.trimmed().isEmpty()) {
@@ -107,11 +176,14 @@ void LibraryService::createFolder(const QString& name)
         return;
     }
     QString error;
-    if (!m_repository.createFolder(name, &error)) {
+    const auto parentId = (m_filterMode == QStringLiteral("all")
+        || m_filterMode.startsWith(QStringLiteral("folder:"))) ? m_currentFolderId : QString {};
+    if (!m_repository.createFolder(name, parentId, &error)) {
         emit errorOccurred(QStringLiteral("创建文件夹失败。"));
         return;
     }
     reloadFolders();
+    reload();
     emit noticeOccurred(QStringLiteral("已创建文件夹 %1").arg(name.trimmed()));
 }
 
@@ -142,20 +214,42 @@ void LibraryService::renameFolder(const QString& folderId, const QString& name)
         return;
     }
     reloadFolders();
+    if (m_currentFolderId == folderId) {
+        m_currentFolderName = name.trimmed();
+        QString error;
+        m_currentFolderBreadcrumb = m_repository.folderBreadcrumb(folderId, &error);
+        emit currentFolderChanged();
+    }
+    reload();
     emit noticeOccurred(QStringLiteral("已重命名为 %1").arg(name.trimmed()));
 }
 
 void LibraryService::deleteFolder(const QString& folderId)
 {
     QString error;
+    const auto files = m_repository.folderScoresRecursive(folderId, &error);
+    if (!error.isEmpty()) {
+        emit errorOccurred(QStringLiteral("读取文件夹内容失败。"));
+        return;
+    }
+    for (const auto& value : files) {
+        const auto item = value.toMap();
+        if (!FileService::removeFile(item.value(QStringLiteral("filePath")).toString(), &error)
+            || !FileService::removeFile(item.value(QStringLiteral("thumbnailPath")).toString(), &error)) {
+            emit errorOccurred(error);
+            return;
+        }
+    }
     if (!m_repository.deleteFolder(folderId, &error)) {
         emit errorOccurred(QStringLiteral("删除文件夹失败。"));
         return;
     }
-    if (m_filterMode.startsWith(QStringLiteral("folder:"))) {
-        m_filterMode = QStringLiteral("all");
-        emit filterModeChanged();
-    }
+    m_currentFolderId.clear();
+    m_currentFolderName = QStringLiteral("乐谱库");
+    m_currentFolderBreadcrumb = QStringLiteral("乐谱库");
+    m_filterMode = QStringLiteral("all");
+    emit currentFolderChanged();
+    emit filterModeChanged();
     reloadFolders();
     reload();
     emit noticeOccurred(QStringLiteral("文件夹已删除"));
@@ -415,22 +509,26 @@ void LibraryService::reload()
 {
     QString error;
     QList<Score> scores;
+    QVariantList visibleFolders;
     if (m_filterMode == QStringLiteral("favorites")) {
         scores = m_repository.listFavorites(m_searchQuery, &error);
     } else if (m_filterMode == QStringLiteral("recent")) {
         scores = m_repository.listRecent(m_searchQuery, &error);
     } else if (m_filterMode.startsWith(QStringLiteral("folder:"))) {
-        scores = m_repository.listByFolder(m_filterMode.mid(7), m_searchQuery, &error);
+        scores = m_repository.listAtFolder(m_currentFolderId, m_searchQuery, &error);
+        visibleFolders = m_repository.childFolders(m_currentFolderId, &error);
     } else if (m_filterMode.startsWith(QStringLiteral("tag:"))) {
         scores = m_repository.listByTag(m_filterMode.mid(4), m_searchQuery, &error);
     } else {
-        scores = m_repository.list(m_searchQuery, &error);
+        scores = m_repository.listAtFolder({}, m_searchQuery, &error);
+        visibleFolders = m_repository.childFolders({}, &error);
     }
     if (!error.isEmpty()) {
         emit errorOccurred(QStringLiteral("加载乐谱库失败。"));
         return;
     }
     m_scores.replaceAll(scores);
+    m_entries.replaceAll(visibleFolders, scores);
 }
 
 void LibraryService::reloadFolders()
@@ -477,7 +575,9 @@ void LibraryService::importFile(const QString& sourcePath, const QString& titleO
         .createdAt = now,
         .updatedAt = now
     };
-    if (!m_repository.insert(score, &error)) {
+    const auto destinationFolder = (m_filterMode == QStringLiteral("all")
+        || m_filterMode.startsWith(QStringLiteral("folder:"))) ? m_currentFolderId : QString {};
+    if (!m_repository.insert(score, destinationFolder, &error)) {
         FileService::removeFile(storedPath, &error);
         emit errorOccurred(QStringLiteral("将乐谱添加到乐谱库失败。"));
         return;

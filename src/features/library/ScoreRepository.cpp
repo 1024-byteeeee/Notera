@@ -149,13 +149,13 @@ QList<Score> ScoreRepository::listRecent(const QString& searchQuery, QString* er
     return scores;
 }
 
-bool ScoreRepository::insert(const Score& score, QString* error) const
+bool ScoreRepository::insert(const Score& score, const QString& folderId, QString* error) const
 {
     QSqlQuery query(m_database);
     query.prepare(QStringLiteral(R"(
         INSERT INTO scores (id, title, composer, file_name, file_path, file_type, page_count, thumbnail_path,
-                            favorite, last_page, created_at, updated_at, last_opened_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            favorite, last_page, created_at, updated_at, last_opened_at, folder_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     )"));
     query.addBindValue(score.id);
     query.addBindValue(score.title);
@@ -170,11 +170,58 @@ bool ScoreRepository::insert(const Score& score, QString* error) const
     query.addBindValue(milliseconds(score.createdAt));
     query.addBindValue(milliseconds(score.updatedAt));
     query.addBindValue(milliseconds(score.lastOpenedAt));
+    query.addBindValue(folderId.isEmpty() ? QVariant(QVariant::String) : folderId);
     if (query.exec()) {
         return true;
     }
     *error = query.lastError().text();
     return false;
+}
+
+QList<Score> ScoreRepository::listAtFolder(const QString& folderId, const QString& searchQuery, QString* error) const
+{
+    QSqlQuery query(m_database);
+    const auto needle = QStringLiteral("%%1%").arg(searchQuery);
+    query.prepare(QStringLiteral(R"(
+        SELECT id, title, composer, file_name, file_path, file_type, page_count, thumbnail_path,
+               favorite, last_page, created_at, updated_at, last_opened_at
+        FROM scores
+        WHERE ((? = '' AND folder_id IS NULL) OR folder_id = ?)
+          AND (title LIKE ? OR composer LIKE ? OR EXISTS (
+            SELECT 1 FROM score_tags JOIN tags ON tags.id = score_tags.tag_id
+            WHERE score_tags.score_id = scores.id AND tags.name LIKE ?
+          ))
+        ORDER BY favorite DESC, last_opened_at DESC, created_at DESC
+    )"));
+    query.addBindValue(folderId);
+    query.addBindValue(folderId);
+    query.addBindValue(needle);
+    query.addBindValue(needle);
+    query.addBindValue(needle);
+    if (!query.exec()) {
+        *error = query.lastError().text();
+        return {};
+    }
+
+    QList<Score> scores;
+    while (query.next()) {
+        Score score;
+        score.id = query.value(0).toString();
+        score.title = query.value(1).toString();
+        score.composer = query.value(2).toString();
+        score.fileName = query.value(3).toString();
+        score.filePath = query.value(4).toString();
+        score.fileType = query.value(5).toString();
+        score.pageCount = query.value(6).toInt();
+        score.thumbnailPath = query.value(7).toString();
+        score.favorite = query.value(8).toBool();
+        score.lastPage = query.value(9).toInt();
+        score.createdAt = QDateTime::fromMSecsSinceEpoch(query.value(10).toLongLong());
+        score.updatedAt = QDateTime::fromMSecsSinceEpoch(query.value(11).toLongLong());
+        score.lastOpenedAt = QDateTime::fromMSecsSinceEpoch(query.value(12).toLongLong());
+        scores.append(std::move(score));
+    }
+    return scores;
 }
 
 bool ScoreRepository::setFavorite(const QString& scoreId, const bool favorite, QString* error) const
@@ -367,25 +414,123 @@ QList<Score> ScoreRepository::listByTag(const QString& tagId, const QString& sea
 QVariantList ScoreRepository::folders(QString* error) const
 {
     QSqlQuery query(m_database);
-    if (!query.exec(QStringLiteral("SELECT id, name FROM folders ORDER BY name COLLATE NOCASE"))) {
+    if (!query.exec(QStringLiteral("SELECT id, name, created_at FROM folders ORDER BY name COLLATE NOCASE"))) {
         *error = query.lastError().text();
         return {};
     }
     QVariantList result;
     while (query.next()) {
-        result.append(QVariantMap{{"id", query.value(0).toString()}, {"name", query.value(1).toString()}});
+        result.append(QVariantMap{{"id", query.value(0).toString()}, {"name", query.value(1).toString()},
+            {"createdAt", query.value(2).toLongLong()}});
     }
     return result;
 }
 
-bool ScoreRepository::createFolder(const QString& name, QString* error) const
+QVariantList ScoreRepository::childFolders(const QString& parentId, QString* error) const
 {
     QSqlQuery query(m_database);
-    query.prepare(QStringLiteral("INSERT INTO folders (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)"));
+    query.prepare(QStringLiteral(R"(
+        SELECT id, name, created_at FROM folders
+        WHERE ((? = '' AND parent_id IS NULL) OR parent_id = ?)
+        ORDER BY name COLLATE NOCASE
+    )"));
+    query.addBindValue(parentId);
+    query.addBindValue(parentId);
+    if (!query.exec()) {
+        *error = query.lastError().text();
+        return {};
+    }
+    QVariantList result;
+    while (query.next()) {
+        result.append(QVariantMap{{"id", query.value(0).toString()}, {"name", query.value(1).toString()},
+            {"createdAt", query.value(2).toLongLong()}});
+    }
+    return result;
+}
+
+QString ScoreRepository::folderParent(const QString& folderId, QString* error) const
+{
+    if (folderId.isEmpty()) return {};
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("SELECT parent_id FROM folders WHERE id = ?"));
+    query.addBindValue(folderId);
+    if (!query.exec() || !query.next()) {
+        *error = query.lastError().text();
+        return {};
+    }
+    return query.value(0).toString();
+}
+
+QString ScoreRepository::folderName(const QString& folderId, QString* error) const
+{
+    if (folderId.isEmpty()) return QStringLiteral("乐谱库");
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("SELECT name FROM folders WHERE id = ?"));
+    query.addBindValue(folderId);
+    if (!query.exec() || !query.next()) {
+        *error = query.lastError().text();
+        return {};
+    }
+    return query.value(0).toString();
+}
+
+QString ScoreRepository::folderBreadcrumb(const QString& folderId, QString* error) const
+{
+    if (folderId.isEmpty()) return QStringLiteral("乐谱库");
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral(R"(
+        WITH RECURSIVE ancestors(id, name, parent_id, depth) AS (
+            SELECT id, name, parent_id, 0 FROM folders WHERE id = ?
+            UNION ALL
+            SELECT f.id, f.name, f.parent_id, ancestors.depth + 1
+            FROM folders f JOIN ancestors ON ancestors.parent_id = f.id
+        )
+        SELECT name FROM ancestors ORDER BY depth DESC
+    )"));
+    query.addBindValue(folderId);
+    if (!query.exec()) {
+        *error = query.lastError().text();
+        return {};
+    }
+    QStringList names {QStringLiteral("乐谱库")};
+    while (query.next()) names.append(query.value(0).toString());
+    return names.join(QStringLiteral("  ›  "));
+}
+
+QVariantList ScoreRepository::folderScoresRecursive(const QString& folderId, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral(R"(
+        WITH RECURSIVE tree(id) AS (
+            SELECT id FROM folders WHERE id = ?
+            UNION ALL
+            SELECT folders.id FROM folders JOIN tree ON folders.parent_id = tree.id
+        )
+        SELECT scores.id, scores.file_path, scores.thumbnail_path
+        FROM scores WHERE folder_id IN (SELECT id FROM tree)
+    )"));
+    query.addBindValue(folderId);
+    if (!query.exec()) {
+        *error = query.lastError().text();
+        return {};
+    }
+    QVariantList result;
+    while (query.next()) {
+        result.append(QVariantMap{{"id", query.value(0)}, {"filePath", query.value(1)},
+            {"thumbnailPath", query.value(2)}});
+    }
+    return result;
+}
+
+bool ScoreRepository::createFolder(const QString& name, const QString& parentId, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("INSERT INTO folders (id, name, created_at, updated_at, parent_id) VALUES (?, ?, ?, ?, ?)"));
     query.addBindValue(QUuid::createUuid().toString(QUuid::WithoutBraces));
     query.addBindValue(name.trimmed());
     const auto now = QDateTime::currentMSecsSinceEpoch();
     query.addBindValue(now);
+    query.addBindValue(parentId.isEmpty() ? QVariant(QVariant::String) : parentId);
     query.addBindValue(now);
     if (query.exec()) return true;
     *error = query.lastError().text();
@@ -429,14 +574,35 @@ bool ScoreRepository::renameFolder(const QString& folderId, const QString& name,
     return false;
 }
 
-bool ScoreRepository::deleteFolder(const QString& folderId, QString* error) const
+bool ScoreRepository::deleteFolder(const QString& folderId, QString* error)
 {
+    if (!m_database.transaction()) {
+        *error = m_database.lastError().text();
+        return false;
+    }
     QSqlQuery query(m_database);
+    query.prepare(QStringLiteral(R"(
+        WITH RECURSIVE tree(id) AS (
+            SELECT id FROM folders WHERE id = ?
+            UNION ALL
+            SELECT folders.id FROM folders JOIN tree ON folders.parent_id = tree.id
+        )
+        DELETE FROM scores WHERE folder_id IN (SELECT id FROM tree)
+    )"));
+    query.addBindValue(folderId);
+    if (!query.exec()) {
+        m_database.rollback();
+        *error = query.lastError().text();
+        return false;
+    }
     query.prepare(QStringLiteral("DELETE FROM folders WHERE id = ?"));
     query.addBindValue(folderId);
-    if (query.exec() && query.numRowsAffected() == 1) return true;
-    *error = query.lastError().text();
-    return false;
+    if (!query.exec() || query.numRowsAffected() != 1 || !m_database.commit()) {
+        m_database.rollback();
+        *error = query.lastError().text();
+        return false;
+    }
+    return true;
 }
 
 bool ScoreRepository::renameTag(const QString& tagId, const QString& name, QString* error) const

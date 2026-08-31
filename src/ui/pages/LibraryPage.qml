@@ -12,10 +12,9 @@ Rectangle {
 
     readonly property string filterTitle: {
         const filter = appController.libraryFilter
-        if (filter === "all") return "乐谱库"
+        if (filter === "all" || filter.startsWith("folder:")) return libraryService.currentFolderName
         if (filter === "recent") return "最近使用"
         if (filter === "favorites") return "收藏"
-        if (filter.startsWith("folder:")) return "文件夹"
         if (filter.startsWith("tag:")) return "标签"
         return "乐谱库"
     }
@@ -39,6 +38,13 @@ Rectangle {
             Layout.fillWidth: true
             spacing: Theme.spacingMd
 
+            AppButton {
+                visible: libraryService.canGoUp
+                Layout.preferredWidth: 78
+                text: "← 上一级"
+                onClicked: libraryService.goUp()
+            }
+
             ColumnLayout {
                 spacing: 3
                 Label {
@@ -48,7 +54,9 @@ Rectangle {
                     font.weight: Font.Bold
                 }
                 Label {
-                    text: libraryService.scores.count > 0 ? libraryService.scores.count + " 份乐谱" : "这里还没有乐谱"
+                    text: (appController.libraryFilter === "all" || appController.libraryFilter.startsWith("folder:"))
+                        ? libraryService.currentFolderBreadcrumb + "  ·  " + libraryService.entries.count + " 个项目"
+                        : (libraryService.scores.count > 0 ? libraryService.scores.count + " 份乐谱" : "这里还没有乐谱")
                     color: Theme.mutedForeground
                     font.pixelSize: Theme.fontSm
                 }
@@ -112,6 +120,7 @@ Rectangle {
 
             GridView {
                 id: grid
+                objectName: "browserGrid"
                 anchors.fill: parent
                 anchors.margins: 16
                 visible: count > 0
@@ -122,14 +131,15 @@ Rectangle {
                     return Math.floor(width / columns)
                 }
                 cellHeight: 304
-                model: libraryService.scores
+                model: libraryService.entries
 
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
                 delegate: Item {
                     id: scoreDelegate
-                    objectName: "scoreDelegate"
-                    required property string scoreId
+                    objectName: itemType === "score" ? "scoreDelegate" : "folderDelegate"
+                    required property string itemType
+                    required property string itemId
                     required property string title
                     required property string createdDate
                     required property int pageCount
@@ -137,6 +147,7 @@ Rectangle {
                     required property bool favorite
                     required property string filePath
                     required property string fileType
+                    readonly property string scoreId: itemId
                     readonly property bool contextMenuOpenedOnce: scoreMenu.openedOnce
                     readonly property bool folderSubmenuEnabled: folderSubmenu.enabled
                     readonly property bool tagSubmenuEnabled: tagSubmenu.enabled
@@ -180,6 +191,7 @@ Rectangle {
                                 clip: true
 
                                 Image {
+                                    visible: scoreDelegate.itemType === "score"
                                     anchors.fill: parent
                                     anchors.margins: 4
                                     source: scoreDelegate.thumbnailPath.length > 0 ? "file://" + scoreDelegate.thumbnailPath : ""
@@ -189,15 +201,16 @@ Rectangle {
                                 }
                                 Label {
                                     anchors.centerIn: parent
-                                    visible: scoreDelegate.thumbnailPath.length === 0
-                                    text: "♫"
-                                    color: Theme.faintForeground
-                                    font.pixelSize: 38
+                                    visible: scoreDelegate.itemType === "folder" || scoreDelegate.thumbnailPath.length === 0
+                                    text: scoreDelegate.itemType === "folder" ? "▰" : "♫"
+                                    color: scoreDelegate.itemType === "folder" ? Theme.accent : Theme.faintForeground
+                                    font.pixelSize: scoreDelegate.itemType === "folder" ? 54 : 38
                                 }
                                 Rectangle {
                                     anchors.right: parent.right
                                     anchors.bottom: parent.bottom
                                     anchors.margins: 6
+                                    visible: scoreDelegate.itemType === "score"
                                     implicitWidth: pageBadge.implicitWidth + 12
                                     implicitHeight: 20
                                     radius: 5
@@ -223,7 +236,7 @@ Rectangle {
                             }
                             Label {
                                 Layout.fillWidth: true
-                                text: "添加于 " + scoreDelegate.createdDate
+                                text: scoreDelegate.itemType === "folder" ? "文件夹" : "添加于 " + scoreDelegate.createdDate
                                 color: Theme.mutedForeground
                                 font.pixelSize: Theme.fontSm
                                 elide: Text.ElideRight
@@ -233,7 +246,7 @@ Rectangle {
 
                     MouseArea {
                         id: cardMouse
-                        objectName: "scoreCardMouse"
+                        objectName: scoreDelegate.itemType === "score" ? "scoreCardMouse" : "folderCardMouse"
                         anchors.fill: card
                         z: 1
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
@@ -241,7 +254,10 @@ Rectangle {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: function(mouse) {
                             if (mouse.button === Qt.RightButton) {
-                                scoreMenu.popup()
+                                if (scoreDelegate.itemType === "folder") folderCardMenu.popup()
+                                else scoreMenu.popup()
+                            } else if (scoreDelegate.itemType === "folder") {
+                                libraryService.enterFolder(scoreDelegate.itemId)
                             } else {
                                 appController.openScore(scoreDelegate.title, scoreDelegate.filePath,
                                     scoreDelegate.fileType, scoreDelegate.pageCount)
@@ -250,12 +266,13 @@ Rectangle {
                     }
 
                     IconButton {
-                        objectName: "favoriteButton"
+                        objectName: scoreDelegate.itemType === "score" ? "favoriteButton" : ""
                         z: 2
                         anchors.right: card.right
                         anchors.top: card.top
                         anchors.margins: 18
                         symbol: scoreDelegate.favorite ? "★" : "☆"
+                        visible: scoreDelegate.itemType === "score"
                         selected: scoreDelegate.favorite
                         Accessible.name: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
                         onClicked: libraryService.toggleFavorite(scoreDelegate.scoreId, !scoreDelegate.favorite)
@@ -263,7 +280,7 @@ Rectangle {
 
                     AppMenu {
                         id: scoreMenu
-                        objectName: "scoreContextMenu"
+                        objectName: scoreDelegate.itemType === "score" ? "scoreContextMenu" : ""
                         AppMenuItem {
                             text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
                             onTriggered: libraryService.toggleFavorite(scoreDelegate.scoreId, !scoreDelegate.favorite)
@@ -348,6 +365,32 @@ Rectangle {
                             }
                         }
                     }
+
+                    AppMenu {
+                        id: folderCardMenu
+                        AppMenuItem {
+                            text: "打开"
+                            onTriggered: libraryService.enterFolder(scoreDelegate.itemId)
+                        }
+                        AppMenuItem {
+                            text: "重命名"
+                            onTriggered: {
+                                renameFolderDialog.targetId = scoreDelegate.itemId
+                                renameFolderDialog.value = scoreDelegate.title
+                                renameFolderDialog.open()
+                            }
+                        }
+                        AppMenuSeparator { }
+                        AppMenuItem {
+                            text: "删除文件夹"
+                            danger: true
+                            onTriggered: {
+                                deleteFolderDialog.targetId = scoreDelegate.itemId
+                                deleteFolderDialog.folderName = scoreDelegate.title
+                                deleteFolderDialog.open()
+                            }
+                        }
+                    }
                 }
             }
 
@@ -368,7 +411,7 @@ Rectangle {
                 }
                 Label {
                     Layout.alignment: Qt.AlignHCenter
-                    text: libraryService.searchQuery.length > 0 ? "没有符合条件的乐谱"
+                    text: libraryService.searchQuery.length > 0 ? "没有符合条件的项目"
                         : appController.libraryFilter === "favorites" ? "还没有收藏的乐谱" : "乐谱库为空"
                     color: Theme.foreground
                     font.pixelSize: Theme.fontLg
@@ -441,6 +484,23 @@ Rectangle {
         title: "新建文件夹"
         placeholderText: "输入文件夹名称"
         onSubmitted: function(text) { libraryService.createFolder(text) }
+    }
+
+    AppDialog {
+        id: renameFolderDialog
+        property string targetId: ""
+        title: "重命名文件夹"
+        placeholderText: "输入新名称"
+        onSubmitted: function(text) { libraryService.renameFolder(targetId, text) }
+    }
+
+    ConfirmDialog {
+        id: deleteFolderDialog
+        property string targetId: ""
+        property string folderName: ""
+        title: "删除文件夹？"
+        message: "将删除“" + folderName + "”及其中的所有子文件夹和乐谱。此操作无法撤销。"
+        onAccepted: libraryService.deleteFolder(targetId)
     }
 
     AppDialog {

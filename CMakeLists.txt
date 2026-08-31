@@ -29,6 +29,8 @@ qt_add_executable(Notera
     src/features/library/ScoreListModel.cpp
     src/features/library/NamedListModel.h
     src/features/library/NamedListModel.cpp
+    src/features/library/LibraryEntryModel.h
+    src/features/library/LibraryEntryModel.cpp
     src/features/library/ScoreRepository.h
     src/features/library/ScoreRepository.cpp
     src/features/library/ThumbnailGenerator.h

@@ -14,6 +14,7 @@ Rectangle {
     property bool autoScrolling: false
     property real scrollSpeed: appController.autoScrollSpeed
     property real zoomLevel: 1.0
+    property int viewRotation: 0
     property real pinchBaseZoom: 1.0
     property real pinchAnchorX: 0.5
     property real pinchAnchorY: 0.5
@@ -65,6 +66,9 @@ Rectangle {
         root.viewInitializationPending = true
         root.autoScrolling = false
         readerFlick.cancelFlick()
+        readerFlick.rotation = 0
+        readerFlick.scale = 1
+        root.viewRotation = 0
         root.zoomLevel = 1.0
         readerFlick.contentX = 0
         readerFlick.contentY = 0
@@ -90,6 +94,28 @@ Rectangle {
     }
 
     function resetZoom() { root.markUserInteraction(); applyDefaultView() }
+    function resetReaderView() {
+        root.markUserInteraction()
+        root.autoScrolling = false
+        readerFlick.cancelFlick()
+        readerFlick.rotation = 0
+        readerFlick.scale = 1
+        root.viewRotation = 0
+        root.applyDefaultView()
+    }
+    function rotateBy(delta) {
+        root.markUserInteraction()
+        const normalizedX = (readerFlick.contentX + readerFlick.width / 2)
+            / Math.max(readerFlick.width, readerFlick.contentWidth)
+        const normalizedY = (readerFlick.contentY + readerFlick.height / 2)
+            / Math.max(readerFlick.height, readerFlick.contentHeight)
+        root.viewRotation = (root.viewRotation + delta + 360) % 360
+        Qt.callLater(function() {
+            root.restoreAnchor(normalizedX, normalizedY, readerFlick.width / 2, readerFlick.height / 2)
+        })
+    }
+    function rotateLeft() { rotateBy(-90) }
+    function rotateRight() { rotateBy(90) }
     function zoomIn() {
         root.markUserInteraction()
         zoomAroundViewport(root.zoomLevel + 0.25, readerFlick.width / 2, readerFlick.height / 2)
@@ -257,6 +283,22 @@ Rectangle {
                 }
 
                 // 缩放控制
+                ToolButton {
+                    objectName: "rotateLeftButton"
+                    btnText: "↶"
+                    btnEnabled: root.isPdf || root.isImage
+                    Layout.preferredWidth: 42
+                    onBtnClicked: root.rotateLeft()
+                }
+
+                ToolButton {
+                    objectName: "rotateRightButton"
+                    btnText: "↷"
+                    btnEnabled: root.isPdf || root.isImage
+                    Layout.preferredWidth: 42
+                    onBtnClicked: root.rotateRight()
+                }
+
                 Rectangle {
                     Layout.preferredWidth: 170
                     height: Theme.controlHeight
@@ -324,6 +366,14 @@ Rectangle {
                         }
                     }
                 }
+
+                ToolButton {
+                    objectName: "resetReaderButton"
+                    btnText: "重置"
+                    btnEnabled: root.isPdf || root.isImage
+                    Layout.preferredWidth: 68
+                    onBtnClicked: root.resetReaderView()
+                }
             }
         }
 
@@ -356,6 +406,7 @@ Rectangle {
             // 双指捏合缩放（触控板，不阻塞滚动）
             PinchHandler {
                 id: pinchZoom
+                target: null
                 onActiveChanged: function(active) {
                     if (active) {
                         root.markUserInteraction()
@@ -395,40 +446,59 @@ Rectangle {
 
                 Repeater {
                     model: root.isPdf ? pdfDocument.pageCount : 0
-                    delegate: Rectangle {
+                    delegate: Item {
                         required property int index
                         readonly property size pageSize: pdfDocument.pagePointSize(index)
+                        readonly property bool rotated: root.viewRotation % 180 !== 0
+                        readonly property real pageRatio: pageSize.height > 0 ? pageSize.width / pageSize.height : 0.7
                         width: documentColumn.pageWidth
-                        height: pageSize.width > 0 ? width * pageSize.height / pageSize.width : 800
+                        height: rotated ? width * pageRatio : width / pageRatio
                         x: (documentColumn.width - width) / 2
-                        color: "white"
-                        radius: Theme.radiusSm
-                        border.color: Theme.border
-                        border.width: 1
 
-                        PdfPageImage {
-                            anchors.fill: parent
-                            document: pdfDocument
-                            currentFrame: index
-                            asynchronous: true
-                            fillMode: Image.PreserveAspectFit
-                            sourceSize.width: width
-                            sourceSize.height: height
+                        Rectangle {
+                            width: parent.rotated ? parent.height : parent.width
+                            height: parent.rotated ? parent.width : parent.height
+                            anchors.centerIn: parent
+                            rotation: root.viewRotation
+                            color: "white"
+                            radius: Theme.radiusSm
+                            border.color: Theme.border
+                            border.width: 1
+
+                            PdfPageImage {
+                                anchors.fill: parent
+                                document: pdfDocument
+                                currentFrame: index
+                                asynchronous: true
+                                fillMode: Image.PreserveAspectFit
+                                sourceSize.width: width
+                                sourceSize.height: height
+                            }
                         }
                     }
                 }
 
-                Image {
-                    id: scoreImage
+                Item {
                     visible: root.isImage
                     width: visible ? documentColumn.pageWidth : 0
-                    height: visible ? (sourceSize.width > 0 ? width * sourceSize.height / sourceSize.width : 700) : 0
+                    readonly property bool rotated: root.viewRotation % 180 !== 0
+                    readonly property real imageRatio: scoreImage.sourceSize.height > 0
+                        ? scoreImage.sourceSize.width / scoreImage.sourceSize.height : 0.7
+                    height: visible ? (rotated ? width * imageRatio : width / imageRatio) : 0
                     x: (documentColumn.width - width) / 2
-                    source: root.isImage ? appController.currentFileUrl : ""
-                    asynchronous: true
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                    onStatusChanged: root.finishInitialViewIfReady()
+
+                    Image {
+                        id: scoreImage
+                        width: parent.rotated ? parent.height : parent.width
+                        height: parent.rotated ? parent.width : parent.height
+                        anchors.centerIn: parent
+                        rotation: root.viewRotation
+                        source: root.isImage ? appController.currentFileUrl : ""
+                        asynchronous: true
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                        onStatusChanged: root.finishInitialViewIfReady()
+                    }
                 }
 
                 Label {

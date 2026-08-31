@@ -305,6 +305,7 @@ int main(int argc, char* argv[])
                 fail("score-tag-removal");
                 return;
             }
+            libraryService.setFilterMode(QStringLiteral("folder:") + folderId);
 
             const auto favoriteRole = libraryService.scores()->roleNames().key("favorite", -1);
             const auto createdDateRole = libraryService.scores()->roleNames().key("createdDate", -1);
@@ -433,8 +434,10 @@ int main(int argc, char* argv[])
                 return;
             }
 
+            libraryService.goToLibraryRoot();
+            QCoreApplication::processEvents();
             const auto* const browserGrid = root->findChild<QObject*>(QStringLiteral("browserGrid"));
-            if (!browserGrid || browserGrid->property("count").toInt() < 2) {
+            if (!browserGrid || browserGrid->property("count").toInt() != 1) {
                 fail("library-folder-score-browser");
                 return;
             }

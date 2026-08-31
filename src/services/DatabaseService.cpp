@@ -116,5 +116,29 @@ bool DatabaseService::applyMigrations(QString* error)
         }
     }
 
+    // v3: hierarchical folders. Existing folders remain at the library root.
+    if (version < 3) {
+        if (!m_database.transaction()) {
+            *error = m_database.lastError().text();
+            return false;
+        }
+
+        const auto succeeded = query.exec(QStringLiteral(
+            "ALTER TABLE folders ADD COLUMN parent_id TEXT REFERENCES folders(id) ON DELETE CASCADE"))
+            && query.exec(QStringLiteral("CREATE INDEX IF NOT EXISTS idx_folders_parent_id ON folders(parent_id)"))
+            && query.exec(QStringLiteral("CREATE INDEX IF NOT EXISTS idx_scores_folder_id ON scores(folder_id)"))
+            && query.exec(QStringLiteral("PRAGMA user_version = 3"));
+
+        if (!succeeded) {
+            m_database.rollback();
+            *error = query.lastError().text();
+            return false;
+        }
+        if (!m_database.commit()) {
+            *error = m_database.lastError().text();
+            return false;
+        }
+    }
+
     return true;
 }
