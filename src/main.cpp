@@ -200,9 +200,6 @@ int main(int argc, char* argv[])
 
     QTemporaryFile uiSmokeFile;
     if (arguments.contains(QStringLiteral("--ui-smoke-test"))) {
-        QObject::connect(&libraryService, &LibraryService::errorOccurred, &app, [](const QString& message) {
-            qWarning() << "[DEBUG-browser-state]" << message;
-        });
         uiSmokeFile.setFileTemplate(QDir::tempPath() + QStringLiteral("/notera-ui-XXXXXX.png"));
         if (!uiSmokeFile.open()) {
             return 1;
@@ -217,10 +214,6 @@ int main(int argc, char* argv[])
         libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
         libraryService.createFolder(QStringLiteral("界面测试文件夹"));
         libraryService.createTag(QStringLiteral("界面测试标签"));
-        qWarning() << "[DEBUG-browser-state] counts"
-                   << libraryService.scores()->rowCount()
-                   << libraryService.folders()->rowCount()
-                   << libraryService.entries()->rowCount();
 
         auto* const root = engine.rootObjects().constFirst();
         QTimer::singleShot(300, root, [root, &controller, &libraryService] {

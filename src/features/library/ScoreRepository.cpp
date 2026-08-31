@@ -170,7 +170,7 @@ bool ScoreRepository::insert(const Score& score, const QString& folderId, QStrin
     query.addBindValue(milliseconds(score.createdAt));
     query.addBindValue(milliseconds(score.updatedAt));
     query.addBindValue(milliseconds(score.lastOpenedAt));
-    query.addBindValue(folderId.isEmpty() ? QVariant(QVariant::String) : folderId);
+    query.addBindValue(folderId.isEmpty() ? QVariant {} : QVariant {folderId});
     if (query.exec()) {
         return true;
     }
@@ -274,7 +274,7 @@ bool ScoreRepository::setFolder(const QString& scoreId, const QString& folderId,
 {
     QSqlQuery query(m_database);
     query.prepare(QStringLiteral("UPDATE scores SET folder_id = ?, updated_at = ? WHERE id = ?"));
-    query.addBindValue(folderId.isEmpty() ? QVariant(QVariant::String) : folderId);
+    query.addBindValue(folderId.isEmpty() ? QVariant {} : QVariant {folderId});
     query.addBindValue(QDateTime::currentMSecsSinceEpoch());
     query.addBindValue(scoreId);
     if (query.exec() && query.numRowsAffected() == 1) return true;
@@ -530,7 +530,7 @@ bool ScoreRepository::createFolder(const QString& name, const QString& parentId,
     query.addBindValue(name.trimmed());
     const auto now = QDateTime::currentMSecsSinceEpoch();
     query.addBindValue(now);
-    query.addBindValue(parentId.isEmpty() ? QVariant(QVariant::String) : parentId);
+    query.addBindValue(parentId.isEmpty() ? QVariant {} : QVariant {parentId});
     query.addBindValue(now);
     if (query.exec()) return true;
     *error = query.lastError().text();
