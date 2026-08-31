@@ -34,6 +34,7 @@ LibraryService::LibraryService(QObject* parent)
     , m_repository(m_databaseService.database())
     , m_scores(this)
     , m_entries(this)
+    , m_selection(this)
     , m_folders(this)
     , m_tags(this)
     , m_thumbnailGenerator(this)
@@ -70,6 +71,11 @@ LibraryEntryModel* LibraryService::entries()
     return &m_entries;
 }
 
+LibrarySelectionModel* LibraryService::selection()
+{
+    return &m_selection;
+}
+
 QString LibraryService::searchQuery() const
 {
     return m_searchQuery;
@@ -91,6 +97,7 @@ QString LibraryService::filterMode() const
 void LibraryService::setFilterMode(const QString& mode)
 {
     if (m_filterMode == mode) return;
+    m_selection.clear();
     m_filterMode = mode;
     if (mode == QStringLiteral("all")) {
         m_currentFolderId.clear();
@@ -133,6 +140,7 @@ void LibraryService::enterFolder(const QString& folderId)
         emit errorOccurred(QStringLiteral("无法打开文件夹。"));
         return;
     }
+    m_selection.clear();
     m_currentFolderId = folderId;
     m_currentFolderName = name;
     m_currentFolderBreadcrumb = breadcrumb;
@@ -160,6 +168,7 @@ void LibraryService::goUp()
 
 void LibraryService::goToLibraryRoot()
 {
+    m_selection.clear();
     m_currentFolderId.clear();
     m_currentFolderName = QStringLiteral("乐谱库");
     m_currentFolderBreadcrumb = QStringLiteral("乐谱库");
@@ -457,6 +466,7 @@ void LibraryService::deleteScore(const QString& scoreId, const QString& filePath
 void LibraryService::deleteItems(const QVariantList& ids)
 {
     QString error;
+    int deletedCount = 0;
     for (const auto& idVariant : ids) {
         const auto id = idVariant.toString();
         if (id.isEmpty()) continue;
@@ -464,16 +474,38 @@ void LibraryService::deleteItems(const QVariantList& ids)
         if (type == QStringLiteral("score")) {
             const auto filePath = m_repository.filePathById(id, &error);
             const auto thumbPath = m_repository.thumbnailPathById(id, &error);
-            FileService::removeFile(filePath, &error);
-            FileService::removeFile(thumbPath, &error);
-            m_repository.remove(id, &error);
+            if (!FileService::removeFile(filePath, &error)
+                || !FileService::removeFile(thumbPath, &error)
+                || !m_repository.remove(id, &error)) {
+                emit errorOccurred(error.isEmpty() ? QStringLiteral("删除乐谱失败。") : error);
+                return;
+            }
+            ++deletedCount;
         } else if (type == QStringLiteral("folder")) {
-            m_repository.deleteFolder(id, &error);
+            const auto files = m_repository.folderScoresRecursive(id, &error);
+            if (!error.isEmpty()) {
+                emit errorOccurred(QStringLiteral("读取文件夹内容失败。"));
+                return;
+            }
+            for (const auto& value : files) {
+                const auto item = value.toMap();
+                if (!FileService::removeFile(item.value(QStringLiteral("filePath")).toString(), &error)
+                    || !FileService::removeFile(item.value(QStringLiteral("thumbnailPath")).toString(), &error)) {
+                    emit errorOccurred(error);
+                    return;
+                }
+            }
+            if (!m_repository.deleteFolder(id, &error)) {
+                emit errorOccurred(QStringLiteral("删除文件夹失败。"));
+                return;
+            }
+            ++deletedCount;
         }
     }
+    m_selection.clear();
     reloadFolders();
     reload();
-    emit noticeOccurred(QStringLiteral("已删除 %1 个项目").arg(ids.size()));
+    emit noticeOccurred(QStringLiteral("已删除 %1 个项目").arg(deletedCount));
 }
 
 QVariantList LibraryService::scoresInFolder(const QString& folderId)
@@ -492,6 +524,14 @@ QVariantList LibraryService::scoresInFolder(const QString& folderId)
         });
     }
     return result;
+}
+
+QString LibraryService::scoreFolderId(const QString& scoreId)
+{
+    QString error;
+    const auto folderId = m_repository.scoreFolderId(scoreId, &error);
+    if (!error.isEmpty()) emit errorOccurred(QStringLiteral("无法确定乐谱所在目录。"));
+    return folderId;
 }
 
 void LibraryService::setScoreFolder(const QString& scoreId, const QString& folderId)

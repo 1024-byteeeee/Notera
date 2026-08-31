@@ -30,6 +30,7 @@ public:
     [[nodiscard]] int count() const;
     [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
     [[nodiscard]] QHash<int, QByteArray> roleNames() const override;
+    Q_INVOKABLE QVariantList itemIds() const;
 
     void replaceAll(const QVariantList& folders, const QList<Score>& scores);
 

@@ -353,6 +353,18 @@ QString ScoreRepository::thumbnailPathById(const QString& scoreId, QString* erro
     return {};
 }
 
+QString ScoreRepository::scoreFolderId(const QString& scoreId, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("SELECT folder_id FROM scores WHERE id = ?"));
+    query.addBindValue(scoreId);
+    if (!query.exec()) {
+        *error = query.lastError().text();
+        return {};
+    }
+    return query.next() ? query.value(0).toString() : QString {};
+}
+
 QList<Score> ScoreRepository::listByFolder(const QString& folderId, const QString& searchQuery, QString* error) const
 {
     QSqlQuery query(m_database);

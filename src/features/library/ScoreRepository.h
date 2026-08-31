@@ -28,6 +28,7 @@ public:
     [[nodiscard]] QString itemTypeById(const QString& id, QString* error) const;
     [[nodiscard]] QString filePathById(const QString& scoreId, QString* error) const;
     [[nodiscard]] QString thumbnailPathById(const QString& scoreId, QString* error) const;
+    [[nodiscard]] QString scoreFolderId(const QString& scoreId, QString* error) const;
 
     [[nodiscard]] QVariantList folders(QString* error) const;
     [[nodiscard]] QVariantList childFolders(const QString& parentId, QString* error) const;

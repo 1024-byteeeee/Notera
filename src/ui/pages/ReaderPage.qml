@@ -463,8 +463,8 @@ Rectangle {
             PinchHandler {
                 id: pinchZoom
                 target: null
-                onActiveChanged: function(active) {
-                    if (active) {
+                onActiveChanged: {
+                    if (pinchZoom.active) {
                         root.markUserInteraction()
                         root.pinchBaseZoom = root.zoomLevel
                         root.pinchViewportX = centroid.position.x
@@ -475,8 +475,9 @@ Rectangle {
                             / Math.max(readerFlick.height, readerFlick.contentHeight)
                     }
                 }
-                onScaleChanged: function(scale) {
-                    root.zoomLevel = Math.max(0.4, Math.min(3.0, root.pinchBaseZoom * scale))
+                onActiveScaleChanged: {
+                    root.zoomLevel = Math.max(0.4, Math.min(3.0,
+                        root.pinchBaseZoom * pinchZoom.activeScale))
                     Qt.callLater(function() {
                         root.restoreAnchor(root.pinchAnchorX, root.pinchAnchorY,
                             root.pinchViewportX, root.pinchViewportY)

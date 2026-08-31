@@ -212,6 +212,7 @@ int main(int argc, char* argv[])
             return 1;
         }
         libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
+        libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
         libraryService.createFolder(QStringLiteral("界面测试文件夹"));
         libraryService.createTag(QStringLiteral("界面测试标签"));
 
@@ -239,6 +240,39 @@ int main(int argc, char* argv[])
             auto* const window = qobject_cast<QQuickWindow*>(root);
             if (!window || !window->grabWindow().save(QStringLiteral("notera-library-smoke.png"))) {
                 fail("library-screenshot");
+                return;
+            }
+
+            const auto* const entryCheckBox = findVisualItem(root, QStringLiteral("entryCheckBox"));
+            if (!entryCheckBox || !entryCheckBox->isVisible()
+                || !clickItem(root, QStringLiteral("entryCheckBox"), Qt::LeftButton)
+                || libraryService.selection()->count() != 1) {
+                fail("library-entry-checkbox-selection");
+                return;
+            }
+            libraryService.selection()->clear();
+
+            auto* const libraryPage = root->findChild<QObject*>(QStringLiteral("libraryPage"));
+            auto* const librarySurface = findVisualItem(root, QStringLiteral("librarySurface"));
+            auto* const selectionBox = findVisualItem(root, QStringLiteral("selectionBox"));
+            if (!libraryPage || !librarySurface || !selectionBox) {
+                fail("library-rubber-selection-objects");
+                return;
+            }
+            selectionBox->setX(0);
+            selectionBox->setY(0);
+            selectionBox->setWidth(librarySurface->width());
+            selectionBox->setHeight(librarySurface->height());
+            QMetaObject::invokeMethod(libraryPage, "updateRubberSelection");
+            if (libraryService.selection()->count() != libraryService.entries()->count()) {
+                fail("library-rubber-selection-expand");
+                return;
+            }
+            selectionBox->setWidth(0);
+            selectionBox->setHeight(0);
+            QMetaObject::invokeMethod(libraryPage, "updateRubberSelection");
+            if (libraryService.selection()->count() != 0) {
+                fail("library-rubber-selection-shrink");
                 return;
             }
 
@@ -283,11 +317,14 @@ int main(int argc, char* argv[])
             const auto folderIdRole = libraryService.folders()->roleNames().key("itemId", -1);
             const auto tagIdRole = libraryService.tags()->roleNames().key("itemId", -1);
             const auto scoreId = libraryService.scores()->data(libraryService.scores()->index(0, 0), scoreIdRole).toString();
+            const auto secondScoreId = libraryService.scores()->data(libraryService.scores()->index(1, 0), scoreIdRole).toString();
             const auto folderId = libraryService.folders()->data(libraryService.folders()->index(0, 0), folderIdRole).toString();
             const auto tagId = libraryService.tags()->data(libraryService.tags()->index(0, 0), tagIdRole).toString();
             libraryService.setScoreFolder(scoreId, folderId);
+            libraryService.setScoreFolder(secondScoreId, folderId);
             libraryService.setFilterMode(QStringLiteral("folder:") + folderId);
-            if (scoreId.isEmpty() || folderId.isEmpty() || libraryService.scores()->rowCount() != 1) {
+            if (scoreId.isEmpty() || secondScoreId.isEmpty() || folderId.isEmpty()
+                || libraryService.scores()->rowCount() != 2) {
                 fail("score-folder-assignment");
                 return;
             }
@@ -326,8 +363,14 @@ int main(int argc, char* argv[])
                 return;
             }
 
+            libraryService.setFilterMode(QStringLiteral("all"));
+            libraryService.setFilterMode(QStringLiteral("favorites"));
+            controller.setCurrentPage(QStringLiteral("library"));
+            QCoreApplication::processEvents();
+
             if (!clickItem(root, QStringLiteral("scoreCardMouse"), Qt::LeftButton)
-                || controller.currentPage() != QStringLiteral("reader")) {
+                || controller.currentPage() != QStringLiteral("reader")
+                || controller.currentScoreFolderId() != folderId) {
                 fail("score-single-click");
                 return;
             }
@@ -337,6 +380,15 @@ int main(int argc, char* argv[])
             auto* const readerFlick = root->findChild<QObject*>(QStringLiteral("readerFlick"));
             if (!sidebar || sidebar->isVisible()) {
                 fail("reader-focus-layout");
+                return;
+            }
+            const auto openedScoreId = controller.currentScoreId();
+            const auto hasPrevious = readerPage->property("hasPrev").toBool();
+            const auto hasNext = readerPage->property("hasNext").toBool();
+            QMetaObject::invokeMethod(readerPage, hasPrevious ? "goToPrevScore" : "goToNextScore");
+            QCoreApplication::processEvents();
+            if ((!hasPrevious && !hasNext) || controller.currentScoreId() == openedScoreId) {
+                fail("reader-folder-sibling-navigation");
                 return;
             }
             const auto centerBefore = (readerFlick->property("contentX").toDouble()
@@ -441,9 +493,16 @@ int main(int argc, char* argv[])
                 fail("library-folder-score-browser");
                 return;
             }
-            const auto storedFilePath = controller.currentFileUrl().toLocalFile();
+            const auto folderScores = libraryService.scoresInFolder(folderId);
+            QStringList storedFilePaths;
+            for (const auto& value : folderScores) {
+                storedFilePaths.append(value.toMap().value(QStringLiteral("filePath")).toString());
+            }
             libraryService.deleteItems({folderId});
-            if (libraryService.scores()->rowCount() != 0 || QFileInfo::exists(storedFilePath)) {
+            const auto hasRemainingFile = std::any_of(storedFilePaths.cbegin(), storedFilePaths.cend(), [](const QString& path) {
+                return QFileInfo::exists(path);
+            });
+            if (libraryService.scores()->rowCount() != 0 || hasRemainingFile) {
                 fail("batch-folder-cascade-delete");
                 return;
             }

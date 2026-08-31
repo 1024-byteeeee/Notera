@@ -44,6 +44,14 @@ QHash<int, QByteArray> LibraryEntryModel::roleNames() const
         {FilePathRole, "filePath"}, {FileTypeRole, "fileType"}};
 }
 
+QVariantList LibraryEntryModel::itemIds() const
+{
+    QVariantList result;
+    result.reserve(m_entries.size());
+    for (const auto& entry : m_entries) result.append(entry.itemId);
+    return result;
+}
+
 void LibraryEntryModel::replaceAll(const QVariantList& folders, const QList<Score>& scores)
 {
     QList<Entry> entries;

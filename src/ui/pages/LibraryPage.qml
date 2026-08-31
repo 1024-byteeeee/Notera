@@ -10,26 +10,27 @@ Rectangle {
     objectName: "libraryPage"
     color: Theme.background
 
-    property bool selectionMode: false
-    property var selectedIds: []
-    readonly property int selectedCount: selectedIds.length
+    readonly property int selectedCount: libraryService.selection.count
 
-    function toggleSelect(id) {
-        const idx = selectedIds.indexOf(id)
-        if (idx >= 0) selectedIds.splice(idx, 1)
-        else selectedIds.push(id)
-        selectedIds = selectedIds // 触发变更
+    function selectAll() { libraryService.selection.replace(libraryService.entries.itemIds()) }
+    function clearSelection() { libraryService.selection.clear() }
+    function isSelected(id) {
+        const selectionRevision = root.selectedCount
+        return selectionRevision >= 0 && libraryService.selection.contains(id)
     }
-    function selectAll() {
+
+    function updateRubberSelection() {
         const ids = []
+        const selectionRect = Qt.rect(selectionBox.x, selectionBox.y, selectionBox.width, selectionBox.height)
         for (let i = 0; i < grid.count; i++) {
             const item = grid.itemAtIndex(i)
-            if (item) ids.push(item.itemId)
+            if (!item) continue
+            const topLeft = item.card.mapToItem(librarySurface, 0, 0)
+            const itemRect = Qt.rect(topLeft.x, topLeft.y, item.card.width, item.card.height)
+            if (itemRect.intersects(selectionRect)) ids.push(item.itemId)
         }
-        selectedIds = ids
+        libraryService.selection.replace(ids)
     }
-    function clearSelection() { selectedIds = []; selectionMode = false }
-    function isSelected(id) { return selectedIds.indexOf(id) >= 0 }
 
     readonly property string filterTitle: {
         const filter = appController.libraryFilter
@@ -129,15 +130,6 @@ Rectangle {
                 onClicked: stitchDialog.open()
             }
 
-            AppButton {
-                objectName: "selectButton"
-                Layout.preferredWidth: 80
-                text: root.selectionMode ? "完成" : "选择"
-                onClicked: {
-                    if (root.selectionMode) root.clearSelection()
-                    else root.selectionMode = true
-                }
-            }
         }
 
         Rectangle {
@@ -157,7 +149,7 @@ Rectangle {
                 visible: count > 0
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
-                interactive: !root.selectionMode
+                interactive: true
                 cellWidth: {
                     const columns = Math.max(1, Math.floor(width / 218))
                     return Math.floor(width / columns)
@@ -207,33 +199,6 @@ Rectangle {
 
                         Behavior on color { ColorAnimation { duration: 100 } }
                         Behavior on border.color { ColorAnimation { duration: 100 } }
-
-                        // 左上角勾选框
-                        Rectangle {
-                            id: checkBox
-                            visible: root.selectionMode
-                            anchors.left: parent.left
-                            anchors.top: parent.top
-                            anchors.margins: 10
-                            width: 22
-                            height: 22
-                            radius: 6
-                            color: root.isSelected(scoreDelegate.itemId) ? Theme.accent : Theme.surface
-                            border.width: 1.5
-                            border.color: root.isSelected(scoreDelegate.itemId) ? Theme.accent : Theme.strongBorder
-                            z: 3
-                            Label {
-                                anchors.centerIn: parent
-                                text: root.isSelected(scoreDelegate.itemId) ? "✓" : ""
-                                color: "white"
-                                font.pixelSize: 14
-                                font.weight: Font.Bold
-                            }
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: root.toggleSelect(scoreDelegate.itemId)
-                            }
-                        }
 
                         ColumnLayout {
                             anchors.fill: parent
@@ -301,16 +266,45 @@ Rectangle {
                         }
                         onClicked: function(mouse) {
                             if (mouse.button === Qt.RightButton) return
-                            if (root.selectionMode) {
-                                root.toggleSelect(scoreDelegate.itemId)
+                            if (root.selectedCount > 0) {
+                                libraryService.selection.toggle(scoreDelegate.itemId)
                                 return
                             }
                             if (scoreDelegate.itemType === "folder") {
                                 libraryService.enterFolder(scoreDelegate.itemId)
                             } else {
                                 appController.openScore(scoreDelegate.scoreId, scoreDelegate.title, scoreDelegate.filePath,
-                                    scoreDelegate.fileType, scoreDelegate.pageCount, libraryService.currentFolderId)
+                                    scoreDelegate.fileType, scoreDelegate.pageCount,
+                                    libraryService.scoreFolderId(scoreDelegate.scoreId))
                             }
+                        }
+                    }
+
+                    // 左上角勾选框始终可用，并位于卡片点击层之上。
+                    Rectangle {
+                        id: checkBox
+                        objectName: "entryCheckBox"
+                        anchors.left: card.left
+                        anchors.top: card.top
+                        anchors.margins: 10
+                        width: 22
+                        height: 22
+                        radius: 6
+                        color: root.isSelected(scoreDelegate.itemId) ? Theme.accent : Theme.surface
+                        border.width: 1.5
+                        border.color: root.isSelected(scoreDelegate.itemId) ? Theme.accent : Theme.strongBorder
+                        z: 3
+                        Label {
+                            anchors.centerIn: parent
+                            text: root.isSelected(scoreDelegate.itemId) ? "✓" : ""
+                            color: "white"
+                            font.pixelSize: 14
+                            font.weight: Font.Bold
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: libraryService.selection.toggle(scoreDelegate.itemId)
                         }
                     }
 
@@ -461,10 +455,11 @@ Rectangle {
                 }
             }
 
-            // 框选层（仅选择模式下激活）
+            // 鼠标拖过空白或卡片后直接框选；矩形缩小时同步取消离开选区的项目。
             Rectangle {
                 id: selectionBox
-                visible: root.selectionMode && selecting
+                objectName: "selectionBox"
+                visible: rubberBand.active
                 z: 10
                 color: Theme.accent + "22"
                 border.width: 1
@@ -472,49 +467,29 @@ Rectangle {
                 radius: 4
             }
 
-            MouseArea {
+            DragHandler {
                 id: rubberBand
-                visible: root.selectionMode
-                anchors.fill: parent
-                z: 9
-                property bool selecting: false
-                property real startX: 0
-                property real startY: 0
+                target: null
+                acceptedButtons: Qt.LeftButton
+                acceptedDevices: PointerDevice.Mouse
+                grabPermissions: PointerHandler.CanTakeOverFromItems
+                    | PointerHandler.ApprovesTakeOverByAnything
 
-                onPressed: function(mouse) {
-                    selecting = true
-                    startX = mouse.x
-                    startY = mouse.y
-                    selectionBox.x = mouse.x
-                    selectionBox.y = mouse.y
+                onActiveChanged: {
+                    if (!active) return
+                    selectionBox.x = centroid.pressPosition.x
+                    selectionBox.y = centroid.pressPosition.y
                     selectionBox.width = 0
                     selectionBox.height = 0
                 }
-                onPositionChanged: function(mouse) {
-                    if (!selecting) return
-                    selectionBox.x = Math.min(startX, mouse.x)
-                    selectionBox.y = Math.min(startY, mouse.y)
-                    selectionBox.width = Math.abs(mouse.x - startX)
-                    selectionBox.height = Math.abs(mouse.y - startY)
-                    // 实时更新选中状态
-                    for (let i = 0; i < grid.count; i++) {
-                        const item = grid.itemAtIndex(i)
-                        if (!item) continue
-                        const card = item.card
-                        const itemRect = Qt.rect(card.x + item.x + 16, card.y + item.y + 16, card.width, card.height)
-                        const selRect = Qt.rect(selectionBox.x, selectionBox.y, selectionBox.width, selectionBox.height)
-                        if (itemRect.intersects(selRect)) {
-                            if (!root.isSelected(item.itemId)) root.toggleSelect(item.itemId)
-                        }
-                    }
-                }
-                onReleased: function(mouse) {
-                    selecting = false
-                    selectionBox.visible = false
-                    // 如果只是点击（没有拖动），取消所有选中
-                    if (Math.abs(mouse.x - startX) < 5 && Math.abs(mouse.y - startY) < 5) {
-                        root.selectedIds = []
-                    }
+                onActiveTranslationChanged: {
+                    selectionBox.x = Math.min(centroid.pressPosition.x,
+                        centroid.pressPosition.x + activeTranslation.x)
+                    selectionBox.y = Math.min(centroid.pressPosition.y,
+                        centroid.pressPosition.y + activeTranslation.y)
+                    selectionBox.width = Math.abs(activeTranslation.x)
+                    selectionBox.height = Math.abs(activeTranslation.y)
+                    root.updateRubberSelection()
                 }
             }
 
@@ -552,7 +527,6 @@ Rectangle {
                     Layout.topMargin: 6
                     visible: libraryService.searchQuery.length === 0 && appController.libraryFilter === "all"
                     text: "导入第一份乐谱"
-                    symbol: "+"
                     primary: true
                     onClicked: fileDialog.open()
                 }
@@ -594,7 +568,7 @@ Rectangle {
 
         // 底部批量操作栏
         Rectangle {
-            visible: root.selectionMode
+            visible: root.selectedCount > 0
             Layout.fillWidth: true
             Layout.preferredHeight: 56
             radius: Theme.radiusMd
@@ -626,7 +600,7 @@ Rectangle {
                 AppButton {
                     text: "取消全选"
                     Layout.preferredWidth: 84
-                    onClicked: root.selectedIds = []
+                    onClicked: root.clearSelection()
                 }
 
                 AppButton {
@@ -635,7 +609,7 @@ Rectangle {
                     Layout.preferredWidth: 70
                     enabled: root.selectedCount > 0
                     onClicked: {
-                        batchDeleteDialog.selectedIds = root.selectedIds
+                        batchDeleteDialog.selectedIds = libraryService.selection.selectedIds
                         batchDeleteDialog.open()
                     }
                 }

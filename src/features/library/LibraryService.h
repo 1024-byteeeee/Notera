@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QUrl>
 #include "features/library/LibraryEntryModel.h"
+#include "features/library/LibrarySelectionModel.h"
 #include "features/library/NamedListModel.h"
 #include "features/library/ScoreListModel.h"
 #include "features/library/ScoreRepository.h"
@@ -14,6 +15,7 @@ class LibraryService final : public QObject
     Q_OBJECT
     Q_PROPERTY(ScoreListModel* scores READ scores CONSTANT)
     Q_PROPERTY(LibraryEntryModel* entries READ entries CONSTANT)
+    Q_PROPERTY(LibrarySelectionModel* selection READ selection CONSTANT)
     Q_PROPERTY(QString searchQuery READ searchQuery WRITE setSearchQuery NOTIFY searchQueryChanged)
     Q_PROPERTY(QString filterMode READ filterMode WRITE setFilterMode NOTIFY filterModeChanged)
     Q_PROPERTY(NamedListModel* folders READ folders CONSTANT)
@@ -28,6 +30,7 @@ public:
 
     [[nodiscard]] ScoreListModel* scores();
     [[nodiscard]] LibraryEntryModel* entries();
+    [[nodiscard]] LibrarySelectionModel* selection();
     [[nodiscard]] QString searchQuery() const;
     void setSearchQuery(const QString& searchQuery);
     [[nodiscard]] QString filterMode() const;
@@ -46,6 +49,7 @@ public:
     Q_INVOKABLE void deleteScore(const QString& scoreId, const QString& filePath, const QString& thumbnailPath);
     Q_INVOKABLE void deleteItems(const QVariantList& ids);
     Q_INVOKABLE QVariantList scoresInFolder(const QString& folderId);
+    Q_INVOKABLE QString scoreFolderId(const QString& scoreId);
     Q_INVOKABLE void setScoreFolder(const QString& scoreId, const QString& folderId);
     Q_INVOKABLE void addScoreTag(const QString& scoreId, const QString& tagId);
     Q_INVOKABLE void removeScoreTag(const QString& scoreId, const QString& tagId);
@@ -82,6 +86,7 @@ private:
     ScoreRepository m_repository;
     ScoreListModel m_scores;
     LibraryEntryModel m_entries;
+    LibrarySelectionModel m_selection;
     NamedListModel m_folders;
     NamedListModel m_tags;
     ThumbnailGenerator m_thumbnailGenerator;
