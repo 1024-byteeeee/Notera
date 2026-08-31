@@ -27,7 +27,11 @@ Rectangle {
             if (!item) continue
             const topLeft = item.card.mapToItem(librarySurface, 0, 0)
             const itemRect = Qt.rect(topLeft.x, topLeft.y, item.card.width, item.card.height)
-            if (itemRect.intersects(selectionRect)) ids.push(item.itemId)
+            const intersects = itemRect.x < selectionRect.x + selectionRect.width
+                && itemRect.x + itemRect.width > selectionRect.x
+                && itemRect.y < selectionRect.y + selectionRect.height
+                && itemRect.y + itemRect.height > selectionRect.y
+            if (intersects) ids.push(item.itemId)
         }
         libraryService.selection.replace(ids)
     }
