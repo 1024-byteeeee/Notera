@@ -128,7 +128,6 @@ Rectangle {
             Layout.fillWidth: true
             Layout.bottomMargin: 12
             text: "导入乐谱"
-            symbol: "+"
             primary: true
             onClicked: {
                 appController.libraryFilter = "all"

@@ -21,6 +21,7 @@ QVariant ScoreListModel::data(const QModelIndex& index, const int role) const
     case IdRole: return score.id;
     case TitleRole: return score.title;
     case ComposerRole: return score.composer;
+    case CreatedDateRole: return score.createdAt.toLocalTime().toString(QStringLiteral("yyyy-MM-dd"));
     case PageCountRole: return score.pageCount;
     case ThumbnailPathRole: return score.thumbnailPath;
     case FavoriteRole: return score.favorite;
@@ -33,7 +34,7 @@ QVariant ScoreListModel::data(const QModelIndex& index, const int role) const
 QHash<int, QByteArray> ScoreListModel::roleNames() const
 {
     return {
-        {IdRole, "scoreId"}, {TitleRole, "title"}, {ComposerRole, "composer"},
+        {IdRole, "scoreId"}, {TitleRole, "title"}, {ComposerRole, "composer"}, {CreatedDateRole, "createdDate"},
         {PageCountRole, "pageCount"}, {ThumbnailPathRole, "thumbnailPath"},
         {FavoriteRole, "favorite"}, {FilePathRole, "filePath"}, {FileTypeRole, "fileType"}
     };

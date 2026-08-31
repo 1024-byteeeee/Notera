@@ -13,6 +13,7 @@ public:
         IdRole = Qt::UserRole + 1,
         TitleRole,
         ComposerRole,
+        CreatedDateRole,
         PageCountRole,
         ThumbnailPathRole,
         FavoriteRole,

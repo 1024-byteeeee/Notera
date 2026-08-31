@@ -89,7 +89,6 @@ Rectangle {
                 objectName: "importButton"
                 Layout.preferredWidth: 108
                 text: "导入"
-                symbol: "+"
                 primary: true
                 onClicked: fileDialog.open()
             }
@@ -98,7 +97,6 @@ Rectangle {
                 objectName: "stitchButton"
                 Layout.preferredWidth: 120
                 text: "拼接导入"
-                symbol: "⬚⬚"
                 onClicked: stitchDialog.open()
             }
         }
@@ -133,13 +131,17 @@ Rectangle {
                     objectName: "scoreDelegate"
                     required property string scoreId
                     required property string title
-                    required property string composer
+                    required property string createdDate
                     required property int pageCount
                     required property string thumbnailPath
                     required property bool favorite
                     required property string filePath
                     required property string fileType
                     readonly property bool contextMenuOpenedOnce: scoreMenu.openedOnce
+                    readonly property bool folderSubmenuEnabled: folderSubmenu.enabled
+                    readonly property bool tagSubmenuEnabled: tagSubmenu.enabled
+                    readonly property int folderSubmenuItemCount: folderSubmenu.count
+                    readonly property int tagSubmenuItemCount: tagSubmenu.count
 
                     function closeContextMenu() {
                         scoreMenu.close()
@@ -221,7 +223,7 @@ Rectangle {
                             }
                             Label {
                                 Layout.fillWidth: true
-                                text: scoreDelegate.composer.length > 0 ? scoreDelegate.composer : "未知作曲者"
+                                text: "添加于 " + scoreDelegate.createdDate
                                 color: Theme.mutedForeground
                                 font.pixelSize: Theme.fontSm
                                 elide: Text.ElideRight
@@ -280,18 +282,25 @@ Rectangle {
                         AppMenu {
                             id: folderSubmenu
                             title: "移动到文件夹"
+                            enabled: libraryService.folders.count > 0
                             AppMenuItem {
                                 text: "无（移出文件夹）"
                                 onTriggered: libraryService.setScoreFolder(scoreDelegate.scoreId, "")
                             }
                             AppMenuSeparator { }
-                            Repeater {
+                            Instantiator {
                                 model: libraryService.folders
                                 delegate: AppMenuItem {
                                     required property string itemId
                                     required property string name
                                     text: name
                                     onTriggered: libraryService.setScoreFolder(scoreDelegate.scoreId, itemId)
+                                }
+                                onObjectAdded: function(index, object) {
+                                    folderSubmenu.insertItem(index + 2, object)
+                                }
+                                onObjectRemoved: function(index, object) {
+                                    folderSubmenu.removeItem(object)
                                 }
                             }
                         }
@@ -300,7 +309,8 @@ Rectangle {
                         AppMenu {
                             id: tagSubmenu
                             title: "标签"
-                            Repeater {
+                            enabled: libraryService.tags.count > 0
+                            Instantiator {
                                 model: libraryService.tags
                                 delegate: AppMenuItem {
                                     required property string itemId
@@ -315,6 +325,12 @@ Rectangle {
                                             libraryService.removeScoreTag(scoreDelegate.scoreId, itemId)
                                         }
                                     }
+                                }
+                                onObjectAdded: function(index, object) {
+                                    tagSubmenu.insertItem(index, object)
+                                }
+                                onObjectRemoved: function(index, object) {
+                                    tagSubmenu.removeItem(object)
                                 }
                             }
                         }

@@ -256,6 +256,10 @@ int main(int argc, char* argv[])
                 || controller.currentPage() != QStringLiteral("library")
                 || !scoreDelegate
                 || !scoreDelegate->property("contextMenuOpenedOnce").toBool()
+                || !scoreDelegate->property("folderSubmenuEnabled").toBool()
+                || !scoreDelegate->property("tagSubmenuEnabled").toBool()
+                || scoreDelegate->property("folderSubmenuItemCount").toInt() < libraryService.folders()->rowCount() + 2
+                || scoreDelegate->property("tagSubmenuItemCount").toInt() < libraryService.tags()->rowCount()
                 || popupIsOpen(root, QStringLiteral("blankContextMenu"))) {
                 fail("score-context-menu");
                 return;

@@ -16,8 +16,9 @@ Button {
     rightPadding: 14
     hoverEnabled: true
 
-    contentItem: RowLayout {
+    contentItem: Row {
         id: contentRow
+        anchors.centerIn: parent
         spacing: 7
 
         Label {
@@ -29,7 +30,6 @@ Button {
         }
 
         Label {
-            Layout.alignment: Qt.AlignVCenter
             text: control.text
             color: control.danger ? Theme.danger : (control.primary ? Theme.accentForeground : Theme.buttonText)
             font.pixelSize: Theme.fontMd

@@ -15,10 +15,45 @@ Rectangle {
     property real scrollSpeed: appController.autoScrollSpeed
     property real zoomLevel: 1.0
     property real pinchBaseZoom: 1.0
+    property real pinchAnchorX: 0.5
+    property real pinchAnchorY: 0.5
+    property real pinchViewportX: 0
+    property real pinchViewportY: 0
 
-    function resetZoom() { root.zoomLevel = 1.0 }
-    function zoomIn() { root.zoomLevel = Math.min(3.0, root.zoomLevel + 0.25) }
-    function zoomOut() { root.zoomLevel = Math.max(0.4, root.zoomLevel - 0.25) }
+    function clampScroll(value, contentSize, viewportSize) {
+        return Math.max(0, Math.min(value, Math.max(0, contentSize - viewportSize)))
+    }
+
+    function restoreAnchor(normalizedX, normalizedY, viewportX, viewportY) {
+        readerFlick.contentX = clampScroll(normalizedX * readerFlick.contentWidth - viewportX,
+            readerFlick.contentWidth, readerFlick.width)
+        readerFlick.contentY = clampScroll(normalizedY * readerFlick.contentHeight - viewportY,
+            readerFlick.contentHeight, readerFlick.height)
+    }
+
+    function zoomAroundViewport(newZoom, viewportX, viewportY) {
+        const safeWidth = Math.max(readerFlick.width, readerFlick.contentWidth)
+        const safeHeight = Math.max(readerFlick.height, readerFlick.contentHeight)
+        const normalizedX = (readerFlick.contentX + viewportX) / safeWidth
+        const normalizedY = (readerFlick.contentY + viewportY) / safeHeight
+        root.zoomLevel = Math.max(0.4, Math.min(3.0, newZoom))
+        Qt.callLater(function() {
+            root.restoreAnchor(normalizedX, normalizedY, viewportX, viewportY)
+        })
+    }
+
+    function fitAndCenter() {
+        root.zoomLevel = 1.0
+        Qt.callLater(function() {
+            readerFlick.contentX = root.clampScroll((readerFlick.contentWidth - readerFlick.width) / 2,
+                readerFlick.contentWidth, readerFlick.width)
+            readerFlick.contentY = 0
+        })
+    }
+
+    function resetZoom() { fitAndCenter() }
+    function zoomIn() { zoomAroundViewport(root.zoomLevel + 0.25, readerFlick.width / 2, readerFlick.height / 2) }
+    function zoomOut() { zoomAroundViewport(root.zoomLevel - 0.25, readerFlick.width / 2, readerFlick.height / 2) }
 
     function stopAtEnd() {
         const maximum = Math.max(0, readerFlick.contentHeight - readerFlick.height)
@@ -264,10 +299,22 @@ Rectangle {
             PinchHandler {
                 id: pinchZoom
                 onActiveChanged: function(active) {
-                    if (active) root.pinchBaseZoom = root.zoomLevel
+                    if (active) {
+                        root.pinchBaseZoom = root.zoomLevel
+                        root.pinchViewportX = centroid.position.x
+                        root.pinchViewportY = centroid.position.y
+                        root.pinchAnchorX = (readerFlick.contentX + root.pinchViewportX)
+                            / Math.max(readerFlick.width, readerFlick.contentWidth)
+                        root.pinchAnchorY = (readerFlick.contentY + root.pinchViewportY)
+                            / Math.max(readerFlick.height, readerFlick.contentHeight)
+                    }
                 }
                 onScaleChanged: function(scale) {
                     root.zoomLevel = Math.max(0.4, Math.min(3.0, root.pinchBaseZoom * scale))
+                    Qt.callLater(function() {
+                        root.restoreAnchor(root.pinchAnchorX, root.pinchAnchorY,
+                            root.pinchViewportX, root.pinchViewportY)
+                    })
                 }
             }
 
@@ -377,9 +424,8 @@ Rectangle {
     Connections {
         target: appController
         function onCurrentScoreChanged() {
-            readerFlick.contentY = 0
             root.autoScrolling = false
-            root.zoomLevel = 1.0
+            root.fitAndCenter()
         }
     }
 }
