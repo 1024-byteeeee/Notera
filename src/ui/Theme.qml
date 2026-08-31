@@ -3,10 +3,10 @@ pragma Singleton
 import QtQuick
 
 QtObject {
-    // 0 跟随系统，1 浅色，2 深色。
+    // 0 浅色，1 深色。
     property int mode: 0
     property bool systemDark: false
-    readonly property bool dark: mode === 2 || (mode === 0 && systemDark)
+    readonly property bool dark: mode === 1
 
     // ── 基础色板 ──────────────────────────────────────────
     readonly property color background: dark ? "#0d0d0e" : "#f7f6f3"

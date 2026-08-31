@@ -9,6 +9,8 @@ Menu {
     padding: 6
     onOpened: openedOnce = true
 
+    delegate: AppMenuItem {}
+
     background: Rectangle {
         implicitWidth: 176
         radius: Theme.radiusMd

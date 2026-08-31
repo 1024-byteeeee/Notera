@@ -13,6 +13,7 @@ Rectangle {
     readonly property bool isImage: ["jpg", "jpeg", "png", "bmp", "gif", "webp", "tif", "tiff"].indexOf(appController.currentFileType) !== -1
     property bool autoScrolling: false
     property real scrollSpeed: appController.autoScrollSpeed
+    property real scrollAccumulator: 0
     property real zoomLevel: 1.0
     property int viewRotation: 0
     property real pinchBaseZoom: 1.0
@@ -605,7 +606,12 @@ Rectangle {
         repeat: true
         running: root.autoScrolling
         onTriggered: {
-            readerFlick.contentY += root.scrollSpeed * interval / 1000
+            root.scrollAccumulator += root.scrollSpeed * interval / 1000
+            const step = Math.floor(root.scrollAccumulator)
+            if (step > 0) {
+                readerFlick.contentY += step
+                root.scrollAccumulator -= step
+            }
             root.stopAtEnd()
         }
     }

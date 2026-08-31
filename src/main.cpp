@@ -165,10 +165,10 @@ int main(int argc, char* argv[])
     if (arguments.contains(QStringLiteral("--theme-smoke-test"))) {
         auto* const root = engine.rootObjects().constFirst();
         const auto originalMode = controller.themeMode();
-        controller.setThemeMode(1);
+        controller.setThemeMode(0);
         QCoreApplication::processEvents();
         const auto lightBackground = root->property("themeBackground").value<QColor>();
-        controller.setThemeMode(2);
+        controller.setThemeMode(1);
         QCoreApplication::processEvents();
         const auto darkBackground = root->property("themeBackground").value<QColor>();
         controller.setThemeMode(originalMode);
@@ -233,16 +233,12 @@ int main(int argc, char* argv[])
             };
             auto* const importButton = root->findChild<QQuickItem*>(QStringLiteral("importButton"));
             const auto* const stitchButton = root->findChild<QObject*>(QStringLiteral("stitchButton"));
-            const auto* const sidebarImportButton = root->findChild<QObject*>(QStringLiteral("sidebarImportButton"));
             if (!importButton || !importButton->isVisible() || importButton->width() < 96.0
                 || importButton->property("symbol").toString().length() > 0
                 || !stitchButton || stitchButton->property("symbol").toString().length() > 0
-                || !sidebarImportButton || sidebarImportButton->property("symbol").toString().length() > 0
                 || std::abs(importButton->property("visualContentCenterX").toDouble() - importButton->width() / 2.0) > 1.0
                 || std::abs(stitchButton->property("visualContentCenterX").toDouble()
-                    - stitchButton->property("width").toDouble() / 2.0) > 1.0
-                || std::abs(sidebarImportButton->property("visualContentCenterX").toDouble()
-                    - sidebarImportButton->property("width").toDouble() / 2.0) > 1.0) {
+                    - stitchButton->property("width").toDouble() / 2.0) > 1.0) {
                 fail("import-button-geometry");
                 return;
             }
@@ -524,14 +520,14 @@ int main(int argc, char* argv[])
                 fail("settings-screenshot");
                 return;
             }
-            controller.setThemeMode(2);
+            controller.setThemeMode(1);
             QCoreApplication::processEvents();
             if (root->property("themeBackground").value<QColor>().lightnessF() > 0.25
                 || !window->grabWindow().save(QStringLiteral("notera-settings-dark-smoke.png"))) {
                 fail("dark-theme-render");
                 return;
             }
-            controller.setThemeMode(1);
+            controller.setThemeMode(0);
             QCoreApplication::processEvents();
 
             controller.setCurrentPage(QStringLiteral("library"));

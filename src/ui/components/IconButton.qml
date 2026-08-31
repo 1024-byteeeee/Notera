@@ -15,6 +15,7 @@ Button {
     hoverEnabled: true
 
     contentItem: Label {
+        anchors.fill: parent
         text: control.symbol
         color: control.danger ? Theme.danger : (control.selected ? Theme.accent : Theme.mutedForeground)
         font.pixelSize: 16
@@ -30,6 +31,5 @@ Button {
             : control.selected ? Theme.accentSoft : "transparent"
         border.width: control.activeFocus ? 1 : 0
         border.color: Theme.inputFocusBorder
-        Behavior on color { ColorAnimation { duration: 100 } }
     }
 }

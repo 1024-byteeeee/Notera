@@ -133,19 +133,6 @@ Rectangle {
             }
         }
 
-        AppButton {
-            objectName: "sidebarImportButton"
-            Layout.fillWidth: true
-            Layout.bottomMargin: 12
-            text: "导入乐谱"
-            primary: true
-            onClicked: {
-                appController.libraryFilter = "all"
-                appController.currentPage = "library"
-                libraryService.requestImport()
-            }
-        }
-
         NavItem {
             objectName: "libraryNavItem"
             label: "乐谱库"; navId: "all"; symbol: "♪"

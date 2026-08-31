@@ -21,14 +21,17 @@ MenuItem {
     contentItem: RowLayout {
         spacing: 8
 
-        Label {
-            visible: control.checkable
+        Item {
             Layout.preferredWidth: 16
-            text: control.checked ? "✓" : ""
-            color: Theme.accent
-            font.pixelSize: Theme.fontMd
-            font.weight: Font.Bold
-            horizontalAlignment: Text.AlignHCenter
+            Layout.preferredHeight: 16
+            Label {
+                visible: control.checkable
+                anchors.centerIn: parent
+                text: control.checked ? "✓" : ""
+                color: Theme.accent
+                font.pixelSize: Theme.fontMd
+                font.weight: Font.Bold
+            }
         }
 
         Label {
@@ -37,6 +40,16 @@ MenuItem {
             color: control.danger ? Theme.danger : Theme.foreground
             font.pixelSize: Theme.fontMd
             verticalAlignment: Text.AlignVCenter
+        }
+
+        Label {
+            visible: control.menu !== null
+            text: "›"
+            color: Theme.mutedForeground
+            font.pixelSize: Theme.fontMd
+            font.weight: Font.Bold
+            Layout.preferredWidth: 16
+            horizontalAlignment: Text.AlignHCenter
         }
     }
 

@@ -116,7 +116,7 @@ Rectangle {
                                     spacing: 3
 
                                     Repeater {
-                                        model: ["跟随系统", "浅色", "深色"]
+                                        model: ["浅色", "深色"]
                                         delegate: Button {
                                             required property int index
                                             required property string modelData
@@ -263,7 +263,7 @@ Rectangle {
                                 Layout.fillWidth: true
                                 spacing: 3
                                 Label { text: "关于 Notera"; color: Theme.foreground; font.pixelSize: Theme.fontMd; font.weight: Font.Medium }
-                                Label { text: "本地优先的中文乐谱阅读器"; color: Theme.mutedForeground; font.pixelSize: Theme.fontXs }
+                                Label { text: "简单的本地乐谱阅读器"; color: Theme.mutedForeground; font.pixelSize: Theme.fontXs }
                             }
                             Label { text: "v0.1.2"; color: Theme.mutedForeground; font.pixelSize: Theme.fontSm }
                         }
