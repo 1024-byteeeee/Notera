@@ -18,25 +18,30 @@ Button {
     rightPadding: 14
     hoverEnabled: true
 
-    contentItem: Row {
-        id: contentRow
-        anchors.centerIn: parent
-        spacing: 7
+    contentItem: Item {
+        implicitWidth: contentRow.implicitWidth
+        implicitHeight: contentRow.implicitHeight
 
-        Label {
-            visible: control.symbol.length > 0
-            text: control.symbol
-            color: control.danger ? Theme.danger : (control.primary ? Theme.accentForeground : Theme.buttonText)
-            font.pixelSize: 16
-            font.weight: Font.DemiBold
-        }
+        Row {
+            id: contentRow
+            anchors.centerIn: parent
+            spacing: 7
 
-        Label {
-            text: control.text
-            color: control.danger ? Theme.danger : (control.primary ? Theme.accentForeground : Theme.buttonText)
-            font.pixelSize: Theme.fontMd
-            font.weight: Font.DemiBold
-            horizontalAlignment: Text.AlignHCenter
+            Label {
+                visible: control.symbol.length > 0
+                text: control.symbol
+                color: control.danger ? Theme.danger : (control.primary ? Theme.accentForeground : Theme.buttonText)
+                font.pixelSize: 16
+                font.weight: Font.DemiBold
+            }
+
+            Label {
+                text: control.text
+                color: control.danger ? Theme.danger : (control.primary ? Theme.accentForeground : Theme.buttonText)
+                font.pixelSize: Theme.fontMd
+                font.weight: Font.DemiBold
+                horizontalAlignment: Text.AlignHCenter
+            }
         }
     }
 
