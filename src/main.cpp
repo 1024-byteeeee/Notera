@@ -442,9 +442,9 @@ int main(int argc, char* argv[])
                 return;
             }
             const auto storedFilePath = controller.currentFileUrl().toLocalFile();
-            libraryService.deleteFolder(folderId);
+            libraryService.deleteItems({folderId});
             if (libraryService.scores()->rowCount() != 0 || QFileInfo::exists(storedFilePath)) {
-                fail("folder-cascade-delete");
+                fail("batch-folder-cascade-delete");
                 return;
             }
             QCoreApplication::exit(0);
