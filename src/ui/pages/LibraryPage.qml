@@ -182,6 +182,9 @@ Rectangle {
                     readonly property bool tagSubmenuEnabled: tagSubmenu.enabled
                     readonly property int folderSubmenuItemCount: folderSubmenu.count
                     readonly property int tagSubmenuItemCount: tagSubmenu.count
+                    readonly property bool tagMenuHasDefaultCheckIndicator: tagSubmenu.count > 0
+                        && tagSubmenu.itemAt(0).indicator.visible
+                        && tagSubmenu.itemAt(0).indicator.implicitWidth > 0
                     readonly property alias card: card
 
                     function closeContextMenu() {
@@ -408,7 +411,6 @@ Rectangle {
                             Instantiator {
                                 model: libraryService.tags
                                 delegate: AppMenuItem {
-                                    objectName: "tagAssignmentMenuItem"
                                     required property string itemId
                                     required property string name
                                     text: name

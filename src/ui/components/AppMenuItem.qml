@@ -10,7 +10,13 @@ MenuItem {
     implicitHeight: 36
     leftPadding: 12
     rightPadding: 12
-    indicator: Item { }
+    indicator: Item {
+        visible: false
+        implicitWidth: 0
+        implicitHeight: 0
+        width: 0
+        height: 0
+    }
 
     contentItem: RowLayout {
         spacing: 8

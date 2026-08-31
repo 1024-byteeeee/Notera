@@ -328,11 +328,7 @@ int main(int argc, char* argv[])
                 fail("score-context-menu");
                 return;
             }
-            const auto* const tagAssignmentItem = root->findChild<QObject*>(QStringLiteral("tagAssignmentMenuItem"));
-            const auto* const defaultIndicator = tagAssignmentItem
-                ? tagAssignmentItem->property("indicator").value<QObject*>() : nullptr;
-            if (!tagAssignmentItem || (defaultIndicator && defaultIndicator->property("visible").toBool()
-                && defaultIndicator->property("implicitWidth").toDouble() > 0.0)) {
+            if (scoreDelegate->property("tagMenuHasDefaultCheckIndicator").toBool()) {
                 fail("tag-menu-single-check-indicator");
                 return;
             }
