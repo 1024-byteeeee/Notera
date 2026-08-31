@@ -31,7 +31,7 @@ QList<Score> ScoreRepository::list(const QString& searchQuery, QString* error) c
             SELECT 1 FROM score_tags JOIN tags ON tags.id = score_tags.tag_id
             WHERE score_tags.score_id = scores.id AND tags.name LIKE ?
         )
-        ORDER BY file_name COLLATE NOCASE, id
+        ORDER BY title COLLATE NOCASE, id
     )"));
     query.addBindValue(needle);
     query.addBindValue(needle);
@@ -75,7 +75,7 @@ QList<Score> ScoreRepository::listFavorites(const QString& searchQuery, QString*
             SELECT 1 FROM score_tags JOIN tags ON tags.id = score_tags.tag_id
             WHERE score_tags.score_id = scores.id AND tags.name LIKE ?
           ))
-        ORDER BY file_name COLLATE NOCASE, id
+        ORDER BY title COLLATE NOCASE, id
     )"));
     query.addBindValue(needle);
     query.addBindValue(needle);
@@ -118,7 +118,7 @@ QList<Score> ScoreRepository::listRecent(const QString& searchQuery, QString* er
             SELECT 1 FROM score_tags JOIN tags ON tags.id = score_tags.tag_id
             WHERE score_tags.score_id = scores.id AND tags.name LIKE ?
         )
-        ORDER BY last_opened_at IS NULL, last_opened_at DESC, created_at DESC
+        ORDER BY last_opened_at IS NULL, last_opened_at DESC, title COLLATE NOCASE, id
     )"));
     query.addBindValue(needle);
     query.addBindValue(needle);
@@ -194,7 +194,7 @@ QList<Score> ScoreRepository::listAtFolder(const QString& folderId, const QStrin
             SELECT 1 FROM score_tags JOIN tags ON tags.id = score_tags.tag_id
             WHERE score_tags.score_id = scores.id AND tags.name LIKE ?
           ))
-        ORDER BY file_name COLLATE NOCASE, id
+        ORDER BY title COLLATE NOCASE, id
     )").arg(folderCondition);
     query.prepare(sql);
     if (!folderId.isEmpty()) query.addBindValue(folderId);
@@ -233,6 +233,23 @@ bool ScoreRepository::setFavorite(const QString& scoreId, const bool favorite, Q
     query.prepare(QStringLiteral("UPDATE scores SET favorite = ?, updated_at = ? WHERE id = ?"));
     query.addBindValue(favorite);
     query.addBindValue(QDateTime::currentMSecsSinceEpoch());
+    query.addBindValue(scoreId);
+    if (query.exec() && query.numRowsAffected() == 1) return true;
+    *error = query.lastError().text();
+    return false;
+}
+
+bool ScoreRepository::markScoreOpened(const QString& scoreId, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral(R"(
+        UPDATE scores
+        SET last_opened_at = MAX(?, COALESCE((SELECT MAX(last_opened_at) + 1 FROM scores), ?))
+        WHERE id = ?
+    )"));
+    const auto now = QDateTime::currentMSecsSinceEpoch();
+    query.addBindValue(now);
+    query.addBindValue(now);
     query.addBindValue(scoreId);
     if (query.exec() && query.numRowsAffected() == 1) return true;
     *error = query.lastError().text();
@@ -378,7 +395,7 @@ QList<Score> ScoreRepository::listByFolder(const QString& folderId, const QStrin
             SELECT 1 FROM score_tags JOIN tags ON tags.id = score_tags.tag_id
             WHERE score_tags.score_id = scores.id AND tags.name LIKE ?
           ))
-        ORDER BY file_name COLLATE NOCASE, id
+        ORDER BY title COLLATE NOCASE, id
     )"));
     query.addBindValue(folderId);
     query.addBindValue(needle);
@@ -424,7 +441,7 @@ QList<Score> ScoreRepository::listByTag(const QString& tagId, const QString& sea
             SELECT 1 FROM score_tags st2 JOIN tags t ON t.id = st2.tag_id
             WHERE st2.score_id = s.id AND t.name LIKE ?
           ))
-        ORDER BY s.file_name COLLATE NOCASE, s.id
+        ORDER BY s.title COLLATE NOCASE, s.id
     )"));
     query.addBindValue(tagId);
     query.addBindValue(needle);
@@ -460,6 +477,27 @@ QVariantList ScoreRepository::folders(QString* error) const
 {
     QSqlQuery query(m_database);
     if (!query.exec(QStringLiteral("SELECT id, name, created_at FROM folders ORDER BY name COLLATE NOCASE"))) {
+        *error = query.lastError().text();
+        return {};
+    }
+    QVariantList result;
+    while (query.next()) {
+        result.append(QVariantMap{{"id", query.value(0).toString()}, {"name", query.value(1).toString()},
+            {"createdAt", query.value(2).toLongLong()}});
+    }
+    return result;
+}
+
+QVariantList ScoreRepository::recentFolders(const QString& searchQuery, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral(R"(
+        SELECT id, name, created_at FROM folders
+        WHERE name LIKE ?
+        ORDER BY last_opened_at IS NULL, last_opened_at DESC, name COLLATE NOCASE, id
+    )"));
+    query.addBindValue(QStringLiteral("%%1%").arg(searchQuery));
+    if (!query.exec()) {
         *error = query.lastError().text();
         return {};
     }
@@ -580,6 +618,23 @@ bool ScoreRepository::createFolder(const QString& name, const QString& parentId,
     query.addBindValue(now);
     query.addBindValue(parentId.isEmpty() ? QVariant {} : QVariant {parentId});
     if (query.exec()) return true;
+    *error = query.lastError().text();
+    return false;
+}
+
+bool ScoreRepository::markFolderOpened(const QString& folderId, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral(R"(
+        UPDATE folders
+        SET last_opened_at = MAX(?, COALESCE((SELECT MAX(last_opened_at) + 1 FROM folders), ?))
+        WHERE id = ?
+    )"));
+    const auto now = QDateTime::currentMSecsSinceEpoch();
+    query.addBindValue(now);
+    query.addBindValue(now);
+    query.addBindValue(folderId);
+    if (query.exec() && query.numRowsAffected() == 1) return true;
     *error = query.lastError().text();
     return false;
 }

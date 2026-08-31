@@ -43,6 +43,7 @@ signals:
     void themeModeChanged();
     void libraryFilterChanged();
     void currentScoreChanged();
+    void scoreOpened(QString scoreId);
     void autoScrollSpeedChanged();
 
 private:

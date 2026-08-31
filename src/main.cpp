@@ -111,6 +111,8 @@ int main(int argc, char* argv[])
 
     ApplicationController controller;
     LibraryService libraryService;
+    QObject::connect(&controller, &ApplicationController::scoreOpened,
+        &libraryService, &LibraryService::markScoreOpened);
 
     QTemporaryFile importSmokeFile;
     if (arguments.contains(QStringLiteral("--import-smoke-test"))) {
@@ -219,7 +221,8 @@ int main(int argc, char* argv[])
         }
         libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
         libraryService.importLocalFile(QUrl::fromLocalFile(secondImagePath));
-        libraryService.createFolder(QStringLiteral("界面测试文件夹"));
+        libraryService.createFolder(QStringLiteral("Z界面测试文件夹"));
+        libraryService.createFolder(QStringLiteral("A界面测试文件夹"));
         libraryService.createTag(QStringLiteral("界面测试标签"));
 
         auto* const root = engine.rootObjects().constFirst();
@@ -278,12 +281,16 @@ int main(int argc, char* argv[])
 
             const auto entryTypeRole = libraryService.entries()->roleNames().key("itemType", -1);
             const auto entryTitleRole = libraryService.entries()->roleNames().key("title", -1);
-            if (libraryService.entries()->rowCount() != 3
+            if (libraryService.entries()->rowCount() != 4
                 || libraryService.entries()->data(libraryService.entries()->index(0, 0), entryTypeRole).toString()
                     != QStringLiteral("folder")
+                || !libraryService.entries()->data(libraryService.entries()->index(0, 0), entryTitleRole).toString()
+                    .startsWith(QStringLiteral("A"))
                 || !libraryService.entries()->data(libraryService.entries()->index(1, 0), entryTitleRole).toString()
-                    .startsWith(QStringLiteral("notera-ui-a-"))
+                    .startsWith(QStringLiteral("Z"))
                 || !libraryService.entries()->data(libraryService.entries()->index(2, 0), entryTitleRole).toString()
+                    .startsWith(QStringLiteral("notera-ui-a-"))
+                || !libraryService.entries()->data(libraryService.entries()->index(3, 0), entryTitleRole).toString()
                     .startsWith(QStringLiteral("notera-ui-z-"))) {
                 fail("library-folder-first-file-name-sort");
                 return;
@@ -360,6 +367,8 @@ int main(int argc, char* argv[])
             const auto scoreId = libraryService.scores()->data(libraryService.scores()->index(0, 0), scoreIdRole).toString();
             const auto secondScoreId = libraryService.scores()->data(libraryService.scores()->index(1, 0), scoreIdRole).toString();
             const auto folderId = libraryService.folders()->data(libraryService.folders()->index(0, 0), folderIdRole).toString();
+            const auto recentFirstFolderId = libraryService.folders()->data(
+                libraryService.folders()->index(1, 0), folderIdRole).toString();
             const auto tagId = libraryService.tags()->data(libraryService.tags()->index(0, 0), tagIdRole).toString();
             libraryService.setScoreFolder(scoreId, folderId);
             libraryService.setScoreFolder(secondScoreId, folderId);
@@ -540,17 +549,25 @@ int main(int argc, char* argv[])
             libraryService.goToLibraryRoot();
             QCoreApplication::processEvents();
             const auto* const browserGrid = root->findChild<QObject*>(QStringLiteral("browserGrid"));
-            if (!browserGrid || browserGrid->property("count").toInt() != 1) {
+            if (!browserGrid || browserGrid->property("count").toInt() != 2) {
                 fail("library-folder-score-browser");
                 return;
             }
+            libraryService.enterFolder(folderId);
+            libraryService.goToLibraryRoot();
+            libraryService.enterFolder(recentFirstFolderId);
+            libraryService.goToLibraryRoot();
             libraryService.setFilterMode(QStringLiteral("recent"));
             QCoreApplication::processEvents();
             const auto entryIdRole = libraryService.entries()->roleNames().key("itemId", -1);
-            if (libraryService.entries()->rowCount() != 3
+            if (libraryService.entries()->rowCount() != 4
                 || libraryService.entries()->data(libraryService.entries()->index(0, 0), entryTypeRole).toString()
                     != QStringLiteral("folder")
+                || libraryService.entries()->data(libraryService.entries()->index(0, 0), entryIdRole).toString()
+                    != recentFirstFolderId
                 || libraryService.entries()->data(libraryService.entries()->index(1, 0), entryIdRole).toString()
+                    != folderId
+                || libraryService.entries()->data(libraryService.entries()->index(2, 0), entryIdRole).toString()
                     != controller.currentScoreId()) {
                 fail("recent-folder-first-last-opened-sort");
                 return;

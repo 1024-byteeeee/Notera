@@ -140,6 +140,10 @@ void LibraryService::enterFolder(const QString& folderId)
         emit errorOccurred(QStringLiteral("无法打开文件夹。"));
         return;
     }
+    if (!m_repository.markFolderOpened(folderId, &error)) {
+        emit errorOccurred(QStringLiteral("无法记录文件夹打开时间。"));
+        return;
+    }
     m_selection.clear();
     m_currentFolderId = folderId;
     m_currentFolderName = name;
@@ -148,6 +152,17 @@ void LibraryService::enterFolder(const QString& folderId)
     emit currentFolderChanged();
     emit filterModeChanged();
     reload();
+}
+
+void LibraryService::markScoreOpened(const QString& scoreId)
+{
+    if (scoreId.isEmpty()) return;
+    QString error;
+    if (!m_repository.markScoreOpened(scoreId, &error)) {
+        emit errorOccurred(QStringLiteral("无法记录乐谱打开时间。"));
+        return;
+    }
+    if (m_filterMode == QStringLiteral("recent")) reload();
 }
 
 void LibraryService::goUp()
@@ -594,6 +609,7 @@ void LibraryService::reload()
         scores = m_repository.listFavorites(m_searchQuery, &error);
     } else if (m_filterMode == QStringLiteral("recent")) {
         scores = m_repository.listRecent(m_searchQuery, &error);
+        visibleFolders = m_repository.recentFolders(m_searchQuery, &error);
     } else if (m_filterMode.startsWith(QStringLiteral("folder:"))) {
         scores = m_repository.listAtFolder(m_currentFolderId, m_searchQuery, &error);
         visibleFolders = m_repository.childFolders(m_currentFolderId, &error);

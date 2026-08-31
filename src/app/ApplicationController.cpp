@@ -89,6 +89,7 @@ void ApplicationController::openScore(const QString& scoreId, const QString& tit
     m_currentScoreFolderId = folderId;
     m_currentScorePageCount = pageCount;
     emit currentScoreChanged();
+    emit scoreOpened(scoreId);
     setCurrentPage(QStringLiteral("reader"));
 }
 

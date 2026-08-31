@@ -140,5 +140,26 @@ bool DatabaseService::applyMigrations(QString* error)
         }
     }
 
+    // v4: persist folder access time so folders can participate in Recent.
+    if (version < 4) {
+        if (!m_database.transaction()) {
+            *error = m_database.lastError().text();
+            return false;
+        }
+
+        const auto succeeded = query.exec(QStringLiteral(
+            "ALTER TABLE folders ADD COLUMN last_opened_at INTEGER"))
+            && query.exec(QStringLiteral("PRAGMA user_version = 4"));
+        if (!succeeded) {
+            m_database.rollback();
+            *error = query.lastError().text();
+            return false;
+        }
+        if (!m_database.commit()) {
+            *error = m_database.lastError().text();
+            return false;
+        }
+    }
+
     return true;
 }

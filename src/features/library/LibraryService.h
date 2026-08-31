@@ -65,6 +65,7 @@ public:
     Q_INVOKABLE void enterFolder(const QString& folderId);
     Q_INVOKABLE void goUp();
     Q_INVOKABLE void goToLibraryRoot();
+    void markScoreOpened(const QString& scoreId);
 
 signals:
     void searchQueryChanged();
