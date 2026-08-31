@@ -301,10 +301,11 @@ Rectangle {
                             font.pixelSize: 14
                             font.weight: Font.Bold
                         }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: libraryService.selection.toggle(scoreDelegate.itemId)
+                        HoverHandler { cursorShape: Qt.PointingHandCursor }
+                        TapHandler {
+                            acceptedButtons: Qt.LeftButton
+                            gesturePolicy: TapHandler.ReleaseWithinBounds
+                            onTapped: libraryService.selection.toggle(scoreDelegate.itemId)
                         }
                     }
 
