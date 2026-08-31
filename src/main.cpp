@@ -4,6 +4,7 @@
 #include <QColor>
 #include <QDebug>
 #include <QDir>
+#include <QEventLoop>
 #include <QGuiApplication>
 #include <QImage>
 #include <QLocale>
@@ -226,7 +227,12 @@ int main(int argc, char* argv[])
             if (!importButton || !importButton->isVisible() || importButton->width() < 96.0
                 || importButton->property("symbol").toString().length() > 0
                 || !stitchButton || stitchButton->property("symbol").toString().length() > 0
-                || !sidebarImportButton || sidebarImportButton->property("symbol").toString().length() > 0) {
+                || !sidebarImportButton || sidebarImportButton->property("symbol").toString().length() > 0
+                || std::abs(importButton->property("visualContentCenterX").toDouble() - importButton->width() / 2.0) > 1.0
+                || std::abs(stitchButton->property("visualContentCenterX").toDouble()
+                    - stitchButton->property("width").toDouble() / 2.0) > 1.0
+                || std::abs(sidebarImportButton->property("visualContentCenterX").toDouble()
+                    - sidebarImportButton->property("width").toDouble() / 2.0) > 1.0) {
                 fail("import-button-geometry");
                 return;
             }
@@ -342,6 +348,24 @@ int main(int argc, char* argv[])
                 / readerFlick->property("contentWidth").toDouble();
             if (std::abs(centerBefore - centerAfter) > 0.02) {
                 fail("reader-centered-zoom");
+                return;
+            }
+
+            controller.setCurrentPage(QStringLiteral("library"));
+            controller.openScore(QStringLiteral("再次打开测试"), controller.currentFileUrl().toLocalFile(),
+                controller.currentFileType(), 1);
+            QEventLoop reopenWait;
+            QTimer::singleShot(250, &reopenWait, &QEventLoop::quit);
+            reopenWait.exec();
+            const auto reopenedZoom = readerPage->property("zoomLevel").toDouble();
+            const auto reopenedContentY = readerFlick->property("contentY").toDouble();
+            const auto reopenedContentHeight = readerFlick->property("contentHeight").toDouble();
+            const auto reopenedViewportHeight = readerFlick->property("height").toDouble();
+            if (controller.currentPage() != QStringLiteral("reader")
+                || std::abs(reopenedZoom - 1.0) > 0.001
+                || std::abs(reopenedContentY) > 1.0
+                || reopenedContentHeight <= reopenedViewportHeight) {
+                fail("reader-reopen-default-view");
                 return;
             }
             if (!window->grabWindow().save(QStringLiteral("notera-reader-smoke.png"))) {

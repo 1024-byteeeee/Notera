@@ -9,6 +9,8 @@ Button {
     property bool primary: false
     property bool danger: false
     property string symbol: ""
+    readonly property real visualContentCenterX: contentRow.x + contentRow.childrenRect.x
+        + contentRow.childrenRect.width / 2
 
     implicitWidth: Math.max(96, contentRow.implicitWidth + 30)
     implicitHeight: 38
