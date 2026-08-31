@@ -74,11 +74,13 @@ Rectangle {
             hoverEnabled: true
             preventStealing: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: function(mouse) {
-                if (mouse.button === Qt.RightButton) {
+            onPressed: function(mouse) {
+                if (mouse.button === Qt.RightButton && navItem.contextEnabled) {
                     navItem.contextRequested()
-                    return
                 }
+            }
+            onClicked: function(mouse) {
+                if (mouse.button === Qt.RightButton) return
                 if (navItem.targetPage === "library") {
                     if (navItem.navId === "all") libraryService.goToLibraryRoot()
                     appController.libraryFilter = navItem.navId
