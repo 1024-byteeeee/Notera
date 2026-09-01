@@ -71,14 +71,15 @@ QQuickItem* findVisualItem(QObject* root, const QString& objectName)
     return findVisualItem(qobject_cast<QQuickItem*>(root), objectName);
 }
 
-bool clickItem(QObject* root, const QString& objectName, const Qt::MouseButton button)
+bool clickItemAt(QObject* root, const QString& objectName, const Qt::MouseButton button,
+    const double relX, const double relY)
 {
     auto* const item = findVisualItem(root, objectName);
     if (!item || !item->isVisible() || item->width() <= 0.0 || item->height() <= 0.0 || !item->window()) {
         return false;
     }
 
-    const auto scenePosition = item->mapToScene(QPointF(item->width() / 2.0, item->height() / 2.0));
+    const auto scenePosition = item->mapToScene(QPointF(item->width() * relX, item->height() * relY));
     const auto globalPosition = QPointF(item->window()->mapToGlobal(scenePosition.toPoint()));
     QMouseEvent pressEvent(QEvent::MouseButtonPress, scenePosition, scenePosition, globalPosition,
         button, button, Qt::NoModifier, QPointingDevice::primaryPointingDevice());
@@ -88,6 +89,11 @@ bool clickItem(QObject* root, const QString& objectName, const Qt::MouseButton b
     QCoreApplication::sendEvent(item->window(), &releaseEvent);
     QCoreApplication::processEvents();
     return true;
+}
+
+bool clickItem(QObject* root, const QString& objectName, const Qt::MouseButton button)
+{
+    return clickItemAt(root, objectName, button, 0.5, 0.5);
 }
 
 bool popupIsOpen(QObject* root, const QString& objectName)
@@ -514,7 +520,7 @@ int main(int argc, char* argv[])
             }
             QMetaObject::invokeMethod(scoreDelegate, "closeContextMenu");
 
-            if (!clickItem(root, QStringLiteral("librarySurface"), Qt::RightButton)
+            if (!clickItemAt(root, QStringLiteral("librarySurface"), Qt::RightButton, 0.5, 0.92)
                 || !popupIsOpen(root, QStringLiteral("blankContextMenu"))) {
                 fail("blank-context-menu");
                 return;

@@ -23,6 +23,50 @@ Rectangle {
         Drag.keys: ["notera-library-items"]
         Drag.hotSpot.x: 1
         Drag.hotSpot.y: 1
+
+        // 拖拽预览 - 跟随鼠标的半透明卡片
+        Rectangle {
+            visible: root.dragInProgress && internalDragSource.dragIds.length > 0
+            width: 150
+            height: 56
+            radius: Theme.radiusMd
+            color: Theme.elevatedSurface
+            border.width: 1
+            border.color: Theme.accent
+            opacity: 0.92
+            x: 14
+            y: 14
+            z: 1001
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                spacing: 8
+
+                Rectangle {
+                    Layout.preferredWidth: 32
+                    Layout.preferredHeight: 32
+                    radius: Theme.radiusSm
+                    color: Theme.accentSoft
+                    Label {
+                        anchors.centerIn: parent
+                        text: internalDragSource.dragIds.length > 9 ? "9+" : internalDragSource.dragIds.length
+                        color: Theme.accent
+                        font.pixelSize: Theme.fontMd
+                        font.weight: Font.Bold
+                    }
+                }
+                Label {
+                    Layout.fillWidth: true
+                    text: internalDragSource.dragIds.length === 1 ? "移动 1 项" : "移动 " + internalDragSource.dragIds.length + " 项"
+                    color: Theme.foreground
+                    font.pixelSize: Theme.fontSm
+                    font.weight: Font.Medium
+                    elide: Text.ElideRight
+                }
+            }
+        }
     }
 
     function dragIds(drag) {
@@ -257,9 +301,9 @@ Rectangle {
                         anchors.top: parent.top
                         anchors.topMargin: 6
                         radius: Theme.radiusMd
-                        color: root.isSelected(scoreDelegate.itemId) ? Theme.accentSoft : (cardHover.hovered ? Theme.cardHover : Theme.cardBackground)
+                        color: folderDrop.containsDrag ? Theme.accentSoft : (root.isSelected(scoreDelegate.itemId) ? Theme.accentSoft : (cardHover.hovered ? Theme.cardHover : Theme.cardBackground))
                         Behavior on color { ColorAnimation { duration: 150; easing.type: Easing.OutCubic } }
-                        border.width: root.isSelected(scoreDelegate.itemId) ? 2 : 1
+                        border.width: folderDrop.containsDrag ? 2 : (root.isSelected(scoreDelegate.itemId) ? 2 : 1)
                         border.color: folderDrop.containsDrag ? Theme.accent
                             : root.isSelected(scoreDelegate.itemId) ? Theme.accent : (cardHover.hovered ? Theme.strongBorder : Theme.cardBorder)
                         Behavior on border.color { ColorAnimation { duration: 150; easing.type: Easing.OutCubic } }
