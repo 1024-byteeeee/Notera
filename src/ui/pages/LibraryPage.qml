@@ -23,7 +23,6 @@ Rectangle {
         height: 2
         z: 1000
         property var dragIds: []
-        Drag.source: dragPreview
         Drag.keys: ["notera-library-items"]
         Drag.supportedActions: Qt.MoveAction
         Drag.hotSpot.x: 1
@@ -764,7 +763,7 @@ Rectangle {
             Rectangle {
                 id: selectionBox
                 objectName: "selectionBox"
-                visible: rubberBand.active || gridRubberBand.active
+                visible: gridRubberBand.active
                 z: 10
                 color: Theme.accent + "22"
                 border.width: 1
@@ -774,7 +773,7 @@ Rectangle {
 
             DragHandler {
                 id: rubberBand
-                enabled: !root.dragInProgress
+                enabled: false
                 target: null
                 acceptedButtons: Qt.LeftButton
                 acceptedDevices: PointerDevice.Mouse
