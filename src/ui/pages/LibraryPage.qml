@@ -433,12 +433,14 @@ Rectangle {
                             id: cardHover
                             cursorShape: Qt.PointingHandCursor
                         }
-                        MouseArea {
-                            id: cardMouseArea
-                            anchors.fill: parent
+                        TapHandler {
+                            id: cardTapHandler
+                            objectName: scoreDelegate.itemType === "score" ? "scoreCardMouse" : "folderCardMouse"
                             acceptedButtons: Qt.LeftButton
+                            gesturePolicy: TapHandler.ReleaseWithinBounds
 
-                            onPressed: function(mouse) {
+                            onPressedChanged: {
+                                if (!pressed) return
                                 // 按下时准备拖拽数据，Drag.Automatic 会在移动时自动启动
                                 if (root.selectedCount > 0 && root.isSelected(scoreDelegate.itemId)) {
                                     root.dragItemIds = libraryService.selection.selectedIds
@@ -451,7 +453,7 @@ Rectangle {
                                     "application/x-notera-items": root.dragItemIds.join(",")
                                 }
                             }
-                            onClicked: {
+                            onTapped: {
                                 if (root.selectedCount > 0) {
                                     libraryService.selection.toggle(scoreDelegate.itemId)
                                     return
