@@ -6,7 +6,7 @@ import Notera
 MenuItem {
     id: control
     property bool danger: false
-    readonly property bool customArrowVisible: control.menu !== null
+    readonly property bool customArrowVisible: control.subMenu !== null
     readonly property int visibleArrowCount: (control.customArrowVisible ? 1 : 0)
         + (control.arrow && control.arrow.visible && control.arrow.implicitWidth > 0 ? 1 : 0)
 
@@ -14,6 +14,13 @@ MenuItem {
     leftPadding: 12
     rightPadding: 12
     indicator: Item {
+        visible: false
+        implicitWidth: 0
+        implicitHeight: 0
+        width: 0
+        height: 0
+    }
+    arrow: Item {
         visible: false
         implicitWidth: 0
         implicitHeight: 0
