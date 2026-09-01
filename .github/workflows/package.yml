@@ -166,7 +166,13 @@ jobs:
 
       - name: Create MSI
         shell: powershell
-        run: cpack --config build/windows-x64/CPackConfig.cmake -C Release -G WIX
+        run: |
+          cpack --config build/windows-x64/CPackConfig.cmake -C Release -G WIX
+          if ($LASTEXITCODE -ne 0) {
+            $wixLog = Get-ChildItem build/windows-x64/packages/_CPack_Packages -Recurse -Filter wix.log | Select-Object -First 1
+            if ($wixLog) { Get-Content $wixLog.FullName }
+            exit $LASTEXITCODE
+          }
 
       - name: Verify Chinese installer and desktop shortcut option
         shell: powershell
