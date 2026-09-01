@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QSettings>
 #include <QSqlDatabase>
@@ -194,53 +195,98 @@ QString ApplicationController::migrateDataDirectory(const QString& newPath)
     if (cleanNewPath.isEmpty() || cleanNewPath == oldPath) {
         return QStringLiteral("路径无效或与当前路径相同。");
     }
+    const auto oldPrefix = QDir::cleanPath(oldPath) + QDir::separator();
+    if (cleanNewPath.startsWith(oldPrefix, Qt::CaseInsensitive)) {
+        return QStringLiteral("新数据目录不能位于当前数据目录内部。");
+    }
 
     QDir newDir(cleanNewPath);
     if (newDir.exists() && !newDir.isEmpty()) {
         return QStringLiteral("目标目录不为空，请选择一个空目录或新建目录。");
     }
 
-    if (!newDir.mkpath(cleanNewPath)) {
+    if (!QDir().mkpath(cleanNewPath)) {
         return QStringLiteral("无法创建目标目录。");
     }
 
-    // 1. 复制所有数据到新目录
+    QSettings settings;
+    settings.setValue(QStringLiteral("storage/pendingDataDirectory"), cleanNewPath);
+    settings.sync();
+    if (settings.status() != QSettings::NoError) {
+        return QStringLiteral("无法保存新的数据目录设置。");
+    }
+    return {};
+}
+
+bool ApplicationController::applyPendingDataMigration(QString* error)
+{
+    QSettings settings;
+    const auto cleanNewPath = QDir::cleanPath(
+        settings.value(QStringLiteral("storage/pendingDataDirectory")).toString());
+    if (cleanNewPath.isEmpty()) return true;
+
+    const auto oldPath = AppDataPaths::root();
+    if (cleanNewPath == oldPath) {
+        settings.remove(QStringLiteral("storage/pendingDataDirectory"));
+        return true;
+    }
+    QDir newDir(cleanNewPath);
+    if (newDir.exists() && !newDir.isEmpty()) {
+        *error = QStringLiteral("待迁移的目标目录不再为空。");
+        return false;
+    }
+    if (!QDir().mkpath(cleanNewPath)) {
+        *error = QStringLiteral("无法创建目标目录。");
+        return false;
+    }
+
     QString copyError;
     if (!copyDirectoryRecursively(oldPath, cleanNewPath, &copyError)) {
         removeDirectoryRecursively(cleanNewPath);
-        return copyError.isEmpty() ? QStringLiteral("复制文件失败。") : copyError;
+        *error = copyError.isEmpty() ? QStringLiteral("复制文件失败。") : copyError;
+        return false;
     }
 
-    // 2. 在新数据库中更新文件路径
     const auto dbPath = cleanNewPath + QLatin1String("/database/notera.db");
     if (QFileInfo::exists(dbPath)) {
-        const auto connName = QStringLiteral("migration_db_") + QString::number(reinterpret_cast<quintptr>(this), 16);
+        const auto connName = QStringLiteral("notera_pending_migration");
+        bool databaseUpdated = false;
         {
             auto db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connName);
             db.setDatabaseName(dbPath);
-            if (db.open()) {
+            if (db.open() && db.transaction()) {
                 QSqlQuery query(db);
                 query.prepare(QStringLiteral("UPDATE scores SET file_path = REPLACE(file_path, ?, ?)"));
                 query.addBindValue(oldPath);
                 query.addBindValue(cleanNewPath);
-                query.exec();
-                query.prepare(QStringLiteral("UPDATE scores SET thumbnail_path = REPLACE(thumbnail_path, ?, ?)"));
+                const auto filesUpdated = query.exec();
+                query.prepare(QStringLiteral(
+                    "UPDATE scores SET thumbnail_path = REPLACE(thumbnail_path, ?, ?) WHERE thumbnail_path IS NOT NULL"));
                 query.addBindValue(oldPath);
                 query.addBindValue(cleanNewPath);
-                query.exec();
-                db.close();
+                const auto thumbnailsUpdated = query.exec();
+                databaseUpdated = filesUpdated && thumbnailsUpdated && db.commit();
+                if (!databaseUpdated) db.rollback();
             }
+            db.close();
         }
         QSqlDatabase::removeDatabase(connName);
+        if (!databaseUpdated) {
+            removeDirectoryRecursively(cleanNewPath);
+            *error = QStringLiteral("无法更新迁移后数据库中的文件路径。");
+            return false;
+        }
     }
 
-    // 3. 更新设置
-    QSettings().setValue(QStringLiteral("storage/dataDirectory"), cleanNewPath);
+    settings.setValue(QStringLiteral("storage/dataDirectory"), cleanNewPath);
+    settings.remove(QStringLiteral("storage/pendingDataDirectory"));
+    settings.sync();
+    if (settings.status() != QSettings::NoError) {
+        removeDirectoryRecursively(cleanNewPath);
+        *error = QStringLiteral("无法保存迁移后的数据目录设置。");
+        return false;
+    }
     AppDataPaths::setCustomRoot(cleanNewPath);
-
-    // 4. 删除旧数据
     removeDirectoryRecursively(oldPath);
-
-    emit dataDirectoryChanged();
-    return QString();
+    return true;
 }

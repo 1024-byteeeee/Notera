@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 #include <QColor>
 #include <QDebug>
@@ -16,6 +17,10 @@
 #include <QQuickStyle>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QFile>
+#include <QSettings>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
@@ -23,6 +28,7 @@
 
 #include "app/ApplicationController.h"
 #include "features/library/LibraryService.h"
+#include "platform/AppDataPaths.h"
 
 namespace {
 
@@ -103,11 +109,67 @@ int main(int argc, char* argv[])
         || arguments.contains(QStringLiteral("--import-smoke-test"))
         || arguments.contains(QStringLiteral("--stitch-smoke-test"))
         || arguments.contains(QStringLiteral("--reader-smoke-test"))
-        || arguments.contains(QStringLiteral("--ui-smoke-test"));
+        || arguments.contains(QStringLiteral("--ui-smoke-test"))
+        || arguments.contains(QStringLiteral("--storage-migration-smoke-test"));
     if (isSmokeTest) {
         QStandardPaths::setTestModeEnabled(true);
     }
     QQuickStyle::setStyle(QStringLiteral("Basic"));
+
+    std::unique_ptr<QTemporaryDir> migrationSmokeRoot;
+    QString expectedMigratedFile;
+    if (arguments.contains(QStringLiteral("--storage-migration-smoke-test"))) {
+        migrationSmokeRoot = std::make_unique<QTemporaryDir>();
+        if (!migrationSmokeRoot->isValid()) return 1;
+        const auto oldRoot = migrationSmokeRoot->filePath(QStringLiteral("old"));
+        const auto newRoot = migrationSmokeRoot->filePath(QStringLiteral("new"));
+        QDir().mkpath(oldRoot + QStringLiteral("/database"));
+        QDir().mkpath(oldRoot + QStringLiteral("/library/scores"));
+        expectedMigratedFile = newRoot + QStringLiteral("/library/scores/test.png");
+        QFile marker(oldRoot + QStringLiteral("/library/scores/test.png"));
+        if (!marker.open(QIODevice::WriteOnly) || marker.write("notera") != 6) return 1;
+        marker.close();
+        const auto connectionName = QStringLiteral("storage_migration_fixture");
+        {
+            auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+            database.setDatabaseName(oldRoot + QStringLiteral("/database/notera.db"));
+            if (!database.open()) return 1;
+            QSqlQuery query(database);
+            if (!query.exec(QStringLiteral(
+                "CREATE TABLE scores (file_path TEXT NOT NULL, thumbnail_path TEXT)"))) return 1;
+            query.prepare(QStringLiteral("INSERT INTO scores VALUES (?, NULL)"));
+            query.addBindValue(oldRoot + QStringLiteral("/library/scores/test.png"));
+            if (!query.exec()) return 1;
+            database.close();
+        }
+        QSqlDatabase::removeDatabase(connectionName);
+        QSettings settings;
+        settings.setValue(QStringLiteral("storage/dataDirectory"), oldRoot);
+        settings.remove(QStringLiteral("storage/pendingDataDirectory"));
+        settings.sync();
+        ApplicationController migrationController;
+        if (!migrationController.migrateDataDirectory(newRoot).isEmpty()) return 1;
+    }
+
+    QString migrationError;
+    if (!ApplicationController::applyPendingDataMigration(&migrationError)) {
+        qWarning() << "Data directory migration failed:" << migrationError;
+        if (arguments.contains(QStringLiteral("--storage-migration-smoke-test"))) return 1;
+    }
+    if (arguments.contains(QStringLiteral("--storage-migration-smoke-test"))) {
+        QSqlDatabase migratedDatabase = QSqlDatabase::addDatabase(
+            QStringLiteral("QSQLITE"), QStringLiteral("storage_migration_verification"));
+        migratedDatabase.setDatabaseName(AppDataPaths::databaseDirectory() + QStringLiteral("/notera.db"));
+        if (!QFileInfo::exists(expectedMigratedFile) || !migratedDatabase.open()) return 1;
+        QSqlQuery query(migratedDatabase);
+        const auto valid = query.exec(QStringLiteral("SELECT file_path FROM scores")) && query.next()
+            && query.value(0).toString() == expectedMigratedFile;
+        query.finish();
+        migratedDatabase.close();
+        migratedDatabase = {};
+        QSqlDatabase::removeDatabase(QStringLiteral("storage_migration_verification"));
+        return valid ? 0 : 1;
+    }
 
     ApplicationController controller;
     LibraryService libraryService;
@@ -504,8 +566,12 @@ int main(int argc, char* argv[])
             QCoreApplication::processEvents();
             const auto* const settingsContent = root->findChild<QQuickItem*>(QStringLiteral("settingsContent"));
             const auto* const themeSelector = root->findChild<QQuickItem*>(QStringLiteral("themeSelector"));
+            const auto* const changeDataDirectoryButton = root->findChild<QQuickItem*>(
+                QStringLiteral("changeDataDirectoryButton"));
             if (!settingsContent || !themeSelector || settingsContent->width() <= 0.0
-                || themeSelector->width() < 240.0 || themeSelector->x() < 0.0) {
+                || themeSelector->width() < 240.0 || themeSelector->x() < 0.0
+                || !changeDataDirectoryButton || !changeDataDirectoryButton->isVisible()
+                || !changeDataDirectoryButton->isEnabled()) {
                 fail("settings-layout");
                 return;
             }

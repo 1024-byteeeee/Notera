@@ -282,6 +282,7 @@ Rectangle {
                             }
 
                             AppButton {
+                                objectName: "changeDataDirectoryButton"
                                 text: "更改"
                                 onClicked: dataDirDialog.open()
                             }
@@ -335,7 +336,7 @@ Rectangle {
         onAccepted: {
             const error = appController.migrateDataDirectory(newPath)
             if (error === "" || error === undefined || error === null) {
-                migrateResultDialog.message = "数据迁移成功！\n\n请重启应用以使用新的数据目录。"
+                migrateResultDialog.message = "已保存新的数据位置。\n\n请重启 Notera，数据会在启动数据库前安全迁移。"
                 migrateResultDialog.open()
             } else {
                 migrateResultDialog.message = "迁移失败：\n" + error
