@@ -410,7 +410,7 @@ int main(int argc, char* argv[])
                 fail("normal-menu-item-has-arrow");
                 return;
             }
-            if (scoreDelegate->property("folderSubmenuArrowCount").toInt() != 1) {
+            if (!scoreDelegate->property("folderSubmenuArrowIsCustomized").toBool()) {
                 fail("submenu-arrow-count");
                 return;
             }
