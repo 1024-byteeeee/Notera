@@ -88,10 +88,8 @@ Rectangle {
         implicitHeight: 40
         radius: Theme.radiusMd
         color: selected ? Theme.selectedBackground : (navMouse.containsMouse ? Theme.buttonHover : Qt.rgba(Theme.buttonHover.r, Theme.buttonHover.g, Theme.buttonHover.b, 0))
-        Behavior on color { ColorAnimation { duration: 150; easing.type: Easing.OutCubic } }
         border.width: selected ? 1 : 0
         border.color: selected ? Theme.selectedBorder : "transparent"
-        Behavior on border.color { ColorAnimation { duration: 150; easing.type: Easing.OutCubic } }
 
         Rectangle {
             visible: navItem.selected

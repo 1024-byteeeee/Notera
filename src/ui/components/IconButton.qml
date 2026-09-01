@@ -29,10 +29,8 @@ Button {
 
     background: Rectangle {
         radius: Theme.radiusSm
-        color: control.down ? Theme.buttonPressed
-            : control.hovered ? (control.danger ? Theme.dangerSoft : Theme.buttonHover)
+        color: control.down || control.hovered ? (control.danger ? Theme.dangerSoft : Theme.buttonHover)
             : control.selected ? Theme.accentSoft : "transparent"
-        Behavior on color { ColorAnimation { duration: 150; easing.type: Easing.OutCubic } }
         border.width: control.activeFocus ? 1 : 0
         border.color: Theme.inputFocusBorder
     }

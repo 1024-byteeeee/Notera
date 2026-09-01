@@ -53,11 +53,10 @@ Button {
         radius: Theme.radiusMd
         color: {
             if (!control.enabled) return Theme.buttonDisabled
-            if (control.down) return control.primary ? Theme.accentPressed : Theme.buttonPressed
+            if (control.down) return control.primary ? Theme.accentHover : (control.danger ? Theme.dangerSoft : Theme.buttonHover)
             if (control.hovered) return control.primary ? Theme.accentHover : (control.danger ? Theme.dangerSoft : Theme.buttonHover)
             return control.primary ? Theme.accent : (control.danger ? Theme.dangerSoft : Theme.buttonBackground)
         }
-        Behavior on color { ColorAnimation { duration: 150; easing.type: Easing.OutCubic } }
         border.width: control.primary ? 0 : 1
         border.color: control.danger ? Theme.danger : Theme.buttonBorder
 

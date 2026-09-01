@@ -87,7 +87,6 @@ Rectangle {
                             spacing: 16
 
                             ColumnLayout {
-                                Layout.fillWidth: true
                                 spacing: 3
                                 Label {
                                     text: "外观主题"
@@ -101,6 +100,8 @@ Rectangle {
                                     font.pixelSize: Theme.fontXs
                                 }
                             }
+
+                            Item { Layout.fillWidth: true }
 
                             Rectangle {
                                 id: themeSelector
@@ -167,7 +168,6 @@ Rectangle {
                             spacing: 16
 
                             ColumnLayout {
-                                Layout.fillWidth: true
                                 spacing: 3
                                 Label {
                                     text: "界面动画"
@@ -181,6 +181,8 @@ Rectangle {
                                     font.pixelSize: Theme.fontXs
                                 }
                             }
+
+                            Item { Layout.fillWidth: true }
 
                             Switch {
                                 id: animationsSwitch
@@ -255,7 +257,6 @@ Rectangle {
                             spacing: 18
 
                             ColumnLayout {
-                                Layout.fillWidth: true
                                 spacing: 3
                                 Label {
                                     text: "默认滚动速度"
@@ -351,6 +352,8 @@ Rectangle {
                                 }
                             }
 
+                            Item { Layout.fillWidth: true }
+
                             RowLayout {
                                 Layout.alignment: Qt.AlignRight
                                 spacing: 8
@@ -388,11 +391,11 @@ Rectangle {
                             anchors.rightMargin: 18
                             spacing: 12
                             ColumnLayout {
-                                Layout.fillWidth: true
                                 spacing: 3
                                 Label { text: "关于 Notera"; color: Theme.foreground; font.pixelSize: Theme.fontMd; font.weight: Font.Medium }
                                 Label { text: "简单的本地乐谱阅读器"; color: Theme.mutedForeground; font.pixelSize: Theme.fontXs }
                             }
+                            Item { Layout.fillWidth: true }
                             Label {
                                 objectName: "versionLabel"
                                 Layout.alignment: Qt.AlignRight
