@@ -21,7 +21,7 @@ ApplicationController::ApplicationController(QObject* parent)
     }
     m_animationsEnabled = settings.value(QStringLiteral("appearance/animationsEnabled"), true).toBool();
     m_defaultScrollSpeed = settings.value(QStringLiteral("reader/defaultScrollSpeed"), 45.0).toDouble();
-    if (m_defaultScrollSpeed < 15.0 || m_defaultScrollSpeed > 160.0) {
+    if (m_defaultScrollSpeed < 1.0 || m_defaultScrollSpeed > 256.0) {
         m_defaultScrollSpeed = 45.0;
     }
     m_autoScrollSpeed = m_defaultScrollSpeed;
@@ -95,7 +95,7 @@ double ApplicationController::autoScrollSpeed() const
 
 void ApplicationController::setAutoScrollSpeed(const double speed)
 {
-    const auto boundedSpeed = std::clamp(speed, 15.0, 160.0);
+    const auto boundedSpeed = std::clamp(speed, 1.0, 256.0);
     if (qFuzzyCompare(m_autoScrollSpeed, boundedSpeed)) {
         return;
     }
@@ -110,7 +110,7 @@ double ApplicationController::defaultScrollSpeed() const
 
 void ApplicationController::setDefaultScrollSpeed(const double speed)
 {
-    const auto boundedSpeed = std::clamp(speed, 15.0, 160.0);
+    const auto boundedSpeed = std::clamp(speed, 1.0, 256.0);
     if (qFuzzyCompare(m_defaultScrollSpeed, boundedSpeed)) {
         return;
     }

@@ -57,7 +57,7 @@ Button {
             if (control.hovered) return control.primary ? Theme.accentHover : (control.danger ? Theme.dangerSoft : Theme.buttonHover)
             return control.primary ? Theme.accent : (control.danger ? Theme.dangerSoft : Theme.buttonBackground)
         }
-        Behavior on color { ColorAnimation { duration: 60 } }
+        Behavior on color { ColorAnimation { duration: 150; easing.type: Easing.OutCubic } }
         border.width: control.primary ? 0 : 1
         border.color: control.danger ? Theme.danger : Theme.buttonBorder
 

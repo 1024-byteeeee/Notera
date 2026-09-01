@@ -215,10 +215,10 @@ Rectangle {
                         anchors.topMargin: 6
                         radius: Theme.radiusMd
                         color: root.isSelected(scoreDelegate.itemId) ? Theme.accentSoft : (cardHover.hovered ? Theme.cardHover : Theme.cardBackground)
-                        Behavior on color { ColorAnimation { duration: 60 } }
+                        Behavior on color { ColorAnimation { duration: 150; easing.type: Easing.OutCubic } }
                         border.width: root.isSelected(scoreDelegate.itemId) ? 2 : 1
                         border.color: root.isSelected(scoreDelegate.itemId) ? Theme.accent : (cardHover.hovered ? Theme.strongBorder : Theme.cardBorder)
-                        Behavior on border.color { ColorAnimation { duration: 60 } }
+                        Behavior on border.color { ColorAnimation { duration: 150; easing.type: Easing.OutCubic } }
 
 
                         ColumnLayout {
