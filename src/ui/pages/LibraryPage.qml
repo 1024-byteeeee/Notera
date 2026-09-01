@@ -214,8 +214,6 @@ Rectangle {
                         border.width: root.isSelected(scoreDelegate.itemId) ? 2 : 1
                         border.color: root.isSelected(scoreDelegate.itemId) ? Theme.accent : (cardHover.hovered ? Theme.strongBorder : Theme.cardBorder)
 
-                        Behavior on color { ColorAnimation { duration: Motion.fast } }
-                        Behavior on border.color { ColorAnimation { duration: Motion.fast } }
 
                         ColumnLayout {
                             anchors.fill: parent

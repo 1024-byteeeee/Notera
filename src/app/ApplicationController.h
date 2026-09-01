@@ -20,6 +20,7 @@ class ApplicationController final : public QObject
     Q_PROPERTY(double autoScrollSpeed READ autoScrollSpeed WRITE setAutoScrollSpeed NOTIFY autoScrollSpeedChanged)
     Q_PROPERTY(double defaultScrollSpeed READ defaultScrollSpeed WRITE setDefaultScrollSpeed NOTIFY defaultScrollSpeedChanged)
     Q_PROPERTY(QString dataDirectory READ dataDirectory NOTIFY dataDirectoryChanged)
+    Q_PROPERTY(QString pendingDataDirectory READ pendingDataDirectory NOTIFY dataDirectoryChanged)
 
 public:
     explicit ApplicationController(QObject* parent = nullptr);
@@ -43,8 +44,9 @@ public:
     [[nodiscard]] double defaultScrollSpeed() const;
     void setDefaultScrollSpeed(double speed);
     [[nodiscard]] QString dataDirectory() const;
+    [[nodiscard]] QString pendingDataDirectory() const;
     static bool applyPendingDataMigration(QString* error);
-    Q_INVOKABLE QString migrateDataDirectory(const QString& newPath);
+    Q_INVOKABLE QString migrateDataDirectory(const QUrl& newDirectory);
     Q_INVOKABLE void openScore(const QString& scoreId, const QString& title, const QString& filePath,
         const QString& fileType, int pageCount, const QString& folderId);
 

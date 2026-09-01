@@ -7,9 +7,25 @@ import "pages"
 
 Item {
     id: root
+    objectName: "appShell"
+    property int transitionRunCount: 0
+    readonly property int transitionDuration: Motion.normal
 
     function pageIndex(page) {
         return page === "library" ? 0 : page === "reader" ? 1 : 2
+    }
+
+    function animateContent() {
+        if (!Motion.enabled) {
+            pageStack.opacity = 1
+            pageTranslate.y = 0
+            return
+        }
+        pageTransition.stop()
+        pageStack.opacity = 0
+        pageTranslate.y = 8
+        transitionRunCount += 1
+        pageTransition.start()
     }
 
     function switchPage(page) {
@@ -17,17 +33,15 @@ Item {
         if (nextIndex === pageStack.currentIndex) return
         pageTransition.stop()
         pageStack.currentIndex = nextIndex
-        if (Motion.enabled) {
-            pageStack.opacity = 0.72
-            pageTransition.start()
-        } else {
-            pageStack.opacity = 1
-        }
+        animateContent()
     }
 
     Connections {
         target: appController
         function onCurrentPageChanged() { root.switchPage(appController.currentPage) }
+        function onLibraryFilterChanged() {
+            if (appController.currentPage === "library") root.animateContent()
+        }
     }
     Connections {
         target: libraryService
@@ -50,19 +64,29 @@ Item {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         currentIndex: 0
+        transform: Translate { id: pageTranslate }
 
         LibraryPage { }
         ReaderPage { }
         SettingsPage { }
     }
 
-    NumberAnimation {
+    ParallelAnimation {
         id: pageTransition
-        target: pageStack
-        property: "opacity"
-        to: 1
-        duration: Motion.normal
-        easing.type: Easing.OutCubic
+        NumberAnimation {
+            target: pageStack
+            property: "opacity"
+            to: 1
+            duration: Motion.normal
+            easing.type: Easing.OutCubic
+        }
+        NumberAnimation {
+            target: pageTranslate
+            property: "y"
+            to: 0
+            duration: Motion.normal
+            easing.type: Easing.OutCubic
+        }
     }
 
     // Toast 通知

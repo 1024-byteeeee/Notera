@@ -79,7 +79,7 @@ Rectangle {
         property int indent: 0
         property bool hasChildren: false
         property bool expanded: false
-        readonly property int hoverTransitionDuration: Motion.fast
+        readonly property int hoverTransitionDuration: 0
         signal contextRequested()
         signal toggleExpand()
 
@@ -89,8 +89,6 @@ Rectangle {
         color: selected ? Theme.selectedBackground : (navHover.hovered ? Theme.buttonHover : "transparent")
         border.width: selected ? 1 : 0
         border.color: selected ? Theme.selectedBorder : "transparent"
-        Behavior on color { ColorAnimation { duration: navItem.hoverTransitionDuration } }
-        Behavior on border.color { ColorAnimation { duration: Motion.fast } }
 
         Rectangle {
             visible: navItem.selected

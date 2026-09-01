@@ -168,6 +168,11 @@ QString ApplicationController::dataDirectory() const
     return AppDataPaths::root();
 }
 
+QString ApplicationController::pendingDataDirectory() const
+{
+    return QSettings().value(QStringLiteral("storage/pendingDataDirectory")).toString();
+}
+
 static bool copyDirectoryRecursively(const QString& src, const QString& dst, QString* error)
 {
     QDir srcDir(src);
@@ -203,8 +208,12 @@ static bool removeDirectoryRecursively(const QString& path)
     return dir.removeRecursively();
 }
 
-QString ApplicationController::migrateDataDirectory(const QString& newPath)
+QString ApplicationController::migrateDataDirectory(const QUrl& newDirectory)
 {
+    if (!newDirectory.isValid() || !newDirectory.isLocalFile()) {
+        return QStringLiteral("请选择本机文件夹。");
+    }
+    const auto newPath = newDirectory.toLocalFile();
     const auto oldPath = AppDataPaths::root();
     const auto cleanNewPath = QDir::cleanPath(newPath);
 
@@ -231,6 +240,7 @@ QString ApplicationController::migrateDataDirectory(const QString& newPath)
     if (settings.status() != QSettings::NoError) {
         return QStringLiteral("无法保存新的数据目录设置。");
     }
+    emit dataDirectoryChanged();
     return {};
 }
 

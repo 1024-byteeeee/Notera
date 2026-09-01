@@ -85,6 +85,5 @@ MenuItem {
     background: Rectangle {
         radius: Theme.radiusSm
         color: control.highlighted ? (control.danger ? Theme.dangerSoft : Theme.buttonHover) : "transparent"
-        Behavior on color { ColorAnimation { duration: Motion.fast } }
     }
 }

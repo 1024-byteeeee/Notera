@@ -155,7 +155,11 @@ int main(int argc, char* argv[])
         settings.remove(QStringLiteral("storage/pendingDataDirectory"));
         settings.sync();
         ApplicationController migrationController;
-        if (!migrationController.migrateDataDirectory(newRoot).isEmpty()) return 1;
+        if (migrationController.migrateDataDirectory(QUrl::fromLocalFile(newRoot)).isEmpty() == false
+            || migrationController.pendingDataDirectory() != newRoot
+            || migrationController.migrateDataDirectory(QUrl(QStringLiteral("https://example.com/notera"))).isEmpty()) {
+            return 1;
+        }
     }
 
     QString migrationError;
@@ -335,8 +339,20 @@ int main(int argc, char* argv[])
 
             const auto* const libraryNavItem = root->findChild<QObject*>(QStringLiteral("libraryNavItem"));
             if (!libraryNavItem || !libraryNavItem->property("hoverTransitionDuration").isValid()
-                || libraryNavItem->property("hoverTransitionDuration").toInt() <= 0) {
+                || libraryNavItem->property("hoverTransitionDuration").toInt() != 0) {
                 fail("sidebar-hover-transition");
+                return;
+            }
+            const auto* const appShell = root->findChild<QObject*>(QStringLiteral("appShell"));
+            const auto transitionCountBeforeFilter = appShell
+                ? appShell->property("transitionRunCount").toInt() : -1;
+            controller.setLibraryFilter(QStringLiteral("recent"));
+            QCoreApplication::processEvents();
+            controller.setLibraryFilter(QStringLiteral("all"));
+            QCoreApplication::processEvents();
+            if (!appShell || appShell->property("transitionDuration").toInt() <= 0
+                || appShell->property("transitionRunCount").toInt() < transitionCountBeforeFilter + 2) {
+                fail("library-section-transition");
                 return;
             }
             if (QGuiApplication::windowIcon().isNull()) {
@@ -590,12 +606,15 @@ int main(int argc, char* argv[])
             const auto* const themeSelector = root->findChild<QQuickItem*>(QStringLiteral("themeSelector"));
             const auto* const changeDataDirectoryButton = root->findChild<QQuickItem*>(
                 QStringLiteral("changeDataDirectoryButton"));
-            const auto* const animationsSwitch = root->findChild<QObject*>(QStringLiteral("animationsSwitch"));
+            const auto* const animationsSwitch = root->findChild<QQuickItem*>(QStringLiteral("animationsSwitch"));
             if (!settingsContent || !themeSelector || settingsContent->width() <= 0.0
                 || themeSelector->width() < 240.0 || themeSelector->x() < 0.0
                 || !changeDataDirectoryButton || !changeDataDirectoryButton->isVisible()
                 || !changeDataDirectoryButton->isEnabled() || !animationsSwitch
-                || !controller.animationsEnabled()) {
+                || !controller.animationsEnabled()
+                || animationsSwitch->property("independentAnimationDuration").toInt() <= 0
+                || animationsSwitch->mapToScene(QPointF(animationsSwitch->width(), 0)).x()
+                    < themeSelector->mapToScene(QPointF(themeSelector->width(), 0)).x() + 4.0) {
                 fail("settings-layout");
                 return;
             }
@@ -603,11 +622,28 @@ int main(int argc, char* argv[])
             QCoreApplication::processEvents();
             ApplicationController persistedMotionController;
             if (controller.animationsEnabled() || persistedMotionController.animationsEnabled()
-                || libraryNavItem->property("hoverTransitionDuration").toInt() != 0) {
+                || libraryNavItem->property("hoverTransitionDuration").toInt() != 0
+                || animationsSwitch->property("independentAnimationDuration").toInt() <= 0) {
                 fail("animations-setting-persistence");
                 return;
             }
             controller.setAnimationsEnabled(true);
+            auto* const dataDirectoryDialog = root->findChild<QObject*>(QStringLiteral("dataDirectoryDialog"));
+            if (!dataDirectoryDialog) {
+                fail("data-directory-dialog-object");
+                return;
+            }
+            dataDirectoryDialog->setProperty("selectedFolder",
+                QUrl::fromLocalFile(QDir::temp().filePath(QStringLiteral("notera-ui-selected-folder"))));
+            if (!QMetaObject::invokeMethod(dataDirectoryDialog, "accepted")
+                || !popupIsOpen(root, QStringLiteral("migrationConfirmDialog"))) {
+                fail("data-directory-dialog-accepted");
+                return;
+            }
+            closePopup(root, QStringLiteral("migrationConfirmDialog"));
+            QEventLoop migrationDialogCloseWait;
+            QTimer::singleShot(200, &migrationDialogCloseWait, &QEventLoop::quit);
+            migrationDialogCloseWait.exec();
             const auto* const settingsTitle = root->findChild<QQuickItem*>(QStringLiteral("settingsTitle"));
             const auto* const brandLabel = root->findChild<QQuickItem*>(QStringLiteral("brandLabel"));
             if (!settingsTitle || !brandLabel || settingsTitle->mapToScene(QPointF {}).y() < 24.0

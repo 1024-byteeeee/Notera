@@ -163,7 +163,7 @@ Rectangle {
                         RowLayout {
                             anchors.fill: parent
                             anchors.leftMargin: 18
-                            anchors.rightMargin: 18
+                            anchors.rightMargin: 8
                             spacing: 16
 
                             ColumnLayout {
@@ -182,35 +182,43 @@ Rectangle {
                                 }
                             }
 
-                            Switch {
-                                id: animationsSwitch
-                                objectName: "animationsSwitch"
-                                checked: appController.animationsEnabled
-                                padding: 0
-                                implicitWidth: 46
-                                implicitHeight: 26
-                                onToggled: appController.animationsEnabled = checked
+                            Item {
+                                Layout.preferredWidth: 282
+                                Layout.fillHeight: true
 
-                                indicator: Rectangle {
+                                Switch {
+                                    id: animationsSwitch
+                                    objectName: "animationsSwitch"
+                                    readonly property int independentAnimationDuration: 160
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    checked: appController.animationsEnabled
+                                    padding: 0
                                     implicitWidth: 46
                                     implicitHeight: 26
-                                    radius: 13
-                                    color: animationsSwitch.checked ? Theme.accent : Theme.buttonBackground
-                                    border.width: 1
-                                    border.color: animationsSwitch.checked ? Theme.accent : Theme.strongBorder
-                                    Behavior on color { ColorAnimation { duration: Motion.fast } }
+                                    onToggled: appController.animationsEnabled = checked
 
-                                    Rectangle {
-                                        x: animationsSwitch.checked ? parent.width - width - 4 : 4
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        width: 18
-                                        height: 18
-                                        radius: 9
-                                        color: animationsSwitch.checked ? Theme.accentForeground : Theme.mutedForeground
-                                        Behavior on x { NumberAnimation { duration: Motion.normal; easing.type: Easing.OutCubic } }
+                                    indicator: Rectangle {
+                                        implicitWidth: 46
+                                        implicitHeight: 26
+                                        radius: 13
+                                        color: animationsSwitch.checked ? Theme.accent : Theme.buttonBackground
+                                        border.width: 1
+                                        border.color: animationsSwitch.checked ? Theme.accent : Theme.strongBorder
+                                        Behavior on color { ColorAnimation { duration: animationsSwitch.independentAnimationDuration } }
+
+                                        Rectangle {
+                                            x: animationsSwitch.checked ? parent.width - width - 4 : 4
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            width: 18
+                                            height: 18
+                                            radius: 9
+                                            color: animationsSwitch.checked ? Theme.accentForeground : Theme.mutedForeground
+                                            Behavior on x { NumberAnimation { duration: animationsSwitch.independentAnimationDuration; easing.type: Easing.OutCubic } }
+                                        }
                                     }
+                                    contentItem: Item { }
                                 }
-                                contentItem: Item { }
                             }
                         }
                     }
@@ -338,7 +346,9 @@ Rectangle {
                                     font.weight: Font.Medium
                                 }
                                 Label {
-                                    text: appController.dataDirectory
+                                    text: appController.pendingDataDirectory.length > 0
+                                        ? "重启后迁移至：" + appController.pendingDataDirectory
+                                        : appController.dataDirectory
                                     color: Theme.mutedForeground
                                     font.pixelSize: Theme.fontXs
                                     elide: Text.ElideMiddle
@@ -384,23 +394,24 @@ Rectangle {
 
     FolderDialog {
         id: dataDirDialog
+        objectName: "dataDirectoryDialog"
         title: "选择数据存储位置"
         currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
         onAccepted: {
-            const newPath = selectedFolder.toLocalFile()
-            migrateConfirmDialog.message = "将把所有数据迁移到：\n" + newPath + "\n\n迁移完成后需要重启应用才能生效。是否继续？"
-            migrateConfirmDialog.newPath = newPath
+            migrateConfirmDialog.message = "将把所有数据迁移到：\n" + selectedFolder + "\n\n迁移完成后需要重启应用才能生效。是否继续？"
+            migrateConfirmDialog.newDirectory = selectedFolder
             migrateConfirmDialog.open()
         }
     }
 
     ConfirmDialog {
         id: migrateConfirmDialog
-        property string newPath: ""
+        objectName: "migrationConfirmDialog"
+        property url newDirectory: ""
         title: "迁移数据？"
         confirmText: "开始迁移"
         onAccepted: {
-            const error = appController.migrateDataDirectory(newPath)
+            const error = appController.migrateDataDirectory(newDirectory)
             if (error === "" || error === undefined || error === null) {
                 migrateResultDialog.message = "已保存新的数据位置。\n\n请重启 Notera，数据会在启动数据库前安全迁移。"
                 migrateResultDialog.open()
