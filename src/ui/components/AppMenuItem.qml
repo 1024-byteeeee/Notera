@@ -6,6 +6,9 @@ import Notera
 MenuItem {
     id: control
     property bool danger: false
+    readonly property bool customArrowVisible: control.menu !== null
+    readonly property int visibleArrowCount: (control.customArrowVisible ? 1 : 0)
+        + (control.arrow && control.arrow.visible && control.arrow.implicitWidth > 0 ? 1 : 0)
 
     implicitHeight: 36
     leftPadding: 12
@@ -43,7 +46,7 @@ MenuItem {
         }
 
         Label {
-            visible: control.menu !== null
+            visible: control.customArrowVisible
             text: "›"
             color: Theme.mutedForeground
             font.pixelSize: Theme.fontMd

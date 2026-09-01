@@ -183,6 +183,9 @@ Rectangle {
                     readonly property bool tagSubmenuEnabled: tagSubmenu.enabled
                     readonly property int folderSubmenuItemCount: folderSubmenu.count
                     readonly property int tagSubmenuItemCount: tagSubmenu.count
+                    readonly property int normalMenuArrowCount: favoriteMenuItem.visibleArrowCount
+                    readonly property int folderSubmenuArrowCount: folderSubmenu.menuItem
+                        ? folderSubmenu.menuItem.visibleArrowCount : -1
                     readonly property bool tagMenuHasDefaultCheckIndicator: tagSubmenu.count > 0
                         && tagSubmenu.itemAt(0).indicator.visible
                         && tagSubmenu.itemAt(0).indicator.implicitWidth > 0
@@ -364,6 +367,7 @@ Rectangle {
                         id: scoreMenu
                         objectName: scoreDelegate.itemType === "score" ? "scoreContextMenu" : ""
                         AppMenuItem {
+                            id: favoriteMenuItem
                             text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
                             onTriggered: libraryService.toggleFavorite(scoreDelegate.scoreId, !scoreDelegate.favorite)
                         }
