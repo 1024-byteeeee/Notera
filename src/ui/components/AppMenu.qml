@@ -5,6 +5,8 @@ import Notera
 Menu {
     id: menu
     property bool openedOnce: false
+    property string symbol: ""
+    property bool tagIcon: false
     implicitWidth: 210
     padding: 6
     topPadding: 6

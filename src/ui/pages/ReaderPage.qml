@@ -297,10 +297,10 @@ Rectangle {
                         Slider {
                             id: speedSlider
                             Layout.fillWidth: true
-                            from: 15
-                            to: 160
+                            from: 1
+                            to: 256
                             value: root.scrollSpeed
-                            stepSize: 5
+                            stepSize: 1
                             onMoved: appController.autoScrollSpeed = value
 
                             background: Rectangle {

@@ -273,9 +273,9 @@ Rectangle {
                             Slider {
                                 id: speedSlider
                                 Layout.preferredWidth: 180
-                                from: 15
-                                to: 160
-                                stepSize: 5
+                                from: 1
+                                to: 256
+                                stepSize: 1
                                 value: appController.defaultScrollSpeed
                                 onMoved: appController.defaultScrollSpeed = value
 

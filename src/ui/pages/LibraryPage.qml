@@ -121,6 +121,7 @@ Rectangle {
 
             AppButton {
                 objectName: "importButton"
+                visible: !appController.libraryFilter.startsWith("tag:")
                 Layout.preferredWidth: 108
                 text: "导入"
                 primary: true
@@ -129,6 +130,7 @@ Rectangle {
 
             AppButton {
                 objectName: "stitchButton"
+                visible: !appController.libraryFilter.startsWith("tag:")
                 Layout.preferredWidth: 120
                 text: "拼接导入"
                 primary: true
@@ -213,8 +215,10 @@ Rectangle {
                         anchors.topMargin: 6
                         radius: Theme.radiusMd
                         color: root.isSelected(scoreDelegate.itemId) ? Theme.accentSoft : (cardHover.hovered ? Theme.cardHover : Theme.cardBackground)
+                        Behavior on color { ColorAnimation { duration: 60 } }
                         border.width: root.isSelected(scoreDelegate.itemId) ? 2 : 1
                         border.color: root.isSelected(scoreDelegate.itemId) ? Theme.accent : (cardHover.hovered ? Theme.strongBorder : Theme.cardBorder)
+                        Behavior on border.color { ColorAnimation { duration: 60 } }
 
 
                         ColumnLayout {
@@ -390,6 +394,7 @@ Rectangle {
                         AppMenu {
                             id: folderSubmenu
                             title: "移动到文件夹"
+                            symbol: "▣"
                             enabled: libraryService.folders.count > 0
                             AppMenuItem {
                                 symbol: "↖"
@@ -419,6 +424,7 @@ Rectangle {
                         AppMenu {
                             id: tagSubmenu
                             title: "标签"
+                            tagIcon: true
                             enabled: libraryService.tags.count > 0
                             Instantiator {
                                 model: libraryService.tags
@@ -665,10 +671,10 @@ Rectangle {
     AppMenu {
         id: blankContextMenu
         objectName: "blankContextMenu"
-        AppMenuItem { text: "新建文件夹"; symbol: "▣"; onTriggered: newFolderDialog.open() }
+        AppMenuItem { text: "新建文件夹"; symbol: "▣"; visible: !appController.libraryFilter.startsWith("tag:"); onTriggered: newFolderDialog.open() }
         AppMenuItem { text: "新建标签"; tagIcon: true; onTriggered: newTagDialog.open() }
-        AppMenuSeparator { }
-        AppMenuItem { text: "导入乐谱"; symbol: "↓"; onTriggered: fileDialog.open() }
+        AppMenuSeparator { visible: !appController.libraryFilter.startsWith("tag:") }
+        AppMenuItem { text: "导入乐谱"; symbol: "↓"; visible: !appController.libraryFilter.startsWith("tag:"); onTriggered: fileDialog.open() }
     }
 
     AppDialog {

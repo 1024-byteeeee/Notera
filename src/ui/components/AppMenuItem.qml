@@ -8,6 +8,10 @@ MenuItem {
     property bool danger: false
     property string symbol: ""
     property bool tagIcon: false
+    readonly property string effectiveSymbol: control.symbol.length > 0 ? control.symbol
+        : (control.subMenu && control.subMenu.symbol ? control.subMenu.symbol : "")
+    readonly property bool effectiveTagIcon: control.tagIcon
+        || (control.subMenu && control.subMenu.tagIcon ? control.subMenu.tagIcon : false)
     readonly property int visibleArrowCount: control.arrow && control.arrow.visible
         && control.arrow.implicitWidth > 0 ? 1 : 0
     readonly property real arrowVisualWidth: control.arrow && control.arrow.visible ? control.arrow.implicitWidth : 0
@@ -79,15 +83,15 @@ MenuItem {
                 font.weight: Font.Bold
             }
             Label {
-                visible: !control.checkable && !control.tagIcon && control.symbol.length > 0
+                visible: !control.checkable && !control.effectiveTagIcon && control.effectiveSymbol.length > 0
                 anchors.centerIn: parent
-                text: control.symbol
+                text: control.effectiveSymbol
                 color: control.danger ? Theme.danger : Theme.secondaryForeground
                 font.pixelSize: 15
                 font.weight: Font.Medium
             }
             TagIcon {
-                visible: !control.checkable && control.tagIcon
+                visible: !control.checkable && control.effectiveTagIcon
                 anchors.centerIn: parent
                 width: 16
                 height: 16

@@ -32,6 +32,7 @@ Button {
         color: control.down ? Theme.buttonPressed
             : control.hovered ? (control.danger ? Theme.dangerSoft : Theme.buttonHover)
             : control.selected ? Theme.accentSoft : "transparent"
+        Behavior on color { ColorAnimation { duration: 60 } }
         border.width: control.activeFocus ? 1 : 0
         border.color: Theme.inputFocusBorder
     }
