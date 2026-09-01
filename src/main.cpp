@@ -128,7 +128,8 @@ int main(int argc, char* argv[])
         || arguments.contains(QStringLiteral("--stitch-smoke-test"))
         || arguments.contains(QStringLiteral("--reader-smoke-test"))
         || arguments.contains(QStringLiteral("--ui-smoke-test"))
-        || arguments.contains(QStringLiteral("--storage-migration-smoke-test"));
+        || arguments.contains(QStringLiteral("--storage-migration-smoke-test"))
+        || arguments.contains(QStringLiteral("--clear-data-smoke-test"));
     if (isSmokeTest) {
         QStandardPaths::setTestModeEnabled(true);
         app.setApplicationName(QStringLiteral("NoteraTest"));
@@ -185,10 +186,44 @@ int main(int argc, char* argv[])
         if (!restartRequested) return 1;
     }
 
+    QString clearError;
+    if (!ApplicationController::applyPendingDataClear(&clearError)) {
+        qWarning() << "Data clear failed:" << clearError;
+        return 1;
+    }
+
     QString migrationError;
     if (!ApplicationController::applyPendingDataMigration(&migrationError)) {
         qWarning() << "Data directory migration failed:" << migrationError;
         if (arguments.contains(QStringLiteral("--storage-migration-smoke-test"))) return 1;
+    }
+    if (arguments.contains(QStringLiteral("--clear-data-smoke-test"))) {
+        const auto clearRoot = AppDataPaths::root();
+        QDir().mkpath(clearRoot + QStringLiteral("/database"));
+        QFile databaseMarker(clearRoot + QStringLiteral("/database/notera.db"));
+        if (!databaseMarker.open(QIODevice::WriteOnly) || databaseMarker.write("notera") != 6) return 1;
+        databaseMarker.close();
+        QFile marker(clearRoot + QStringLiteral("/clear-marker"));
+        if (!marker.open(QIODevice::WriteOnly) || marker.write("notera") != 6) return 1;
+        marker.close();
+        QSettings().setValue(QStringLiteral("storage/pendingClearRoot"), clearRoot);
+        QString error;
+        if (!ApplicationController::applyPendingDataClear(&error) || QDir(clearRoot).exists()) return 1;
+
+        ApplicationController clearController;
+        QDir().mkpath(AppDataPaths::databaseDirectory());
+        QFile scheduledDatabase(AppDataPaths::databaseDirectory() + QStringLiteral("/notera.db"));
+        if (!scheduledDatabase.open(QIODevice::WriteOnly)) return 1;
+        scheduledDatabase.close();
+        bool restartRequested = false;
+        QObject::connect(&clearController, &ApplicationController::restartRequested,
+            [&restartRequested] { restartRequested = true; });
+        if (clearController.clearAllData(QStringLiteral("清空所有数据")).isEmpty()
+            || !clearController.clearAllData(QStringLiteral("确认清空所有数据")).isEmpty()
+            || !restartRequested
+            || QSettings().value(QStringLiteral("storage/pendingClearRoot")).toString().isEmpty()) return 1;
+        QSettings().clear();
+        return 0;
     }
     if (arguments.contains(QStringLiteral("--storage-migration-smoke-test"))) {
         QSqlDatabase migratedDatabase = QSqlDatabase::addDatabase(
@@ -495,8 +530,10 @@ int main(int argc, char* argv[])
             const auto recentFirstFolderId = libraryService.folders()->data(
                 libraryService.folders()->index(1, 0), folderIdRole).toString();
             const auto tagId = libraryService.tags()->data(libraryService.tags()->index(0, 0), tagIdRole).toString();
-            libraryService.setScoreFolder(scoreId, folderId);
-            libraryService.setScoreFolder(secondScoreId, folderId);
+            if (!libraryService.moveItems({scoreId, secondScoreId}, folderId).isEmpty()) {
+                fail("batch-score-folder-assignment");
+                return;
+            }
             libraryService.setFilterMode(QStringLiteral("folder:") + folderId);
             if (scoreId.isEmpty() || secondScoreId.isEmpty() || folderId.isEmpty()
                 || libraryService.scores()->rowCount() != 2) {
@@ -723,6 +760,36 @@ int main(int argc, char* argv[])
                 fail("page-top-spacing");
                 return;
             }
+            auto* const clearAllDataButton = root->findChild<QObject*>(QStringLiteral("clearAllDataButton"));
+            auto* const clearWarning = root->findChild<QObject*>(QStringLiteral("clearWarningDialog"));
+            if (!clearAllDataButton || !clearWarning
+                || !QMetaObject::invokeMethod(clearWarning, "open")
+                || !popupIsOpen(root, QStringLiteral("clearWarningDialog"))) {
+                fail("clear-data-first-confirmation");
+                return;
+            }
+            if (!QMetaObject::invokeMethod(clearWarning, "accept")) {
+                fail("clear-data-second-confirmation-open");
+                return;
+            }
+            QCoreApplication::processEvents();
+            auto* const clearInput = root->findChild<QObject*>(QStringLiteral("clearConfirmInput"));
+            auto* const clearButton = root->findChild<QObject*>(QStringLiteral("confirmClearAllDataButton"));
+            if (!popupIsOpen(root, QStringLiteral("clearTypedDialog")) || !clearInput || !clearButton
+                || clearButton->property("enabled").toBool()) {
+                fail("clear-data-typed-confirmation-disabled");
+                return;
+            }
+            clearInput->setProperty("text", QStringLiteral("确认清空所有数据"));
+            QCoreApplication::processEvents();
+            if (!clearButton->property("enabled").toBool()) {
+                fail("clear-data-typed-confirmation-enabled");
+                return;
+            }
+            closePopup(root, QStringLiteral("clearTypedDialog"));
+            QEventLoop clearDialogCloseWait;
+            QTimer::singleShot(200, &clearDialogCloseWait, &QEventLoop::quit);
+            clearDialogCloseWait.exec();
             if (!window->grabWindow().save(QStringLiteral("notera-settings-smoke.png"))) {
                 fail("settings-screenshot");
                 return;

@@ -70,6 +70,7 @@ jobs:
           "$bundle_path/Contents/MacOS/Notera" --stitch-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --reader-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --storage-migration-smoke-test
+          "$bundle_path/Contents/MacOS/Notera" --clear-data-smoke-test
           "$bundle_path/Contents/MacOS/Notera" >notera-startup.log 2>&1 &
           app_pid=$!
           sleep 5
@@ -130,7 +131,9 @@ jobs:
 
       - name: Smoke test data directory migration
         shell: powershell
-        run: build/windows-x64/Release/Notera.exe --storage-migration-smoke-test
+        run: |
+          build/windows-x64/Release/Notera.exe --storage-migration-smoke-test
+          build/windows-x64/Release/Notera.exe --clear-data-smoke-test
 
       - name: Create MSI
         shell: powershell

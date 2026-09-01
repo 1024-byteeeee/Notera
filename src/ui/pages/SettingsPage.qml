@@ -407,6 +407,54 @@ Rectangle {
                     }
                 }
             }
+
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: dangerLayout.implicitHeight + 40
+                radius: Theme.radiusLg
+                color: Theme.surface
+                border.width: 1
+                border.color: Theme.danger
+
+                ColumnLayout {
+                    id: dangerLayout
+                    anchors.fill: parent
+                    anchors.margins: 20
+                    spacing: 12
+                    Label {
+                        text: "危险操作"
+                        color: Theme.danger
+                        font.pixelSize: Theme.fontLg
+                        font.weight: Font.DemiBold
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 72
+                        radius: Theme.radiusMd
+                        color: Theme.dangerSoft
+                        border.width: 1
+                        border.color: Theme.danger
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 18
+                            anchors.rightMargin: 18
+                            spacing: 16
+                            ColumnLayout {
+                                spacing: 3
+                                Label { text: "清空所有数据"; color: Theme.danger; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
+                                Label { text: "永久删除全部乐谱、文件夹、标签、收藏、缓存和设置"; color: Theme.secondaryForeground; font.pixelSize: Theme.fontXs }
+                            }
+                            Item { Layout.fillWidth: true }
+                            AppButton {
+                                objectName: "clearAllDataButton"
+                                text: "清空所有数据"
+                                danger: true
+                                onClicked: clearWarningDialog.open()
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -436,6 +484,94 @@ Rectangle {
                 migrateResultDialog.message = "迁移失败：\n" + error
                 migrateResultDialog.open()
             }
+        }
+    }
+
+    ConfirmDialog {
+        id: clearWarningDialog
+        objectName: "clearWarningDialog"
+        title: "确定清空所有数据？"
+        confirmText: "继续"
+        message: "将永久删除所有乐谱文件、缩略图、文件夹、标签、收藏、阅读记录、缓存和应用设置。此操作无法撤销。"
+        onAccepted: {
+            clearConfirmInput.text = ""
+            clearTypedDialog.open()
+        }
+    }
+
+    Dialog {
+        id: clearTypedDialog
+        objectName: "clearTypedDialog"
+        parent: Overlay.overlay
+        width: parent ? Math.min(460, parent.width - 48) : 460
+        x: parent ? Math.round((parent.width - width) / 2) : 0
+        y: parent ? Math.round((parent.height - height) / 2) : 0
+        modal: true
+        focus: true
+        padding: 22
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        header: Label {
+            leftPadding: 22; rightPadding: 22; topPadding: 20; bottomPadding: 4
+            text: "输入确认文字"
+            color: Theme.foreground
+            font.pixelSize: Theme.fontLg
+            font.weight: Font.DemiBold
+        }
+        contentItem: ColumnLayout {
+            spacing: 12
+            Label {
+                Layout.fillWidth: true
+                text: "请手动输入“确认清空所有数据”以继续。应用会在清空后自动重启。"
+                color: Theme.secondaryForeground
+                font.pixelSize: Theme.fontMd
+                wrapMode: Text.WordWrap
+            }
+            TextField {
+                id: clearConfirmInput
+                objectName: "clearConfirmInput"
+                Layout.fillWidth: true
+                placeholderText: "确认清空所有数据"
+                color: Theme.foreground
+                selectByMouse: true
+                background: Rectangle {
+                    implicitHeight: 42
+                    radius: Theme.radiusMd
+                    color: Theme.inputBackground
+                    border.width: 1
+                    border.color: clearConfirmInput.activeFocus ? Theme.inputFocusBorder : Theme.inputBorder
+                }
+            }
+        }
+        footer: Item {
+            implicitHeight: 62
+            RowLayout {
+                anchors.right: parent.right
+                anchors.rightMargin: 22
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 10
+                AppButton { text: "取消"; onClicked: clearTypedDialog.reject() }
+                AppButton {
+                    objectName: "confirmClearAllDataButton"
+                    text: "永久清空"
+                    danger: true
+                    enabled: clearConfirmInput.text === "确认清空所有数据"
+                    onClicked: {
+                        const error = appController.clearAllData(clearConfirmInput.text)
+                        if (error.length > 0) {
+                            migrateResultDialog.message = error
+                            migrateResultDialog.open()
+                        } else {
+                            clearTypedDialog.close()
+                        }
+                    }
+                }
+            }
+        }
+        background: Rectangle {
+            radius: Theme.radiusLg
+            color: Theme.surface
+            border.width: 1
+            border.color: Theme.danger
         }
     }
 

@@ -260,6 +260,57 @@ void ApplicationController::requestRestart()
     emit restartRequested();
 }
 
+QString ApplicationController::clearAllData(const QString& confirmation)
+{
+    if (confirmation != QStringLiteral("确认清空所有数据")) {
+        return QStringLiteral("请输入完整的“确认清空所有数据”。");
+    }
+    const auto clearRoot = QDir::cleanPath(AppDataPaths::root());
+    if (clearRoot.isEmpty() || clearRoot == QDir::rootPath()
+        || clearRoot == QDir::homePath()) {
+        return QStringLiteral("数据目录不安全，已取消清空操作。");
+    }
+    if (!QFileInfo::exists(clearRoot + QStringLiteral("/database/notera.db"))) {
+        return QStringLiteral("未找到 Notera 数据库，已取消清空操作。");
+    }
+    QSettings settings;
+    settings.clear();
+    settings.setValue(QStringLiteral("storage/pendingClearRoot"), clearRoot);
+    settings.sync();
+    if (settings.status() != QSettings::NoError) {
+        return QStringLiteral("无法保存清空任务，请稍后重试。");
+    }
+    emit restartRequested();
+    return {};
+}
+
+bool ApplicationController::applyPendingDataClear(QString* error)
+{
+    QSettings settings;
+    const auto clearRoot = QDir::cleanPath(
+        settings.value(QStringLiteral("storage/pendingClearRoot")).toString());
+    if (clearRoot.isEmpty()) return true;
+    if (clearRoot == QDir::rootPath() || clearRoot == QDir::homePath()) {
+        *error = QStringLiteral("拒绝清空不安全的数据目录。");
+        return false;
+    }
+    if (!QFileInfo::exists(clearRoot + QStringLiteral("/database/notera.db"))) {
+        *error = QStringLiteral("待清空目录不是有效的 Notera 数据目录。");
+        return false;
+    }
+    if (!removeDirectoryRecursively(clearRoot)) {
+        *error = QStringLiteral("无法清空旧数据目录。");
+        return false;
+    }
+    settings.remove(QStringLiteral("storage/pendingClearRoot"));
+    settings.sync();
+    if (settings.status() != QSettings::NoError) {
+        *error = QStringLiteral("无法完成清空状态更新。");
+        return false;
+    }
+    return true;
+}
+
 bool ApplicationController::applyPendingDataMigration(QString* error)
 {
     QSettings settings;

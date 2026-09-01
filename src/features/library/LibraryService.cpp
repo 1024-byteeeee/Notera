@@ -669,6 +669,64 @@ bool LibraryService::canMoveItemToFolder(const QString& itemId, const QString& f
         && m_repository.canMoveFolder(itemId, folderId, &error));
 }
 
+namespace {
+QStringList uniqueItemIds(const QVariantList& values)
+{
+    QStringList ids;
+    for (const auto& value : values) {
+        const auto id = value.toString();
+        if (!id.isEmpty() && !ids.contains(id)) ids.append(id);
+    }
+    return ids;
+}
+}
+
+QString LibraryService::moveItems(const QVariantList& itemIds, const QString& folderId)
+{
+    const auto ids = uniqueItemIds(itemIds);
+    if (ids.isEmpty()) return QStringLiteral("没有可移动的项目。");
+    QString error;
+    if (!m_repository.moveItems(ids, folderId, &error)) {
+        const auto message = error.isEmpty() ? QStringLiteral("移动项目失败。") : error;
+        emit errorOccurred(message);
+        return message;
+    }
+    m_selection.clear();
+    reloadFolders();
+    reload();
+    emit noticeOccurred(QStringLiteral("已移动 %1 个项目").arg(ids.size()));
+    return {};
+}
+
+QString LibraryService::favoriteItems(const QVariantList& itemIds)
+{
+    const auto ids = uniqueItemIds(itemIds);
+    if (ids.isEmpty()) return QStringLiteral("没有可收藏的项目。");
+    QString error;
+    if (!m_repository.setItemsFavorite(ids, true, &error)) {
+        emit errorOccurred(QStringLiteral("添加收藏失败。"));
+        return QStringLiteral("添加收藏失败。");
+    }
+    reloadFolders();
+    reload();
+    emit noticeOccurred(QStringLiteral("已收藏 %1 个项目").arg(ids.size()));
+    return {};
+}
+
+QString LibraryService::tagItems(const QVariantList& itemIds, const QString& tagId)
+{
+    const auto ids = uniqueItemIds(itemIds);
+    if (ids.isEmpty() || tagId.isEmpty()) return QStringLiteral("没有可添加标签的项目。");
+    QString error;
+    if (!m_repository.addItemsTag(ids, tagId, &error)) {
+        emit errorOccurred(QStringLiteral("添加标签失败。"));
+        return QStringLiteral("添加标签失败。");
+    }
+    reload();
+    emit noticeOccurred(QStringLiteral("已为 %1 个项目添加标签").arg(ids.size()));
+    return {};
+}
+
 void LibraryService::reload()
 {
     QString error;

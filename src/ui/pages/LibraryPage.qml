@@ -11,6 +11,30 @@ Rectangle {
     color: Theme.background
 
     readonly property int selectedCount: libraryService.selection.count
+    property bool dragInProgress: false
+
+    Item {
+        id: internalDragSource
+        width: 2
+        height: 2
+        z: 1000
+        property var dragIds: []
+        Drag.active: root.dragInProgress
+        Drag.keys: ["notera-library-items"]
+        Drag.hotSpot.x: 1
+        Drag.hotSpot.y: 1
+    }
+
+    function dragIds(drag) {
+        return drag.source && drag.source.dragIds ? drag.source.dragIds : []
+    }
+    function canMoveAll(ids, folderId) {
+        if (!ids || ids.length === 0) return false
+        for (let i = 0; i < ids.length; ++i) {
+            if (!libraryService.canMoveItemToFolder(ids[i], folderId)) return false
+        }
+        return true
+    }
 
     function selectAll() { libraryService.selection.replace(libraryService.entries.itemIds()) }
     function clearSelection() { libraryService.selection.clear() }
@@ -169,6 +193,7 @@ Rectangle {
             GridView {
                 id: grid
                 objectName: "browserGrid"
+                z: 2
                 anchors.fill: parent
                 anchors.margins: 16
                 visible: count > 0
@@ -235,7 +260,8 @@ Rectangle {
                         color: root.isSelected(scoreDelegate.itemId) ? Theme.accentSoft : (cardHover.hovered ? Theme.cardHover : Theme.cardBackground)
                         Behavior on color { ColorAnimation { duration: 150; easing.type: Easing.OutCubic } }
                         border.width: root.isSelected(scoreDelegate.itemId) ? 2 : 1
-                        border.color: root.isSelected(scoreDelegate.itemId) ? Theme.accent : (cardHover.hovered ? Theme.strongBorder : Theme.cardBorder)
+                        border.color: folderDrop.containsDrag ? Theme.accent
+                            : root.isSelected(scoreDelegate.itemId) ? Theme.accent : (cardHover.hovered ? Theme.strongBorder : Theme.cardBorder)
                         Behavior on border.color { ColorAnimation { duration: 150; easing.type: Easing.OutCubic } }
 
 
@@ -328,21 +354,46 @@ Rectangle {
                             id: cardHover
                             cursorShape: Qt.PointingHandCursor
                         }
-                        TapHandler {
+                        MouseArea {
+                            id: cardMouseArea
+                            anchors.fill: parent
                             acceptedButtons: Qt.LeftButton
-                            gesturePolicy: TapHandler.ReleaseWithinBounds
-                            onTapped: {
-                            if (root.selectedCount > 0) {
-                                libraryService.selection.toggle(scoreDelegate.itemId)
-                                return
+                            drag.target: internalDragSource
+                            drag.threshold: 8
+                            property bool preparedDrag: false
+                            onPressed: function(mouse) {
+                                const point = card.mapToItem(root, mouse.x, mouse.y)
+                                internalDragSource.x = point.x
+                                internalDragSource.y = point.y
                             }
-                            if (scoreDelegate.itemType === "folder") {
-                                libraryService.enterFolder(scoreDelegate.itemId)
-                            } else {
-                                appController.openScore(scoreDelegate.scoreId, scoreDelegate.title, scoreDelegate.filePath,
-                                    scoreDelegate.fileType, scoreDelegate.pageCount,
-                                    libraryService.scoreFolderId(scoreDelegate.scoreId))
+                            onPositionChanged: {
+                                if (!drag.active || preparedDrag) return
+                                if (!root.isSelected(scoreDelegate.itemId))
+                                    libraryService.selection.replace([scoreDelegate.itemId])
+                                internalDragSource.dragIds = libraryService.selection.selectedIds
+                                preparedDrag = true
+                                root.dragInProgress = true
                             }
+                            onReleased: {
+                                preparedDrag = false
+                                root.dragInProgress = false
+                            }
+                            onCanceled: {
+                                preparedDrag = false
+                                root.dragInProgress = false
+                            }
+                            onClicked: {
+                                if (root.selectedCount > 0) {
+                                    libraryService.selection.toggle(scoreDelegate.itemId)
+                                    return
+                                }
+                                if (scoreDelegate.itemType === "folder") {
+                                    libraryService.enterFolder(scoreDelegate.itemId)
+                                } else {
+                                    appController.openScore(scoreDelegate.scoreId, scoreDelegate.title, scoreDelegate.filePath,
+                                        scoreDelegate.fileType, scoreDelegate.pageCount,
+                                        libraryService.scoreFolderId(scoreDelegate.scoreId))
+                                }
                             }
                         }
                         TapHandler {
@@ -353,7 +404,23 @@ Rectangle {
                                 else scoreMenu.popup()
                             }
                         }
+
+                        DropArea {
+                            id: folderDrop
+                            anchors.fill: parent
+                            z: 5
+                            enabled: scoreDelegate.itemType === "folder"
+                            onEntered: function(drag) {
+                                drag.accepted = root.canMoveAll(root.dragIds(drag), scoreDelegate.itemId)
+                            }
+                            onDropped: function(drop) {
+                                if (!root.canMoveAll(root.dragIds(drop), scoreDelegate.itemId)) return
+                                libraryService.moveItems(root.dragIds(drop), scoreDelegate.itemId)
+                                drop.acceptProposedAction()
+                            }
+                        }
                     }
+
 
                     // 左上角勾选框始终可用，并位于卡片点击层之上。
                     Rectangle {
@@ -612,11 +679,11 @@ Rectangle {
 
             DragHandler {
                 id: rubberBand
+                enabled: !root.dragInProgress
                 target: null
                 acceptedButtons: Qt.LeftButton
                 acceptedDevices: PointerDevice.Mouse
-                grabPermissions: PointerHandler.CanTakeOverFromItems
-                    | PointerHandler.ApprovesTakeOverByAnything
+                grabPermissions: PointerHandler.ApprovesTakeOverByAnything
 
                 onActiveChanged: {
                     if (!active) return
@@ -685,7 +752,9 @@ Rectangle {
                 z: 10
                 Label {
                     anchors.centerIn: parent
-                    text: "松开即可导入乐谱"
+                    text: dropArea.internalDragHover
+                        ? "松开即可移动到乐谱库"
+                        : "松开即可导入乐谱"
                     color: Theme.selectedText
                     font.pixelSize: Theme.fontLg
                     font.weight: Font.DemiBold
@@ -694,9 +763,19 @@ Rectangle {
 
             DropArea {
                 id: dropArea
+                property bool internalDragHover: false
                 anchors.fill: parent
-                z: 11
+                z: 1
+                onEntered: function(drag) { internalDragHover = root.dragIds(drag).length > 0 }
+                onExited: internalDragHover = false
                 onDropped: function(drop) {
+                    internalDragHover = false
+                    const internalIds = root.dragIds(drop)
+                    if (internalIds.length > 0) {
+                        libraryService.moveItems(internalIds, "")
+                        drop.acceptProposedAction()
+                        return
+                    }
                     for (let index = 0; index < drop.urls.length; ++index)
                         libraryService.importLocalFile(drop.urls[index])
                 }

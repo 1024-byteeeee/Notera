@@ -46,9 +46,11 @@ public:
     [[nodiscard]] QString dataDirectory() const;
     [[nodiscard]] QString pendingDataDirectory() const;
     static bool applyPendingDataMigration(QString* error);
+    static bool applyPendingDataClear(QString* error);
     Q_INVOKABLE QString migrateDataDirectory(const QUrl& newDirectory);
     Q_INVOKABLE QString openDataDirectory() const;
     Q_INVOKABLE void requestRestart();
+    Q_INVOKABLE QString clearAllData(const QString& confirmation);
     Q_INVOKABLE void openScore(const QString& scoreId, const QString& title, const QString& filePath,
         const QString& fileType, int pageCount, const QString& folderId);
 

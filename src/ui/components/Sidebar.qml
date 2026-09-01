@@ -59,6 +59,17 @@ Rectangle {
         addChildren("", 0)
     }
 
+    function draggedIds(drag) {
+        return drag.source && drag.source.dragIds ? drag.source.dragIds : []
+    }
+    function canMoveAll(ids, folderId) {
+        if (!ids || ids.length === 0) return false
+        for (let i = 0; i < ids.length; ++i) {
+            if (!libraryService.canMoveItemToFolder(ids[i], folderId)) return false
+        }
+        return true
+    }
+
     Connections {
         target: libraryService.folders
         function onCountChanged() {
@@ -80,6 +91,8 @@ Rectangle {
         property bool hasChildren: false
         property bool expanded: false
         property bool tagEntry: false
+        readonly property bool acceptsLibraryDrop: navId === "all" || navId === "favorites"
+            || navId.startsWith("folder:") || navId.startsWith("tag:")
         readonly property int hoverTransitionDuration: 0
         signal contextRequested()
         signal toggleExpand()
@@ -87,7 +100,8 @@ Rectangle {
         Layout.fillWidth: true
         implicitHeight: 40
         radius: Theme.radiusMd
-        color: selected ? Theme.selectedBackground : (navMouse.containsMouse ? Theme.buttonHover : Qt.rgba(Theme.buttonHover.r, Theme.buttonHover.g, Theme.buttonHover.b, 0))
+        color: navDrop.containsDrag ? Theme.accentSoft
+            : selected ? Theme.selectedBackground : (navMouse.containsMouse ? Theme.buttonHover : Qt.rgba(Theme.buttonHover.r, Theme.buttonHover.g, Theme.buttonHover.b, 0))
         border.width: selected ? 1 : 0
         border.color: selected ? Theme.selectedBorder : "transparent"
 
@@ -180,6 +194,32 @@ Rectangle {
                 } else {
                     appController.currentPage = navItem.targetPage
                 }
+            }
+        }
+
+
+        DropArea {
+            id: navDrop
+            anchors.fill: parent
+            z: 5
+            enabled: navItem.acceptsLibraryDrop
+            onEntered: function(drag) {
+                const ids = root.draggedIds(drag)
+                if (navItem.navId === "all") drag.accepted = root.canMoveAll(ids, "")
+                else if (navItem.navId.startsWith("folder:"))
+                    drag.accepted = root.canMoveAll(ids, navItem.navId.substring(7))
+                else drag.accepted = ids.length > 0
+            }
+            onDropped: function(drop) {
+                const ids = root.draggedIds(drop)
+                if (ids.length === 0) return
+                if (navItem.navId === "all") libraryService.moveItems(ids, "")
+                else if (navItem.navId === "favorites") libraryService.favoriteItems(ids)
+                else if (navItem.navId.startsWith("folder:"))
+                    libraryService.moveItems(ids, navItem.navId.substring(7))
+                else if (navItem.navId.startsWith("tag:"))
+                    libraryService.tagItems(ids, navItem.navId.substring(4))
+                drop.acceptProposedAction()
             }
         }
     }

@@ -852,6 +852,59 @@ bool ScoreRepository::moveFolder(const QString& folderId, const QString& parentI
     return false;
 }
 
+bool ScoreRepository::moveItems(const QStringList& itemIds, const QString& folderId, QString* error)
+{
+    if (!m_database.transaction()) { *error = m_database.lastError().text(); return false; }
+    for (const auto& itemId : itemIds) {
+        const auto type = itemTypeById(itemId, error);
+        bool succeeded = false;
+        if (type == QStringLiteral("score")) {
+            succeeded = setFolder(itemId, folderId, error);
+        } else if (type == QStringLiteral("folder")) {
+            succeeded = moveFolder(itemId, folderId, error);
+        }
+        if (!succeeded) {
+            m_database.rollback();
+            if (error->isEmpty()) *error = QStringLiteral("项目不存在或目标文件夹无效。");
+            return false;
+        }
+    }
+    if (m_database.commit()) return true;
+    *error = m_database.lastError().text();
+    m_database.rollback();
+    return false;
+}
+
+bool ScoreRepository::setItemsFavorite(const QStringList& itemIds, const bool favorite, QString* error)
+{
+    if (!m_database.transaction()) { *error = m_database.lastError().text(); return false; }
+    for (const auto& itemId : itemIds) {
+        if (!setItemFavorite(itemId, favorite, error)) {
+            m_database.rollback();
+            return false;
+        }
+    }
+    if (m_database.commit()) return true;
+    *error = m_database.lastError().text();
+    m_database.rollback();
+    return false;
+}
+
+bool ScoreRepository::addItemsTag(const QStringList& itemIds, const QString& tagId, QString* error)
+{
+    if (!m_database.transaction()) { *error = m_database.lastError().text(); return false; }
+    for (const auto& itemId : itemIds) {
+        if (!addItemTag(itemId, tagId, error)) {
+            m_database.rollback();
+            return false;
+        }
+    }
+    if (m_database.commit()) return true;
+    *error = m_database.lastError().text();
+    m_database.rollback();
+    return false;
+}
+
 bool ScoreRepository::deleteFolder(const QString& folderId, QString* error)
 {
     if (!m_database.transaction()) {
