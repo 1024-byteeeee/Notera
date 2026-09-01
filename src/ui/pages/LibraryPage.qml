@@ -12,6 +12,7 @@ Rectangle {
 
     readonly property int selectedCount: libraryService.selection.count
     property bool dragInProgress: false
+    property var dragItemIds: []
 
     Item {
         id: internalDragSource
@@ -26,7 +27,7 @@ Rectangle {
 
         // 拖拽预览 - 跟随鼠标的半透明卡片
         Rectangle {
-            visible: root.dragInProgress && internalDragSource.dragIds.length > 0
+            visible: root.dragInProgress && root.dragItemIds.length > 0
             width: 150
             height: 56
             radius: Theme.radiusMd
@@ -51,7 +52,7 @@ Rectangle {
                     color: Theme.accentSoft
                     Label {
                         anchors.centerIn: parent
-                        text: internalDragSource.dragIds.length > 9 ? "9+" : internalDragSource.dragIds.length
+                        text: root.dragItemIds.length > 9 ? "9+" : root.dragItemIds.length
                         color: Theme.accent
                         font.pixelSize: Theme.fontMd
                         font.weight: Font.Bold
@@ -59,7 +60,7 @@ Rectangle {
                 }
                 Label {
                     Layout.fillWidth: true
-                    text: internalDragSource.dragIds.length === 1 ? "移动 1 项" : "移动 " + internalDragSource.dragIds.length + " 项"
+                    text: root.dragItemIds.length === 1 ? "移动 1 项" : "移动 " + root.dragItemIds.length + " 项"
                     color: Theme.foreground
                     font.pixelSize: Theme.fontSm
                     font.weight: Font.Medium
@@ -412,9 +413,12 @@ Rectangle {
                             }
                             onPositionChanged: {
                                 if (!drag.active || preparedDrag) return
-                                if (!root.isSelected(scoreDelegate.itemId))
-                                    libraryService.selection.replace([scoreDelegate.itemId])
-                                internalDragSource.dragIds = libraryService.selection.selectedIds
+                                if (root.selectedCount > 0 && root.isSelected(scoreDelegate.itemId)) {
+                                    root.dragItemIds = libraryService.selection.selectedIds
+                                } else {
+                                    root.dragItemIds = [scoreDelegate.itemId]
+                                }
+                                internalDragSource.dragIds = root.dragItemIds
                                 preparedDrag = true
                                 root.dragInProgress = true
                             }
@@ -715,6 +719,12 @@ Rectangle {
                 objectName: "selectionBox"
                 visible: rubberBand.active
                 z: 10
+                x: rubberBand.active ? Math.min(rubberBand.centroid.pressPosition.x,
+                    rubberBand.centroid.pressPosition.x + rubberBand.activeTranslation.x) : 0
+                y: rubberBand.active ? Math.min(rubberBand.centroid.pressPosition.y,
+                    rubberBand.centroid.pressPosition.y + rubberBand.activeTranslation.y) : 0
+                width: rubberBand.active ? Math.abs(rubberBand.activeTranslation.x) : 0
+                height: rubberBand.active ? Math.abs(rubberBand.activeTranslation.y) : 0
                 color: Theme.accent + "22"
                 border.width: 1
                 border.color: Theme.accent
@@ -729,21 +739,11 @@ Rectangle {
                 acceptedDevices: PointerDevice.Mouse
                 grabPermissions: PointerHandler.ApprovesTakeOverByAnything
 
-                onActiveChanged: {
-                    if (!active) return
-                    selectionBox.x = centroid.pressPosition.x
-                    selectionBox.y = centroid.pressPosition.y
-                    selectionBox.width = 0
-                    selectionBox.height = 0
-                }
                 onActiveTranslationChanged: {
-                    selectionBox.x = Math.min(centroid.pressPosition.x,
-                        centroid.pressPosition.x + activeTranslation.x)
-                    selectionBox.y = Math.min(centroid.pressPosition.y,
-                        centroid.pressPosition.y + activeTranslation.y)
-                    selectionBox.width = Math.abs(activeTranslation.x)
-                    selectionBox.height = Math.abs(activeTranslation.y)
-                    root.updateRubberSelection()
+                    if (active) root.updateRubberSelection()
+                }
+                onActiveChanged: {
+                    if (!active) libraryService.selection.clear()
                 }
             }
 
@@ -788,7 +788,7 @@ Rectangle {
             Rectangle {
                 anchors.fill: parent
                 anchors.margins: 8
-                visible: dropArea.containsDrag
+                visible: dropArea.containsDrag && !dropArea.internalDragHover
                 radius: Theme.radiusLg
                 color: Theme.accentSoft
                 border.width: 2
@@ -796,9 +796,7 @@ Rectangle {
                 z: 10
                 Label {
                     anchors.centerIn: parent
-                    text: dropArea.internalDragHover
-                        ? "松开即可移动到乐谱库"
-                        : "松开即可导入乐谱"
+                    text: "松开即可导入乐谱"
                     color: Theme.selectedText
                     font.pixelSize: Theme.fontLg
                     font.weight: Font.DemiBold
