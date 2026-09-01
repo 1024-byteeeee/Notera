@@ -184,10 +184,8 @@ Rectangle {
                     readonly property int folderSubmenuItemCount: folderSubmenu.count
                     readonly property int tagSubmenuItemCount: tagSubmenu.count
                     readonly property int normalMenuArrowCount: favoriteMenuItem.visibleArrowCount
-                    readonly property bool folderSubmenuArrowIsCustomized: scoreMenu.openedOnce
-                        && folderSubmenu.menuItem
-                        && folderSubmenu.menuItem.subMenu === folderSubmenu
-                        && !folderSubmenu.menuItem.arrow.visible
+                    readonly property int folderSubmenuArrowCount: scoreMenu.openedOnce && scoreMenu.count > 3
+                        && scoreMenu.itemAt(3) ? scoreMenu.itemAt(3).visibleArrowCount : -1
                     readonly property bool tagMenuHasDefaultCheckIndicator: tagSubmenu.count > 0
                         && tagSubmenu.itemAt(0).indicator.visible
                         && tagSubmenu.itemAt(0).indicator.implicitWidth > 0
