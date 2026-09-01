@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
-    <DirectoryRef Id="DesktopFolder">
+    <Directory Id="DesktopFolder" Name="Desktop">
       <Component Id="NoteraDesktopShortcutComponent" Guid="*">
         <Shortcut Id="NoteraDesktopShortcut"
                   Name="Notera"
@@ -15,7 +15,6 @@
                        Value="1"
                        KeyPath="yes" />
       </Component>
-    </DirectoryRef>
+    </Directory>
   </Fragment>
-
 </Wix>
