@@ -110,18 +110,25 @@ bool dragItemToItem(QObject* root, const QString& sourceName, const QString& tar
 {
     auto* const source = findVisualItem(root, sourceName);
     auto* const target = findVisualItem(root, targetName);
+    auto* const preview = findVisualItem(root, QStringLiteral("dragPreview"));
+    auto* const previewImage = findVisualItem(root, QStringLiteral("dragPreviewImage"));
     auto* const window = qobject_cast<QQuickWindow*>(root);
-    if (!source || !target || !window) return false;
+    if (!source || !target || !preview || !previewImage || !window) return false;
 
     const auto start = source->mapToScene(QPointF(source->width() / 2.0, source->height() / 2.0));
     const auto end = target->mapToScene(QPointF(target->width() / 2.0, target->height() / 2.0));
     sendMouseEvent(window, QEvent::MouseButtonPress, start, Qt::LeftButton, Qt::LeftButton);
+    bool previewReady = false;
     for (int step = 1; step <= 8; ++step) {
         sendMouseEvent(window, QEvent::MouseMove,
             start + (end - start) * (static_cast<double>(step) / 8.0), Qt::NoButton, Qt::LeftButton);
+        if (step == 4) {
+            const auto previewSource = previewImage->property("source").toUrl();
+            previewReady = preview->z() >= 100.0 && previewSource.isLocalFile();
+        }
     }
     sendMouseEvent(window, QEvent::MouseButtonRelease, end, Qt::LeftButton, Qt::NoButton);
-    return true;
+    return previewReady;
 }
 
 bool popupIsOpen(QObject* root, const QString& objectName)

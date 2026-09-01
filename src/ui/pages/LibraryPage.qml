@@ -18,6 +18,8 @@ Rectangle {
     // 内部拖放源与跟随鼠标的预览。
     Rectangle {
         id: dragPreview
+        objectName: "dragPreview"
+        z: 100
         x: -10000
         y: -10000
         width: 110
@@ -36,9 +38,10 @@ Rectangle {
         Drag.hotSpot.y: height / 2
 
         Image {
+            objectName: "dragPreviewImage"
             anchors.fill: parent
             anchors.margins: 6
-            source: root.dragThumbnailPath
+            source: root.localFileUrl(root.dragThumbnailPath)
             fillMode: Image.PreserveAspectFit
             asynchronous: true
         }
@@ -65,6 +68,11 @@ Rectangle {
 
     function dragIds(drag) {
         return drag.source && drag.source.dragIds ? drag.source.dragIds : []
+    }
+    function localFileUrl(path) {
+        if (!path || path.length === 0) return ""
+        const normalized = path.replace(/\\/g, "/")
+        return normalized.startsWith("/") ? "file://" + normalized : "file:///" + normalized
     }
     function finishInternalDrag() {
         if (root.dragInProgress) dragPreview.Drag.drop()
@@ -363,7 +371,7 @@ Rectangle {
                                     visible: scoreDelegate.itemType === "score"
                                     anchors.fill: parent
                                     anchors.margins: 4
-                                    source: scoreDelegate.thumbnailPath.length > 0 ? "file://" + scoreDelegate.thumbnailPath : ""
+                                    source: root.localFileUrl(scoreDelegate.thumbnailPath)
                                     asynchronous: true
                                     smooth: true
                                     fillMode: Image.PreserveAspectFit
