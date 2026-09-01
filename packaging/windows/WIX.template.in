@@ -37,6 +37,13 @@
     <?endif?>
 
     <FeatureRef Id="ProductFeature" />
+    <Feature Id="DesktopShortcutFeature"
+             Title="创建桌面快捷方式"
+             Description="在 Windows 桌面创建 Notera 快捷方式"
+             Level="1"
+             Absent="allow">
+      <ComponentRef Id="NoteraDesktopShortcutComponent" />
+    </Feature>
     <UIRef Id="$(var.CPACK_WIX_UI_REF)" />
     <UIRef Id="WixUI_ErrorProgressText" />
 
