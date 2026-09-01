@@ -15,14 +15,11 @@ Button {
     padding: 0
     hoverEnabled: true
 
-    contentItem: Label {
+    contentItem: AppIcon {
         anchors.fill: parent
-        text: control.symbol
-        color: control.danger ? Theme.danger : (control.selected ? Theme.accent : Theme.mutedForeground)
-        font.pixelSize: 16
-        font.weight: Font.DemiBold
-        horizontalAlignment: Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
+        anchors.margins: 7
+        iconName: control.symbol
+        iconColor: control.danger ? Theme.danger : (control.selected ? Theme.accent : Theme.mutedForeground)
         scale: control.down && control.enabled ? 0.88 : control.hovered && control.enabled ? 1.06 : 1
         Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Easing.OutCubic } }
     }

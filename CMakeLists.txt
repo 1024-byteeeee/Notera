@@ -65,6 +65,7 @@ qt_add_qml_module(Notera
         src/ui/Theme.qml
         src/ui/Motion.qml
         src/ui/components/AppButton.qml
+        src/ui/components/AppIcon.qml
         src/ui/components/IconButton.qml
         src/ui/components/AppDialog.qml
         src/ui/components/ConfirmDialog.qml
@@ -128,6 +129,20 @@ set(CPACK_PACKAGE_DIRECTORY "${CMAKE_BINARY_DIR}/packages")
 if(APPLE)
     set(CPACK_GENERATOR "DragNDrop")
     set(CPACK_DMG_VOLUME_NAME "Notera")
+    set(CPACK_PACKAGE_FILE_NAME "Notera-v${PROJECT_VERSION}-macOS-arm64")
+    set(CPACK_DMG_BACKGROUND_IMAGE "${CMAKE_BINARY_DIR}/dmg-background.png")
+    set(CPACK_DMG_DS_STORE_SETUP_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/packaging/configure-dmg.applescript")
+    execute_process(
+        COMMAND /usr/bin/sips -s format png
+            "${CMAKE_CURRENT_SOURCE_DIR}/packaging/dmg-background.svg"
+            --out "${CPACK_DMG_BACKGROUND_IMAGE}"
+        RESULT_VARIABLE dmg_background_result
+        OUTPUT_QUIET
+        ERROR_VARIABLE dmg_background_error
+    )
+    if(NOT dmg_background_result EQUAL 0)
+        message(FATAL_ERROR "Failed to render DMG background: ${dmg_background_error}")
+    endif()
     # CPack runs this after Qt deployment has copied all nested frameworks and
     # plug-ins, but before the DMG is assembled.
     set(CPACK_PRE_BUILD_SCRIPTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignMacBundle.cmake")

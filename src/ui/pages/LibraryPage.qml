@@ -24,6 +24,7 @@ Rectangle {
         y: -10000
         width: 110
         height: 145
+        visible: root.dragInProgress
         radius: Theme.radiusMd
         opacity: 0.88
         color: Theme.elevatedSurface
@@ -164,7 +165,8 @@ Rectangle {
             AppButton {
                 visible: libraryService.canGoUp
                 Layout.preferredWidth: 78
-                text: "← 上一级"
+                text: "上一级"
+                symbol: "back"
                 onClicked: libraryService.goUp()
             }
 
@@ -200,7 +202,7 @@ Rectangle {
                     anchors.leftMargin: 12
                     anchors.rightMargin: 8
                     spacing: 8
-                    Label { text: "⌕"; color: Theme.mutedForeground; font.pixelSize: 16 }
+                    AppIcon { width: 16; height: 16; iconName: "search"; iconColor: Theme.mutedForeground }
                     TextField {
                         id: searchField
                         Layout.fillWidth: true
@@ -376,12 +378,13 @@ Rectangle {
                                     smooth: true
                                     fillMode: Image.PreserveAspectFit
                                 }
-                                Label {
+                                AppIcon {
                                     anchors.centerIn: parent
                                     visible: scoreDelegate.itemType !== "folder" && scoreDelegate.thumbnailPath.length === 0
-                                    text: "♫"
-                                    color: Theme.faintForeground
-                                    font.pixelSize: 38
+                                    width: 38
+                                    height: 38
+                                    iconName: "music"
+                                    iconColor: Theme.faintForeground
                                 }
                                 FolderIcon {
                                     anchors.centerIn: parent
@@ -448,7 +451,7 @@ Rectangle {
                             objectName: scoreDelegate.itemType === "score" ? "scoreCardMouse" : "folderCardMouse"
                             acceptedButtons: Qt.LeftButton
                             drag.target: dragPreview
-                            drag.threshold: 8
+                            drag.threshold: Qt.styleHints.startDragDistance
                             property bool preparedDrag: false
 
                             onPressed: function(mouse) {
@@ -531,12 +534,12 @@ Rectangle {
                         border.width: 1.5
                         border.color: root.isSelected(scoreDelegate.itemId) ? Theme.accent : Theme.strongBorder
                         z: 3
-                        Label {
+                        AppIcon {
                             anchors.centerIn: parent
-                            text: root.isSelected(scoreDelegate.itemId) ? "✓" : ""
-                            color: "white"
-                            font.pixelSize: 14
-                            font.weight: Font.Bold
+                            width: 14
+                            height: 14
+                            iconName: root.isSelected(scoreDelegate.itemId) ? "check" : ""
+                            iconColor: "white"
                         }
                         HoverHandler { cursorShape: Qt.PointingHandCursor }
                         TapHandler {
@@ -560,13 +563,14 @@ Rectangle {
                         height: 28
                         readonly property bool hovered: favoriteHover.hovered
 
-                        Label {
+                        AppIcon {
                             anchors.centerIn: parent
-                            text: scoreDelegate.favorite ? "★" : "☆"
-                            color: scoreDelegate.favorite ? Theme.accent : Theme.mutedForeground
-                            font.pixelSize: favoriteBtn.hovered ? 22 : 18
-                            font.weight: Font.DemiBold
-                            Behavior on font.pixelSize { NumberAnimation { duration: Motion.fast; easing.type: Easing.OutCubic } }
+                            width: 20
+                            height: 20
+                            iconName: scoreDelegate.favorite ? "star-filled" : "star"
+                            iconColor: scoreDelegate.favorite ? Theme.accent : Theme.mutedForeground
+                            scale: favoriteBtn.hovered ? 1.12 : 1
+                            Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Easing.OutCubic } }
                         }
                         HoverHandler {
                             id: favoriteHover
@@ -584,12 +588,12 @@ Rectangle {
                         objectName: scoreDelegate.itemType === "score" ? "scoreContextMenu" : ""
                         AppMenuItem {
                             id: favoriteMenuItem
-                            symbol: scoreDelegate.favorite ? "★" : "☆"
+                            symbol: scoreDelegate.favorite ? "star-filled" : "star"
                             text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
                             onTriggered: libraryService.toggleItemFavorite(scoreDelegate.itemId, !scoreDelegate.favorite)
                         }
                         AppMenuItem {
-                            symbol: "✎"
+                            symbol: "edit"
                             text: "重命名"
                             onTriggered: {
                                 renameDialog.scoreId = scoreDelegate.scoreId
@@ -603,10 +607,10 @@ Rectangle {
                         AppMenu {
                             id: folderSubmenu
                             title: "移动到文件夹"
-                            symbol: "▣"
+                            symbol: "folder"
                             enabled: libraryService.folders.count > 0
                             AppMenuItem {
-                                symbol: "↖"
+                                symbol: "folder-up"
                                 text: "无（移出文件夹）"
                                 onTriggered: libraryService.setItemFolder(scoreDelegate.itemId, "")
                             }
@@ -617,7 +621,7 @@ Rectangle {
                                     required property string itemId
                                     required property string name
                                     text: name
-                                    symbol: "▣"
+                                    symbol: "folder"
                                     enabled: libraryService.canMoveItemToFolder(scoreDelegate.itemId, itemId)
                                     onTriggered: libraryService.setItemFolder(scoreDelegate.itemId, itemId)
                                 }
@@ -664,7 +668,7 @@ Rectangle {
 
                         AppMenuSeparator { }
                         AppMenuItem {
-                            symbol: "⌫"
+                            symbol: "trash"
                             text: "删除乐谱"
                             danger: true
                             onTriggered: {
@@ -680,17 +684,17 @@ Rectangle {
                     AppMenu {
                         id: folderCardMenu
                         AppMenuItem {
-                            symbol: scoreDelegate.favorite ? "★" : "☆"
+                            symbol: scoreDelegate.favorite ? "star-filled" : "star"
                             text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
                             onTriggered: libraryService.toggleItemFavorite(scoreDelegate.itemId, !scoreDelegate.favorite)
                         }
                         AppMenuItem {
-                            symbol: "↗"
+                            symbol: "open"
                             text: "打开"
                             onTriggered: libraryService.enterFolder(scoreDelegate.itemId)
                         }
                         AppMenuItem {
-                            symbol: "✎"
+                            symbol: "edit"
                             text: "重命名"
                             onTriggered: {
                                 renameFolderDialog.targetId = scoreDelegate.itemId
@@ -702,10 +706,10 @@ Rectangle {
                         AppMenu {
                             id: folderMoveSubmenu
                             title: "移动到文件夹"
-                            symbol: "▣"
+                            symbol: "folder"
                             enabled: libraryService.folders.count > 0
                             AppMenuItem {
-                                symbol: "↖"
+                                symbol: "folder-up"
                                 text: "无（移出文件夹）"
                                 onTriggered: libraryService.setItemFolder(scoreDelegate.itemId, "")
                             }
@@ -716,7 +720,7 @@ Rectangle {
                                     required property string itemId
                                     required property string name
                                     text: name
-                                    symbol: "▣"
+                                    symbol: "folder"
                                     enabled: libraryService.canMoveItemToFolder(scoreDelegate.itemId, itemId)
                                     onTriggered: libraryService.setItemFolder(scoreDelegate.itemId, itemId)
                                 }
@@ -747,7 +751,7 @@ Rectangle {
                         }
                         AppMenuSeparator { }
                         AppMenuItem {
-                            symbol: "⌫"
+                            symbol: "trash"
                             text: "删除文件夹"
                             danger: true
                             onTriggered: {
@@ -817,7 +821,7 @@ Rectangle {
                     color: Theme.elevatedSurface
                     border.width: 1
                     border.color: Theme.border
-                    Label { anchors.centerIn: parent; text: "♫"; color: Theme.mutedForeground; font.pixelSize: 32 }
+                    AppIcon { anchors.centerIn: parent; width: 32; height: 32; iconName: "music"; iconColor: Theme.mutedForeground }
                 }
                 Label {
                     Layout.alignment: Qt.AlignHCenter
@@ -948,10 +952,10 @@ Rectangle {
     AppMenu {
         id: blankContextMenu
         objectName: "blankContextMenu"
-        AppMenuItem { text: "新建文件夹"; symbol: "▣"; visible: !appController.libraryFilter.startsWith("tag:"); onTriggered: newFolderDialog.open() }
+        AppMenuItem { text: "新建文件夹"; symbol: "folder"; visible: !appController.libraryFilter.startsWith("tag:"); onTriggered: newFolderDialog.open() }
         AppMenuItem { text: "新建标签"; tagIcon: true; onTriggered: newTagDialog.open() }
         AppMenuSeparator { visible: !appController.libraryFilter.startsWith("tag:") }
-        AppMenuItem { text: "导入乐谱"; symbol: "↓"; visible: !appController.libraryFilter.startsWith("tag:"); onTriggered: fileDialog.open() }
+        AppMenuItem { text: "导入乐谱"; symbol: "import"; visible: !appController.libraryFilter.startsWith("tag:"); onTriggered: fileDialog.open() }
     }
 
     AppDialog {

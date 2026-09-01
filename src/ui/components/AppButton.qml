@@ -31,12 +31,12 @@ Button {
             anchors.centerIn: parent
             spacing: 7
 
-            Label {
+            AppIcon {
                 visible: control.symbol.length > 0
-                text: control.symbol
-                color: control.danger ? Theme.danger : (control.primary ? Theme.accentForeground : Theme.buttonText)
-                font.pixelSize: 16
-                font.weight: Font.DemiBold
+                width: 16
+                height: 16
+                iconName: control.symbol
+                iconColor: control.danger ? Theme.danger : (control.primary ? Theme.accentForeground : Theme.buttonText)
             }
 
             Label {

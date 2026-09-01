@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="440" viewBox="0 0 720 440">
+  <rect width="720" height="440" fill="#17181c"/>
+  <path d="M310 220h100" fill="none" stroke="#efb63f" stroke-width="5" stroke-linecap="round"/>
+  <path d="m392 204 18 16-18 16" fill="none" stroke="#efb63f" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="360" y="70" text-anchor="middle" fill="#f6f1e8" font-family="Helvetica Neue,Arial,sans-serif" font-size="24" font-weight="600">将 Notera 拖入“应用程序”</text>
+  <text x="360" y="100" text-anchor="middle" fill="#92959d" font-family="Helvetica Neue,Arial,sans-serif" font-size="14">即可完成安装</text>
+</svg>

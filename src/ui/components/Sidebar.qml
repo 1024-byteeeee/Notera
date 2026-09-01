@@ -125,28 +125,24 @@ Rectangle {
             scale: navMouse.pressed ? 0.985 : 1
             Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Easing.OutCubic } }
 
-            Label {
+            AppIcon {
                 Layout.preferredWidth: 16
+                Layout.preferredHeight: 16
                 visible: navItem.hasChildren
-                text: navItem.expanded ? "▾" : "▸"
-                color: navItem.selected ? Theme.selectedText : Theme.mutedForeground
-                font.pixelSize: 12
-                font.weight: Font.Bold
-                horizontalAlignment: Text.AlignHCenter
+                iconName: navItem.expanded ? "chevron-down" : "chevron-right"
+                iconColor: navItem.selected ? Theme.selectedText : Theme.mutedForeground
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     onClicked: navItem.toggleExpand()
                 }
             }
-            Label {
+            AppIcon {
                 Layout.preferredWidth: 18
+                Layout.preferredHeight: 18
                 visible: navItem.symbol.length > 0 && !navItem.tagEntry
-                text: navItem.symbol
-                color: navItem.selected ? Theme.selectedText : Theme.mutedForeground
-                font.pixelSize: 15
-                font.weight: Font.DemiBold
-                horizontalAlignment: Text.AlignHCenter
+                iconName: navItem.symbol
+                iconColor: navItem.selected ? Theme.selectedText : Theme.mutedForeground
             }
             TagIcon {
                 objectName: navItem.tagEntry ? "tagEntryIcon" : ""
@@ -266,15 +262,15 @@ Rectangle {
 
         NavItem {
             objectName: "libraryNavItem"
-            label: "乐谱库"; navId: "all"; symbol: "♪"
+            label: "乐谱库"; navId: "all"; symbol: "music"
             selected: appController.currentPage === "library" && appController.libraryFilter === "all"
         }
         NavItem {
-            label: "最近使用"; navId: "recent"; symbol: "◷"
+            label: "最近使用"; navId: "recent"; symbol: "recent"
             selected: appController.currentPage === "library" && appController.libraryFilter === "recent"
         }
         NavItem {
-            label: "收藏"; navId: "favorites"; symbol: "★"
+            label: "收藏"; navId: "favorites"; symbol: "star-filled"
             selected: appController.currentPage === "library" && appController.libraryFilter === "favorites"
         }
 
@@ -319,7 +315,7 @@ Rectangle {
                     Item { Layout.fillWidth: true }
                     IconButton {
                         objectName: "newFolderButton"
-                        symbol: "+"
+                        symbol: "plus"
                         implicitWidth: 26
                         implicitHeight: 26
                         Accessible.name: "新建文件夹"
@@ -381,7 +377,7 @@ Rectangle {
                     Item { Layout.fillWidth: true }
                     IconButton {
                         objectName: "newTagButton"
-                        symbol: "+"
+                        symbol: "plus"
                         implicitWidth: 26
                         implicitHeight: 26
                         Accessible.name: "新建标签"
@@ -430,7 +426,7 @@ Rectangle {
         }
 
         NavItem {
-            label: "设置"; navId: "settings"; symbol: "⚙"; targetPage: "settings"
+            label: "设置"; navId: "settings"; symbol: "settings"; targetPage: "settings"
             selected: appController.currentPage === "settings"
         }
     }
@@ -484,7 +480,7 @@ Rectangle {
         property string targetId: ""
         property string targetName: ""
         AppMenuItem {
-            symbol: "✎"
+            symbol: "edit"
             text: "重命名"
             onTriggered: {
                 renameFolderDialog.targetId = folderMenu.targetId
@@ -494,7 +490,7 @@ Rectangle {
         }
         AppMenuSeparator { }
         AppMenuItem {
-            symbol: "⌫"
+            symbol: "trash"
             text: "删除文件夹"
             danger: true
             onTriggered: {
@@ -511,7 +507,7 @@ Rectangle {
         property string targetId: ""
         property string targetName: ""
         AppMenuItem {
-            symbol: "✎"
+            symbol: "edit"
             text: "重命名"
             onTriggered: {
                 renameTagDialog.targetId = tagMenu.targetId
@@ -521,7 +517,7 @@ Rectangle {
         }
         AppMenuSeparator { }
         AppMenuItem {
-            symbol: "⌫"
+            symbol: "trash"
             text: "删除标签"
             danger: true
             onTriggered: {

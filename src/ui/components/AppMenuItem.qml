@@ -81,30 +81,30 @@ MenuItem {
                 height: 16
                 iconColor: control.danger ? Theme.danger : Theme.secondaryForeground
             }
-            Label {
+            AppIcon {
                 visible: control.checkable && !control.effectiveTagIcon
                 anchors.centerIn: parent
-                text: control.checked ? "✓" : ""
-                color: Theme.accent
-                font.pixelSize: Theme.fontMd
-                font.weight: Font.Bold
+                width: 15
+                height: 15
+                iconName: control.checked ? "check" : ""
+                iconColor: Theme.accent
             }
-            Label {
+            AppIcon {
                 visible: !control.checkable && !control.effectiveTagIcon && control.effectiveSymbol.length > 0
                 anchors.centerIn: parent
-                text: control.effectiveSymbol
-                color: control.danger ? Theme.danger : Theme.secondaryForeground
-                font.pixelSize: 15
-                font.weight: Font.Medium
+                width: 16
+                height: 16
+                iconName: control.effectiveSymbol
+                iconColor: control.danger ? Theme.danger : Theme.secondaryForeground
             }
-            Label {
+            AppIcon {
                 visible: control.checkable && control.effectiveTagIcon && control.checked
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                text: "✓"
-                color: Theme.accent
-                font.pixelSize: 10
-                font.weight: Font.Bold
+                width: 10
+                height: 10
+                iconName: "check"
+                iconColor: Theme.accent
             }
         }
 

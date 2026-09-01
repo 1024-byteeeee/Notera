@@ -18,7 +18,7 @@ env:
 
 jobs:
   macos-dmg:
-    name: macOS universal DMG
+    name: macOS arm64 DMG
     runs-on: macos-14
     steps:
       - name: Check out source
@@ -36,14 +36,14 @@ jobs:
           modules: "qtpdf"
           cache: true
 
-      - name: Configure universal build
-        run: cmake --preset macos-universal
+      - name: Configure arm64 build
+        run: cmake --preset macos-arm64
 
       - name: Build application
-        run: cmake --build --preset macos-universal --parallel
+        run: cmake --build --preset macos-arm64 --parallel
 
       - name: Smoke test UI interactions
-        run: build/macos-universal/Notera.app/Contents/MacOS/Notera --ui-smoke-test
+        run: build/macos-arm64/Notera.app/Contents/MacOS/Notera --ui-smoke-test
 
       - name: Upload UI verification screenshots
         if: always()
@@ -54,17 +54,30 @@ jobs:
           if-no-files-found: warn
 
       - name: Create DMG
-        run: cpack --config build/macos-universal/CPackConfig.cmake -G DragNDrop
+        run: cpack --config build/macos-arm64/CPackConfig.cmake -G DragNDrop
+
+      - name: Verify DMG filename and architecture
+        shell: bash
+        run: |
+          shopt -s nullglob
+          dmg_files=(build/macos-arm64/packages/Notera-v*-macOS-arm64.dmg)
+          if [[ ${#dmg_files[@]} -ne 1 ]]; then
+            echo "Expected exactly one arm64 DMG, found ${#dmg_files[@]}"
+            exit 1
+          fi
+
+          executable=$(find build/macos-arm64/packages/_CPack_Packages -path '*/Notera.app/Contents/MacOS/Notera' -print -quit)
+          file "$executable" | grep -q "arm64"
 
       - name: Verify signed application bundle
         run: |
-          bundle_path=$(find build/macos-universal/packages/_CPack_Packages -type d -name Notera.app -print -quit)
+          bundle_path=$(find build/macos-arm64/packages/_CPack_Packages -type d -name Notera.app -print -quit)
           test -n "$bundle_path"
           codesign --verify --deep --strict --verbose=2 "$bundle_path"
 
       - name: Smoke test application startup
         run: |
-          bundle_path=$(find build/macos-universal/packages/_CPack_Packages -type d -name Notera.app -print -quit)
+          bundle_path=$(find build/macos-arm64/packages/_CPack_Packages -type d -name Notera.app -print -quit)
           "$bundle_path/Contents/MacOS/Notera" --theme-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --import-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --stitch-smoke-test
@@ -85,16 +98,32 @@ jobs:
       - name: Upload DMG
         uses: actions/upload-artifact@v7
         with:
-          name: Notera-macos-universal-dmg
-          path: build/macos-universal/packages/*.dmg
+          name: Notera-macos-arm64-dmg
+          path: build/macos-arm64/packages/Notera-v*-macOS-arm64.dmg
           if-no-files-found: error
+
+      - name: Remove legacy macOS assets
+        if: github.event_name == 'release' || inputs.release_tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          tag="${{ github.event.release.tag_name || inputs.release_tag }}"
+          gh release view "$tag" --json assets --jq '.assets[].name' |
+            while IFS= read -r asset; do
+              case "$asset" in
+                Notera-*-Darwin.dmg|Notera-v*-macOS-universal.dmg)
+                  gh release delete-asset "$tag" "$asset" --yes
+                  ;;
+              esac
+            done
 
       - name: Attach DMG to GitHub Release
         if: github.event_name == 'release' || inputs.release_tag != ''
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.release.tag_name || inputs.release_tag }}
-          files: build/macos-universal/packages/*.dmg
+          files: build/macos-arm64/packages/Notera-v*-macOS-arm64.dmg
           overwrite_files: true
 
   windows-msi:

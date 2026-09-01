@@ -175,6 +175,7 @@ Rectangle {
     // 工具按钮组件
     component ToolButton: Rectangle {
         required property string btnText
+        property string iconName: ""
         property bool btnEnabled: true
         property bool btnActive: false
         signal btnClicked()
@@ -190,15 +191,26 @@ Rectangle {
                     : btnMouse.containsMouse ? Theme.strongBorder : Theme.buttonBorder
         opacity: btnEnabled ? 1 : 0.4
 
-        Label {
+        Row {
             anchors.centerIn: parent
-            text: parent.btnText
-            color: !btnEnabled ? Theme.buttonDisabledText
-                 : btnActive ? Theme.selectedText : Theme.buttonText
-            font.pixelSize: Theme.fontSm
-            font.weight: btnActive ? Font.DemiBold : Font.Medium
+            spacing: 6
             scale: btnMouse.pressed ? 0.96 : 1
             Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Easing.OutCubic } }
+            AppIcon {
+                visible: parent.parent.iconName.length > 0
+                width: 15
+                height: 15
+                iconName: parent.parent.iconName
+                iconColor: !parent.parent.btnEnabled ? Theme.buttonDisabledText
+                    : parent.parent.btnActive ? Theme.selectedText : Theme.buttonText
+            }
+            Label {
+                text: parent.parent.btnText
+                color: !parent.parent.btnEnabled ? Theme.buttonDisabledText
+                    : parent.parent.btnActive ? Theme.selectedText : Theme.buttonText
+                font.pixelSize: Theme.fontSm
+                font.weight: parent.parent.btnActive ? Font.DemiBold : Font.Medium
+            }
         }
 
         MouseArea {
@@ -230,7 +242,8 @@ Rectangle {
 
                 // 返回按钮
                 ToolButton {
-                    btnText: "← 乐谱库"
+                    btnText: "乐谱库"
+                    iconName: "back"
                     Layout.preferredWidth: 100
                     onBtnClicked: { root.autoScrolling = false; appController.currentPage = "library" }
                 }
@@ -238,7 +251,8 @@ Rectangle {
                 // 上一张
                 ToolButton {
                     objectName: "prevScoreButton"
-                    btnText: "‹ 上一张"
+                    btnText: "上一张"
+                    iconName: "previous"
                     btnEnabled: root.hasPrev
                     Layout.preferredWidth: 84
                     onBtnClicked: root.goToPrevScore()
@@ -247,7 +261,8 @@ Rectangle {
                 // 下一张
                 ToolButton {
                     objectName: "nextScoreButton"
-                    btnText: "下一张 ›"
+                    btnText: "下一张"
+                    iconName: "next"
                     btnEnabled: root.hasNext
                     Layout.preferredWidth: 84
                     onBtnClicked: root.goToNextScore()
@@ -266,7 +281,8 @@ Rectangle {
 
                 // 自动滚动按钮
                 ToolButton {
-                    btnText: root.autoScrolling ? "⏸ 暂停滚动" : "▶ 自动滚动"
+                    btnText: root.autoScrolling ? "暂停滚动" : "自动滚动"
+                    iconName: root.autoScrolling ? "pause" : "play"
                     btnEnabled: root.isPdf || root.isImage
                     btnActive: root.autoScrolling
                     Layout.preferredWidth: 118
@@ -343,7 +359,8 @@ Rectangle {
                 // 缩放控制
                 ToolButton {
                     objectName: "rotateLeftButton"
-                    btnText: "↶"
+                    btnText: ""
+                    iconName: "rotate-left"
                     btnEnabled: root.isPdf || root.isImage
                     Layout.preferredWidth: 42
                     onBtnClicked: root.rotateLeft()
@@ -351,7 +368,8 @@ Rectangle {
 
                 ToolButton {
                     objectName: "rotateRightButton"
-                    btnText: "↷"
+                    btnText: ""
+                    iconName: "rotate-right"
                     btnEnabled: root.isPdf || root.isImage
                     Layout.preferredWidth: 42
                     onBtnClicked: root.rotateRight()
@@ -378,7 +396,7 @@ Rectangle {
                             height: 28
                             radius: 6
                             color: zoomOutMouse.containsMouse ? Theme.buttonHover : "transparent"
-                            Label { anchors.centerIn: parent; text: "−"; color: Theme.buttonText; font.pixelSize: 16; font.weight: Font.Bold }
+                            AppIcon { anchors.centerIn: parent; width: 16; height: 16; iconName: "minus"; iconColor: Theme.buttonText }
                             MouseArea {
                                 id: zoomOutMouse
                                 anchors.fill: parent; hoverEnabled: true
@@ -414,7 +432,7 @@ Rectangle {
                             height: 28
                             radius: 6
                             color: zoomInMouse.containsMouse ? Theme.buttonHover : "transparent"
-                            Label { anchors.centerIn: parent; text: "+"; color: Theme.buttonText; font.pixelSize: 16; font.weight: Font.Bold }
+                            AppIcon { anchors.centerIn: parent; width: 16; height: 16; iconName: "plus"; iconColor: Theme.buttonText }
                             MouseArea {
                                 id: zoomInMouse
                                 anchors.fill: parent; hoverEnabled: true
@@ -428,6 +446,7 @@ Rectangle {
                 ToolButton {
                     objectName: "resetReaderButton"
                     btnText: "重置"
+                    iconName: "reset"
                     btnEnabled: root.isPdf || root.isImage
                     Layout.preferredWidth: 68
                     onBtnClicked: root.resetReaderView()
