@@ -87,7 +87,7 @@ Rectangle {
         Layout.fillWidth: true
         implicitHeight: 40
         radius: Theme.radiusMd
-        color: selected ? Theme.selectedBackground : (navHover.hovered ? Theme.buttonHover : "transparent")
+        color: selected ? Theme.selectedBackground : (navMouse.containsMouse ? Theme.buttonHover : "transparent")
         Behavior on color { ColorAnimation { duration: 150; easing.type: Easing.OutCubic } }
         border.width: selected ? 1 : 0
         border.color: selected ? Theme.selectedBorder : "transparent"
@@ -165,7 +165,7 @@ Rectangle {
             acceptedButtons: navItem.contextEnabled
                 ? Qt.LeftButton | Qt.RightButton
                 : Qt.LeftButton
-            hoverEnabled: false
+            hoverEnabled: true
             preventStealing: true
             cursorShape: Qt.PointingHandCursor
             onPressed: function(mouse) {
@@ -183,10 +183,6 @@ Rectangle {
                     appController.currentPage = navItem.targetPage
                 }
             }
-        }
-        HoverHandler {
-            id: navHover
-            cursorShape: Qt.PointingHandCursor
         }
     }
 
