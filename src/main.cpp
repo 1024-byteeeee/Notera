@@ -402,10 +402,16 @@ int main(int argc, char* argv[])
                 || !scoreDelegate->property("tagSubmenuEnabled").toBool()
                 || scoreDelegate->property("folderSubmenuItemCount").toInt() < libraryService.folders()->rowCount() + 2
                 || scoreDelegate->property("tagSubmenuItemCount").toInt() < libraryService.tags()->rowCount()
-                || scoreDelegate->property("normalMenuArrowCount").toInt() != 0
-                || scoreDelegate->property("folderSubmenuArrowCount").toInt() != 1
                 || popupIsOpen(root, QStringLiteral("blankContextMenu"))) {
                 fail("score-context-menu");
+                return;
+            }
+            if (scoreDelegate->property("normalMenuArrowCount").toInt() != 0) {
+                fail("normal-menu-item-has-arrow");
+                return;
+            }
+            if (scoreDelegate->property("folderSubmenuArrowCount").toInt() != 1) {
+                fail("submenu-arrow-count");
                 return;
             }
             if (scoreDelegate->property("tagMenuHasDefaultCheckIndicator").toBool()) {
