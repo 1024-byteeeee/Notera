@@ -9,6 +9,7 @@ class ApplicationController final : public QObject
     Q_OBJECT
     Q_PROPERTY(QString currentPage READ currentPage WRITE setCurrentPage NOTIFY currentPageChanged)
     Q_PROPERTY(int themeMode READ themeMode WRITE setThemeMode NOTIFY themeModeChanged)
+    Q_PROPERTY(bool animationsEnabled READ animationsEnabled WRITE setAnimationsEnabled NOTIFY animationsEnabledChanged)
     Q_PROPERTY(QString libraryFilter READ libraryFilter WRITE setLibraryFilter NOTIFY libraryFilterChanged)
     Q_PROPERTY(QString currentScoreTitle READ currentScoreTitle NOTIFY currentScoreChanged)
     Q_PROPERTY(QUrl currentFileUrl READ currentFileUrl NOTIFY currentScoreChanged)
@@ -29,6 +30,8 @@ public:
     void setLibraryFilter(const QString& filter);
     [[nodiscard]] int themeMode() const;
     void setThemeMode(int themeMode);
+    [[nodiscard]] bool animationsEnabled() const;
+    void setAnimationsEnabled(bool enabled);
     [[nodiscard]] QString currentScoreTitle() const;
     [[nodiscard]] QUrl currentFileUrl() const;
     [[nodiscard]] QString currentFileType() const;
@@ -48,6 +51,7 @@ public:
 signals:
     void currentPageChanged();
     void themeModeChanged();
+    void animationsEnabledChanged();
     void libraryFilterChanged();
     void currentScoreChanged();
     void scoreOpened(QString scoreId);
@@ -59,6 +63,7 @@ private:
     QString m_currentPage {QStringLiteral("library")};
     QString m_libraryFilter {QStringLiteral("all")};
     int m_themeMode {0};
+    bool m_animationsEnabled {true};
     QString m_currentScoreTitle;
     QUrl m_currentFileUrl;
     QString m_currentFileType;

@@ -22,6 +22,8 @@ Button {
         font.weight: Font.DemiBold
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
+        scale: control.down && control.enabled ? 0.88 : control.hovered && control.enabled ? 1.06 : 1
+        Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Easing.OutCubic } }
     }
 
     background: Rectangle {
@@ -31,5 +33,6 @@ Button {
             : control.selected ? Theme.accentSoft : "transparent"
         border.width: control.activeFocus ? 1 : 0
         border.color: Theme.inputFocusBorder
+        Behavior on color { ColorAnimation { duration: Motion.fast } }
     }
 }

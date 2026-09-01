@@ -188,7 +188,7 @@ Rectangle {
         border.color: !btnEnabled ? "transparent"
                     : btnActive ? Theme.selectedBorder
                     : btnMouse.containsMouse ? Theme.strongBorder : Theme.buttonBorder
-        Behavior on color { ColorAnimation { duration: 120 } }
+        Behavior on color { ColorAnimation { duration: Motion.fast } }
         opacity: btnEnabled ? 1 : 0.4
 
         Label {
@@ -198,6 +198,8 @@ Rectangle {
                  : btnActive ? Theme.selectedText : Theme.buttonText
             font.pixelSize: Theme.fontSm
             font.weight: btnActive ? Font.DemiBold : Font.Medium
+            scale: btnMouse.pressed ? 0.96 : 1
+            Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Easing.OutCubic } }
         }
 
         MouseArea {

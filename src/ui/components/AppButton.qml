@@ -22,6 +22,8 @@ Button {
         id: contentContainer
         implicitWidth: contentRow.implicitWidth
         implicitHeight: contentRow.implicitHeight
+        scale: control.down && control.enabled ? 0.97 : 1
+        Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Easing.OutCubic } }
 
         Row {
             id: contentRow
@@ -57,6 +59,7 @@ Button {
         border.width: control.primary ? 0 : 1
         border.color: control.danger ? Theme.danger : Theme.buttonBorder
 
-        Behavior on color { ColorAnimation { duration: 100 } }
+        Behavior on color { ColorAnimation { duration: Motion.fast } }
+        Behavior on border.color { ColorAnimation { duration: Motion.fast } }
     }
 }

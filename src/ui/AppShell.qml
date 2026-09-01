@@ -6,6 +6,29 @@ import "components"
 import "pages"
 
 Item {
+    id: root
+
+    function pageIndex(page) {
+        return page === "library" ? 0 : page === "reader" ? 1 : 2
+    }
+
+    function switchPage(page) {
+        const nextIndex = pageIndex(page)
+        if (nextIndex === pageStack.currentIndex) return
+        pageTransition.stop()
+        pageStack.currentIndex = nextIndex
+        if (Motion.enabled) {
+            pageStack.opacity = 0.72
+            pageTransition.start()
+        } else {
+            pageStack.opacity = 1
+        }
+    }
+
+    Connections {
+        target: appController
+        function onCurrentPageChanged() { root.switchPage(appController.currentPage) }
+    }
     Connections {
         target: libraryService
         function onErrorOccurred(message) { toast.show(message, false) }
@@ -21,16 +44,25 @@ Item {
     }
 
     StackLayout {
+        id: pageStack
         anchors.left: appController.currentPage === "reader" ? parent.left : sidebar.right
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        currentIndex: appController.currentPage === "library" ? 0
-                    : appController.currentPage === "reader" ? 1 : 2
+        currentIndex: 0
 
         LibraryPage { }
         ReaderPage { }
         SettingsPage { }
+    }
+
+    NumberAnimation {
+        id: pageTransition
+        target: pageStack
+        property: "opacity"
+        to: 1
+        duration: Motion.normal
+        easing.type: Easing.OutCubic
     }
 
     // Toast 通知
@@ -60,7 +92,7 @@ Item {
         implicitHeight: toastLabel.implicitHeight + 22
         z: 100
 
-        Behavior on opacity { NumberAnimation { duration: 200 } }
+        Behavior on opacity { NumberAnimation { duration: Motion.normal } }
 
         Label {
             id: toastLabel

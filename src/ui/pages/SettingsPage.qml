@@ -133,6 +133,8 @@ Rectangle {
                                                 font.weight: appController.themeMode === index ? Font.DemiBold : Font.Medium
                                                 horizontalAlignment: Text.AlignHCenter
                                                 verticalAlignment: Text.AlignVCenter
+                                                scale: parent.down ? 0.97 : 1
+                                                Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Easing.OutCubic } }
                                             }
                                             background: Rectangle {
                                                 radius: Theme.radiusSm
@@ -140,11 +142,75 @@ Rectangle {
                                                     : parent.hovered ? Theme.buttonHover : "transparent"
                                                 border.width: appController.themeMode === index ? 1 : 0
                                                 border.color: Theme.selectedBorder
+                                                Behavior on color { ColorAnimation { duration: Motion.fast } }
                                             }
                                             onClicked: appController.themeMode = index
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 72
+                        radius: Theme.radiusMd
+                        color: Theme.elevatedSurface
+                        border.width: 1
+                        border.color: Theme.border
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 18
+                            anchors.rightMargin: 18
+                            spacing: 16
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 3
+                                Label {
+                                    text: "界面动画"
+                                    color: Theme.foreground
+                                    font.pixelSize: Theme.fontMd
+                                    font.weight: Font.Medium
+                                }
+                                Label {
+                                    text: "控制页面切换、按钮、菜单和弹窗的过渡效果"
+                                    color: Theme.mutedForeground
+                                    font.pixelSize: Theme.fontXs
+                                }
+                            }
+
+                            Switch {
+                                id: animationsSwitch
+                                objectName: "animationsSwitch"
+                                checked: appController.animationsEnabled
+                                padding: 0
+                                implicitWidth: 46
+                                implicitHeight: 26
+                                onToggled: appController.animationsEnabled = checked
+
+                                indicator: Rectangle {
+                                    implicitWidth: 46
+                                    implicitHeight: 26
+                                    radius: 13
+                                    color: animationsSwitch.checked ? Theme.accent : Theme.buttonBackground
+                                    border.width: 1
+                                    border.color: animationsSwitch.checked ? Theme.accent : Theme.strongBorder
+                                    Behavior on color { ColorAnimation { duration: Motion.fast } }
+
+                                    Rectangle {
+                                        x: animationsSwitch.checked ? parent.width - width - 4 : 4
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 18
+                                        height: 18
+                                        radius: 9
+                                        color: animationsSwitch.checked ? Theme.accentForeground : Theme.mutedForeground
+                                        Behavior on x { NumberAnimation { duration: Motion.normal; easing.type: Easing.OutCubic } }
+                                    }
+                                }
+                                contentItem: Item { }
                             }
                         }
                     }

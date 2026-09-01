@@ -79,7 +79,7 @@ Rectangle {
         property int indent: 0
         property bool hasChildren: false
         property bool expanded: false
-        readonly property int hoverTransitionDuration: 0
+        readonly property int hoverTransitionDuration: Motion.fast
         signal contextRequested()
         signal toggleExpand()
 
@@ -89,6 +89,8 @@ Rectangle {
         color: selected ? Theme.selectedBackground : (navHover.hovered ? Theme.buttonHover : "transparent")
         border.width: selected ? 1 : 0
         border.color: selected ? Theme.selectedBorder : "transparent"
+        Behavior on color { ColorAnimation { duration: navItem.hoverTransitionDuration } }
+        Behavior on border.color { ColorAnimation { duration: Motion.fast } }
 
         Rectangle {
             visible: navItem.selected
@@ -102,10 +104,13 @@ Rectangle {
         }
 
         RowLayout {
+            id: navContent
             anchors.fill: parent
             anchors.leftMargin: (navItem.selected ? 16 : 18) + navItem.indent
             anchors.rightMargin: 12
             spacing: 10
+            scale: navMouse.pressed ? 0.985 : 1
+            Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Easing.OutCubic } }
 
             Label {
                 Layout.preferredWidth: 16

@@ -11,6 +11,7 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Concurrent Quick QuickControls2 QuickDi
 qt_standard_project_setup(REQUIRES 6.8)
 
 set_source_files_properties(src/ui/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(src/ui/Motion.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 qt_add_executable(Notera
     MACOSX_BUNDLE
@@ -62,6 +63,7 @@ qt_add_qml_module(Notera
         src/ui/Main.qml
         src/ui/AppShell.qml
         src/ui/Theme.qml
+        src/ui/Motion.qml
         src/ui/components/AppButton.qml
         src/ui/components/IconButton.qml
         src/ui/components/AppDialog.qml

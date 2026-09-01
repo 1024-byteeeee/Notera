@@ -113,11 +113,18 @@ int main(int argc, char* argv[])
         || arguments.contains(QStringLiteral("--storage-migration-smoke-test"));
     if (isSmokeTest) {
         QStandardPaths::setTestModeEnabled(true);
+        app.setApplicationName(QStringLiteral("NoteraTest"));
     }
     QQuickStyle::setStyle(QStringLiteral("Basic"));
 
     std::unique_ptr<QTemporaryDir> migrationSmokeRoot;
+    std::unique_ptr<QTemporaryDir> generalSmokeRoot;
     QString expectedMigratedFile;
+    if (isSmokeTest && !arguments.contains(QStringLiteral("--storage-migration-smoke-test"))) {
+        generalSmokeRoot = std::make_unique<QTemporaryDir>();
+        if (!generalSmokeRoot->isValid()) return 1;
+        AppDataPaths::setCustomRoot(generalSmokeRoot->path());
+    }
     if (arguments.contains(QStringLiteral("--storage-migration-smoke-test"))) {
         migrationSmokeRoot = std::make_unique<QTemporaryDir>();
         if (!migrationSmokeRoot->isValid()) return 1;
@@ -328,7 +335,7 @@ int main(int argc, char* argv[])
 
             const auto* const libraryNavItem = root->findChild<QObject*>(QStringLiteral("libraryNavItem"));
             if (!libraryNavItem || !libraryNavItem->property("hoverTransitionDuration").isValid()
-                || libraryNavItem->property("hoverTransitionDuration").toInt() != 0) {
+                || libraryNavItem->property("hoverTransitionDuration").toInt() <= 0) {
                 fail("sidebar-hover-transition");
                 return;
             }
@@ -412,6 +419,13 @@ int main(int argc, char* argv[])
             }
             if (scoreDelegate->property("folderSubmenuArrowCount").toInt() != 1) {
                 fail("submenu-arrow-count");
+                return;
+            }
+            if (scoreDelegate->property("contextMenuWidth").toDouble() > 220.0
+                || scoreDelegate->property("contextMenuWidth").toDouble() < 180.0
+                || scoreDelegate->property("folderSubmenuArrowCount").toInt() != 1
+                || scoreDelegate->property("folderSubmenuArrowWidth").toDouble() > 14.0) {
+                fail("compact-menu-style");
                 return;
             }
             if (scoreDelegate->property("tagMenuHasDefaultCheckIndicator").toBool()) {
@@ -576,13 +590,24 @@ int main(int argc, char* argv[])
             const auto* const themeSelector = root->findChild<QQuickItem*>(QStringLiteral("themeSelector"));
             const auto* const changeDataDirectoryButton = root->findChild<QQuickItem*>(
                 QStringLiteral("changeDataDirectoryButton"));
+            const auto* const animationsSwitch = root->findChild<QObject*>(QStringLiteral("animationsSwitch"));
             if (!settingsContent || !themeSelector || settingsContent->width() <= 0.0
                 || themeSelector->width() < 240.0 || themeSelector->x() < 0.0
                 || !changeDataDirectoryButton || !changeDataDirectoryButton->isVisible()
-                || !changeDataDirectoryButton->isEnabled()) {
+                || !changeDataDirectoryButton->isEnabled() || !animationsSwitch
+                || !controller.animationsEnabled()) {
                 fail("settings-layout");
                 return;
             }
+            controller.setAnimationsEnabled(false);
+            QCoreApplication::processEvents();
+            ApplicationController persistedMotionController;
+            if (controller.animationsEnabled() || persistedMotionController.animationsEnabled()
+                || libraryNavItem->property("hoverTransitionDuration").toInt() != 0) {
+                fail("animations-setting-persistence");
+                return;
+            }
+            controller.setAnimationsEnabled(true);
             const auto* const settingsTitle = root->findChild<QQuickItem*>(QStringLiteral("settingsTitle"));
             const auto* const brandLabel = root->findChild<QQuickItem*>(QStringLiteral("brandLabel"));
             if (!settingsTitle || !brandLabel || settingsTitle->mapToScene(QPointF {}).y() < 24.0

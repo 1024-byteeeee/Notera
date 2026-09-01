@@ -179,6 +179,7 @@ Rectangle {
                     required property string fileType
                     readonly property string scoreId: itemId
                     readonly property bool contextMenuOpenedOnce: scoreMenu.openedOnce
+                    readonly property real contextMenuWidth: scoreMenu.implicitWidth
                     readonly property bool folderSubmenuEnabled: folderSubmenu.enabled
                     readonly property bool tagSubmenuEnabled: tagSubmenu.enabled
                     readonly property int folderSubmenuItemCount: folderSubmenu.count
@@ -186,6 +187,8 @@ Rectangle {
                     readonly property int normalMenuArrowCount: favoriteMenuItem.visibleArrowCount
                     readonly property int folderSubmenuArrowCount: scoreMenu.openedOnce && scoreMenu.count > 3
                         && scoreMenu.itemAt(3) ? scoreMenu.itemAt(3).visibleArrowCount : -1
+                    readonly property real folderSubmenuArrowWidth: scoreMenu.openedOnce && scoreMenu.count > 3
+                        && scoreMenu.itemAt(3) ? scoreMenu.itemAt(3).arrowVisualWidth : -1
                     readonly property bool tagMenuHasDefaultCheckIndicator: tagSubmenu.count > 0
                         && tagSubmenu.itemAt(0).indicator.visible
                         && tagSubmenu.itemAt(0).indicator.implicitWidth > 0
@@ -211,8 +214,8 @@ Rectangle {
                         border.width: root.isSelected(scoreDelegate.itemId) ? 2 : 1
                         border.color: root.isSelected(scoreDelegate.itemId) ? Theme.accent : (cardHover.hovered ? Theme.strongBorder : Theme.cardBorder)
 
-                        Behavior on color { ColorAnimation { duration: 100 } }
-                        Behavior on border.color { ColorAnimation { duration: 100 } }
+                        Behavior on color { ColorAnimation { duration: Motion.fast } }
+                        Behavior on border.color { ColorAnimation { duration: Motion.fast } }
 
                         ColumnLayout {
                             anchors.fill: parent
@@ -350,7 +353,7 @@ Rectangle {
                             color: scoreDelegate.favorite ? Theme.accent : Theme.mutedForeground
                             font.pixelSize: favoriteBtn.hovered ? 22 : 18
                             font.weight: Font.DemiBold
-                            Behavior on font.pixelSize { NumberAnimation { duration: 120 } }
+                            Behavior on font.pixelSize { NumberAnimation { duration: Motion.fast; easing.type: Easing.OutCubic } }
                         }
                         HoverHandler {
                             id: favoriteHover

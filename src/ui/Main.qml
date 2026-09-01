@@ -25,6 +25,12 @@ ApplicationWindow {
     }
 
     Binding {
+        target: Motion
+        property: "enabled"
+        value: appController.animationsEnabled
+    }
+
+    Binding {
         target: Theme
         property: "systemDark"
         value: (systemPalette.window.r + systemPalette.window.g + systemPalette.window.b) / 3 < 0.5

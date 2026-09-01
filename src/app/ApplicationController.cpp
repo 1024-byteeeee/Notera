@@ -18,6 +18,7 @@ ApplicationController::ApplicationController(QObject* parent)
     if (m_themeMode < 0 || m_themeMode > 1) {
         m_themeMode = 0;
     }
+    m_animationsEnabled = settings.value(QStringLiteral("appearance/animationsEnabled"), true).toBool();
     m_defaultScrollSpeed = settings.value(QStringLiteral("reader/defaultScrollSpeed"), 45.0).toDouble();
     if (m_defaultScrollSpeed < 15.0 || m_defaultScrollSpeed > 160.0) {
         m_defaultScrollSpeed = 45.0;
@@ -39,6 +40,21 @@ void ApplicationController::setThemeMode(const int themeMode)
     m_themeMode = themeMode;
     QSettings().setValue(QStringLiteral("appearance/themeMode"), themeMode);
     emit themeModeChanged();
+}
+
+bool ApplicationController::animationsEnabled() const
+{
+    return m_animationsEnabled;
+}
+
+void ApplicationController::setAnimationsEnabled(const bool enabled)
+{
+    if (m_animationsEnabled == enabled) {
+        return;
+    }
+    m_animationsEnabled = enabled;
+    QSettings().setValue(QStringLiteral("appearance/animationsEnabled"), enabled);
+    emit animationsEnabledChanged();
 }
 
 QString ApplicationController::currentScoreTitle() const

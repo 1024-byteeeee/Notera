@@ -18,6 +18,20 @@ Dialog {
     focus: true
     padding: 22
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    transformOrigin: Item.Center
+
+    enter: Transition {
+        ParallelAnimation {
+            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
+            NumberAnimation { property: "scale"; from: 0.97; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
+        }
+    }
+    exit: Transition {
+        ParallelAnimation {
+            NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Motion.fast; easing.type: Easing.InCubic }
+            NumberAnimation { property: "scale"; from: 1; to: 0.985; duration: Motion.fast; easing.type: Easing.InCubic }
+        }
+    }
 
     header: Label {
         leftPadding: 22

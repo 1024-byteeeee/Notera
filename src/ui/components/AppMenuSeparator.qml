@@ -3,7 +3,9 @@ import QtQuick.Controls
 import Notera
 
 MenuSeparator {
-    implicitHeight: 9
+    implicitHeight: 11
+    leftPadding: 9
+    rightPadding: 9
     contentItem: Rectangle {
         implicitHeight: 1
         color: Theme.border
