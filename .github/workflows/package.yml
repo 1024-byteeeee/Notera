@@ -168,6 +168,31 @@ jobs:
         shell: powershell
         run: cpack --config build/windows-x64/CPackConfig.cmake -C Release -G WIX
 
+      - name: Verify Chinese installer and desktop shortcut option
+        shell: powershell
+        run: |
+          $msi = Get-ChildItem build/windows-x64/packages/*.msi | Select-Object -First 1
+          if (-not $msi) { throw "MSI package was not generated" }
+
+          $inspectDir = "build/windows-x64/msi-inspect"
+          $wxs = "build/windows-x64/msi-inspect.wxs"
+          dark.exe -nologo -x $inspectDir -o $wxs $msi.FullName
+          if ($LASTEXITCODE -ne 0) { throw "Failed to inspect MSI" }
+
+          $source = Get-Content $wxs -Raw
+          $required = @(
+            'Language="2052"',
+            'Id="NoteraOptionsDlg"',
+            'Property="INSTALLDESKTOPSHORTCUT"',
+            'Id="DesktopShortcutFeature"',
+            'Id="NoteraDesktopShortcut"'
+          )
+          foreach ($marker in $required) {
+            if (-not $source.Contains($marker)) {
+              throw "MSI validation failed: missing $marker"
+            }
+          }
+
       - name: Upload MSI
         uses: actions/upload-artifact@v7
         with:

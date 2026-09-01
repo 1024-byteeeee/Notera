@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="DesktopFolder">
+      <Component Id="NoteraDesktopShortcutComponent" Guid="*">
+        <Shortcut Id="NoteraDesktopShortcut"
+                  Name="Notera"
+                  Description="本地优先的乐谱阅读器"
+                  Target="[INSTALL_ROOT]bin\Notera.exe"
+                  WorkingDirectory="INSTALL_ROOT" />
+        <RegistryValue Root="HKMU"
+                       Key="Software\Notera\Notera"
+                       Name="DesktopShortcut"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+
+  <Fragment>
+    <FeatureRef Id="ProductFeature">
+      <Feature Id="DesktopShortcutFeature"
+               Title="创建桌面快捷方式"
+               Description="在 Windows 桌面创建 Notera 快捷方式"
+               Level="1"
+               Absent="allow">
+        <ComponentRef Id="NoteraDesktopShortcutComponent" />
+      </Feature>
+    </FeatureRef>
+  </Fragment>
+</Wix>

@@ -151,6 +151,13 @@ elseif(WIN32)
     set(CPACK_GENERATOR "WIX")
     set(CPACK_WIX_UPGRADE_GUID "C2A4B1D0-76FB-4D37-94B3-32D3A9FD44F1")
     set(CPACK_WIX_PRODUCT_ICON "${CMAKE_CURRENT_SOURCE_DIR}/src/assets/Notera.ico")
+    set(CPACK_WIX_CULTURES "zh-CN")
+    set(CPACK_WIX_TEMPLATE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/WIX.template.in")
+    set(CPACK_WIX_UI_REF "NoteraUI_InstallDir")
+    set(CPACK_WIX_EXTRA_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/NoteraInstallerUI.wxs"
+        "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/DesktopShortcut.wxs"
+    )
 endif()
 
 include(CPack)
