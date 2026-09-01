@@ -188,7 +188,6 @@ Rectangle {
         border.color: !btnEnabled ? "transparent"
                     : btnActive ? Theme.selectedBorder
                     : btnMouse.containsMouse ? Theme.strongBorder : Theme.buttonBorder
-        Behavior on color { ColorAnimation { duration: Motion.fast } }
         opacity: btnEnabled ? 1 : 0.4
 
         Label {

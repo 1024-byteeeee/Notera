@@ -5,10 +5,10 @@ import Notera
 Menu {
     id: menu
     property bool openedOnce: false
-    implicitWidth: 196
-    padding: 7
-    topPadding: 7
-    bottomPadding: 7
+    implicitWidth: 210
+    padding: 6
+    topPadding: 6
+    bottomPadding: 6
     popupType: Popup.Item
     transformOrigin: Item.TopLeft
     onAboutToShow: openedOnce = true
@@ -16,8 +16,8 @@ Menu {
     delegate: AppMenuItem {}
 
     background: Rectangle {
-        implicitWidth: 196
-        radius: Theme.radiusMd
+        implicitWidth: 210
+        radius: Theme.radiusLg
         color: Theme.surface
         border.width: 1
         border.color: Theme.strongBorder
@@ -25,7 +25,7 @@ Menu {
         Rectangle {
             anchors.fill: parent
             anchors.margins: -4
-            radius: Theme.radiusMd + 4
+            radius: Theme.radiusLg + 4
             color: "transparent"
             border.width: 4
             border.color: Theme.dark ? "#26000000" : "#10000000"

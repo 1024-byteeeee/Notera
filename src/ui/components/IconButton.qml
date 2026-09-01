@@ -8,6 +8,7 @@ Button {
     property string symbol: ""
     property bool selected: false
     property bool danger: false
+    readonly property int hoverTransitionDuration: 0
 
     implicitWidth: 32
     implicitHeight: 32
@@ -33,6 +34,5 @@ Button {
             : control.selected ? Theme.accentSoft : "transparent"
         border.width: control.activeFocus ? 1 : 0
         border.color: Theme.inputFocusBorder
-        Behavior on color { ColorAnimation { duration: Motion.fast } }
     }
 }

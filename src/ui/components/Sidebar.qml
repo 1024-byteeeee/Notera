@@ -79,6 +79,7 @@ Rectangle {
         property int indent: 0
         property bool hasChildren: false
         property bool expanded: false
+        property bool tagEntry: false
         readonly property int hoverTransitionDuration: 0
         signal contextRequested()
         signal toggleExpand()
@@ -87,6 +88,7 @@ Rectangle {
         implicitHeight: 40
         radius: Theme.radiusMd
         color: selected ? Theme.selectedBackground : (navHover.hovered ? Theme.buttonHover : "transparent")
+        Behavior on color { ColorAnimation { duration: 60 } }
         border.width: selected ? 1 : 0
         border.color: selected ? Theme.selectedBorder : "transparent"
 
@@ -126,12 +128,19 @@ Rectangle {
             }
             Label {
                 Layout.preferredWidth: 18
-                visible: navItem.symbol.length > 0
+                visible: navItem.symbol.length > 0 && !navItem.tagEntry
                 text: navItem.symbol
                 color: navItem.selected ? Theme.selectedText : Theme.mutedForeground
                 font.pixelSize: 15
                 font.weight: Font.DemiBold
                 horizontalAlignment: Text.AlignHCenter
+            }
+            TagIcon {
+                objectName: navItem.tagEntry ? "tagEntryIcon" : ""
+                visible: navItem.tagEntry
+                Layout.preferredWidth: 18
+                Layout.preferredHeight: 18
+                iconColor: navItem.selected ? Theme.selectedText : Theme.mutedForeground
             }
             FolderIcon {
                 visible: navItem.navId.startsWith("folder:")
@@ -348,7 +357,8 @@ Rectangle {
                         required property string name
                         label: name
                         navId: "tag:" + itemId
-                        symbol: "#"
+                        symbol: ""
+                        tagEntry: true
                         contextEnabled: true
                         selected: appController.currentPage === "library" && appController.libraryFilter === navId
                         onContextRequested: {
@@ -424,6 +434,7 @@ Rectangle {
         property string targetId: ""
         property string targetName: ""
         AppMenuItem {
+            symbol: "✎"
             text: "重命名"
             onTriggered: {
                 renameFolderDialog.targetId = folderMenu.targetId
@@ -433,6 +444,7 @@ Rectangle {
         }
         AppMenuSeparator { }
         AppMenuItem {
+            symbol: "⌫"
             text: "删除文件夹"
             danger: true
             onTriggered: {
@@ -449,6 +461,7 @@ Rectangle {
         property string targetId: ""
         property string targetName: ""
         AppMenuItem {
+            symbol: "✎"
             text: "重命名"
             onTriggered: {
                 renameTagDialog.targetId = tagMenu.targetId
@@ -458,6 +471,7 @@ Rectangle {
         }
         AppMenuSeparator { }
         AppMenuItem {
+            symbol: "⌫"
             text: "删除标签"
             danger: true
             onTriggered: {

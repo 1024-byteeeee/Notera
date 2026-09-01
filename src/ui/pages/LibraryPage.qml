@@ -189,6 +189,8 @@ Rectangle {
                         && scoreMenu.itemAt(3) ? scoreMenu.itemAt(3).visibleArrowCount : -1
                     readonly property real folderSubmenuArrowWidth: scoreMenu.openedOnce && scoreMenu.count > 3
                         && scoreMenu.itemAt(3) ? scoreMenu.itemAt(3).arrowVisualWidth : -1
+                    readonly property real folderSubmenuArrowRightInset: scoreMenu.openedOnce && scoreMenu.count > 3
+                        && scoreMenu.itemAt(3) ? scoreMenu.itemAt(3).arrowRightInset : -1
                     readonly property bool tagMenuHasDefaultCheckIndicator: tagSubmenu.count > 0
                         && tagSubmenu.itemAt(0).indicator.visible
                         && tagSubmenu.itemAt(0).indicator.implicitWidth > 0
@@ -369,10 +371,12 @@ Rectangle {
                         objectName: scoreDelegate.itemType === "score" ? "scoreContextMenu" : ""
                         AppMenuItem {
                             id: favoriteMenuItem
+                            symbol: scoreDelegate.favorite ? "★" : "☆"
                             text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
                             onTriggered: libraryService.toggleFavorite(scoreDelegate.scoreId, !scoreDelegate.favorite)
                         }
                         AppMenuItem {
+                            symbol: "✎"
                             text: "重命名"
                             onTriggered: {
                                 renameDialog.scoreId = scoreDelegate.scoreId
@@ -388,6 +392,7 @@ Rectangle {
                             title: "移动到文件夹"
                             enabled: libraryService.folders.count > 0
                             AppMenuItem {
+                                symbol: "↖"
                                 text: "无（移出文件夹）"
                                 onTriggered: libraryService.setScoreFolder(scoreDelegate.scoreId, "")
                             }
@@ -398,6 +403,7 @@ Rectangle {
                                     required property string itemId
                                     required property string name
                                     text: name
+                                    symbol: "▣"
                                     onTriggered: libraryService.setScoreFolder(scoreDelegate.scoreId, itemId)
                                 }
                                 onObjectAdded: function(index, object) {
@@ -420,6 +426,7 @@ Rectangle {
                                     required property string itemId
                                     required property string name
                                     text: name
+                                    tagIcon: true
                                     checkable: true
                                     checked: libraryService.scoreHasTag(scoreDelegate.scoreId, itemId)
                                     onTriggered: {
@@ -441,6 +448,7 @@ Rectangle {
 
                         AppMenuSeparator { }
                         AppMenuItem {
+                            symbol: "⌫"
                             text: "删除乐谱"
                             danger: true
                             onTriggered: {
@@ -456,10 +464,12 @@ Rectangle {
                     AppMenu {
                         id: folderCardMenu
                         AppMenuItem {
+                            symbol: "↗"
                             text: "打开"
                             onTriggered: libraryService.enterFolder(scoreDelegate.itemId)
                         }
                         AppMenuItem {
+                            symbol: "✎"
                             text: "重命名"
                             onTriggered: {
                                 renameFolderDialog.targetId = scoreDelegate.itemId
@@ -469,6 +479,7 @@ Rectangle {
                         }
                         AppMenuSeparator { }
                         AppMenuItem {
+                            symbol: "⌫"
                             text: "删除文件夹"
                             danger: true
                             onTriggered: {
@@ -654,10 +665,10 @@ Rectangle {
     AppMenu {
         id: blankContextMenu
         objectName: "blankContextMenu"
-        AppMenuItem { text: "新建文件夹"; onTriggered: newFolderDialog.open() }
-        AppMenuItem { text: "新建标签"; onTriggered: newTagDialog.open() }
+        AppMenuItem { text: "新建文件夹"; symbol: "▣"; onTriggered: newFolderDialog.open() }
+        AppMenuItem { text: "新建标签"; tagIcon: true; onTriggered: newTagDialog.open() }
         AppMenuSeparator { }
-        AppMenuItem { text: "导入乐谱"; onTriggered: fileDialog.open() }
+        AppMenuItem { text: "导入乐谱"; symbol: "↓"; onTriggered: fileDialog.open() }
     }
 
     AppDialog {

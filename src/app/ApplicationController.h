@@ -47,6 +47,8 @@ public:
     [[nodiscard]] QString pendingDataDirectory() const;
     static bool applyPendingDataMigration(QString* error);
     Q_INVOKABLE QString migrateDataDirectory(const QUrl& newDirectory);
+    Q_INVOKABLE QString openDataDirectory() const;
+    Q_INVOKABLE void requestRestart();
     Q_INVOKABLE void openScore(const QString& scoreId, const QString& title, const QString& filePath,
         const QString& fileType, int pageCount, const QString& folderId);
 
@@ -60,6 +62,7 @@ signals:
     void autoScrollSpeedChanged();
     void defaultScrollSpeedChanged();
     void dataDirectoryChanged();
+    void restartRequested();
 
 private:
     QString m_currentPage {QStringLiteral("library")};

@@ -6,13 +6,19 @@ import Notera
 MenuItem {
     id: control
     property bool danger: false
+    property string symbol: ""
+    property bool tagIcon: false
     readonly property int visibleArrowCount: control.arrow && control.arrow.visible
         && control.arrow.implicitWidth > 0 ? 1 : 0
     readonly property real arrowVisualWidth: control.arrow && control.arrow.visible ? control.arrow.implicitWidth : 0
+    readonly property real arrowRightInset: control.arrow && control.arrow.visible
+        ? control.width - control.arrow.x - control.arrow.width : 0
 
-    implicitHeight: 36
-    leftPadding: 10
-    rightPadding: 8
+    implicitHeight: 40
+    leftPadding: 12
+    rightPadding: control.subMenu !== null ? 36 : 12
+    topPadding: 0
+    bottomPadding: 0
     indicator: Item {
         visible: false
         implicitWidth: 0
@@ -25,6 +31,9 @@ MenuItem {
         visible: control.subMenu !== null
         implicitWidth: 14
         implicitHeight: 14
+        anchors.right: parent.right
+        anchors.rightMargin: 10
+        anchors.verticalCenter: parent.verticalCenter
 
         Canvas {
             id: arrowCanvas
@@ -59,8 +68,8 @@ MenuItem {
         spacing: 8
 
         Item {
-            Layout.preferredWidth: 16
-            Layout.preferredHeight: 16
+            Layout.preferredWidth: 20
+            Layout.preferredHeight: 20
             Label {
                 visible: control.checkable
                 anchors.centerIn: parent
@@ -68,6 +77,21 @@ MenuItem {
                 color: Theme.accent
                 font.pixelSize: Theme.fontMd
                 font.weight: Font.Bold
+            }
+            Label {
+                visible: !control.checkable && !control.tagIcon && control.symbol.length > 0
+                anchors.centerIn: parent
+                text: control.symbol
+                color: control.danger ? Theme.danger : Theme.secondaryForeground
+                font.pixelSize: 15
+                font.weight: Font.Medium
+            }
+            TagIcon {
+                visible: !control.checkable && control.tagIcon
+                anchors.centerIn: parent
+                width: 16
+                height: 16
+                iconColor: control.danger ? Theme.danger : Theme.secondaryForeground
             }
         }
 

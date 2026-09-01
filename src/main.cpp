@@ -12,6 +12,7 @@
 #include <QLocale>
 #include <QMouseEvent>
 #include <QPointingDevice>
+#include <QProcess>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QQuickStyle>
@@ -31,6 +32,20 @@
 #include "platform/AppDataPaths.h"
 
 namespace {
+
+struct RestartGuard {
+    bool requested {false};
+    QString program;
+    QStringList arguments;
+    QString workingDirectory;
+
+    ~RestartGuard()
+    {
+        if (requested && !program.isEmpty()) {
+            QProcess::startDetached(program, arguments, workingDirectory);
+        }
+    }
+};
 
 QQuickItem* findVisualItem(QQuickItem* parent, const QString& objectName)
 {
@@ -97,7 +112,10 @@ bool closePopup(QObject* root, const QString& objectName)
 
 int main(int argc, char* argv[])
 {
+    RestartGuard restartGuard;
     QGuiApplication app(argc, argv);
+    restartGuard.program = QCoreApplication::applicationFilePath();
+    restartGuard.workingDirectory = QDir::currentPath();
     QLocale::setDefault(QLocale(QLocale::Chinese, QLocale::China));
     app.setOrganizationName(QStringLiteral("Notera"));
     app.setOrganizationDomain(QStringLiteral("notera.app"));
@@ -155,11 +173,16 @@ int main(int argc, char* argv[])
         settings.remove(QStringLiteral("storage/pendingDataDirectory"));
         settings.sync();
         ApplicationController migrationController;
+        bool restartRequested = false;
+        QObject::connect(&migrationController, &ApplicationController::restartRequested,
+            [&restartRequested] { restartRequested = true; });
         if (migrationController.migrateDataDirectory(QUrl::fromLocalFile(newRoot)).isEmpty() == false
             || migrationController.pendingDataDirectory() != newRoot
             || migrationController.migrateDataDirectory(QUrl(QStringLiteral("https://example.com/notera"))).isEmpty()) {
             return 1;
         }
+        migrationController.requestRestart();
+        if (!restartRequested) return 1;
     }
 
     QString migrationError;
@@ -184,6 +207,10 @@ int main(int argc, char* argv[])
 
     ApplicationController controller;
     LibraryService libraryService;
+    QObject::connect(&controller, &ApplicationController::restartRequested, &app, [&restartGuard] {
+        restartGuard.requested = true;
+        QCoreApplication::quit();
+    });
     QObject::connect(&controller, &ApplicationController::scoreOpened,
         &libraryService, &LibraryService::markScoreOpened);
 
@@ -308,6 +335,7 @@ int main(int argc, char* argv[])
             const auto* const stitchButton = root->findChild<QObject*>(QStringLiteral("stitchButton"));
             if (!importButton || !importButton->isVisible() || importButton->width() < 96.0
                 || importButton->property("symbol").toString().length() > 0
+                || importButton->property("hoverTransitionDuration").toInt() != 0
                 || !stitchButton || stitchButton->property("symbol").toString().length() > 0
                 || std::abs(importButton->property("visualContentCenterX").toDouble() - importButton->width() / 2.0) > 1.0
                 || std::abs(stitchButton->property("visualContentCenterX").toDouble()
@@ -440,7 +468,8 @@ int main(int argc, char* argv[])
             if (scoreDelegate->property("contextMenuWidth").toDouble() > 220.0
                 || scoreDelegate->property("contextMenuWidth").toDouble() < 180.0
                 || scoreDelegate->property("folderSubmenuArrowCount").toInt() != 1
-                || scoreDelegate->property("folderSubmenuArrowWidth").toDouble() > 14.0) {
+                || scoreDelegate->property("folderSubmenuArrowWidth").toDouble() > 14.0
+                || scoreDelegate->property("folderSubmenuArrowRightInset").toDouble() > 12.0) {
                 fail("compact-menu-style");
                 return;
             }
@@ -602,19 +631,28 @@ int main(int argc, char* argv[])
 
             controller.setCurrentPage(QStringLiteral("settings"));
             QCoreApplication::processEvents();
+            QEventLoop settingsLayoutWait;
+            QTimer::singleShot(200, &settingsLayoutWait, &QEventLoop::quit);
+            settingsLayoutWait.exec();
             const auto* const settingsContent = root->findChild<QQuickItem*>(QStringLiteral("settingsContent"));
             const auto* const themeSelector = root->findChild<QQuickItem*>(QStringLiteral("themeSelector"));
             const auto* const changeDataDirectoryButton = root->findChild<QQuickItem*>(
                 QStringLiteral("changeDataDirectoryButton"));
+            const auto* const openDataDirectoryButton = root->findChild<QQuickItem*>(
+                QStringLiteral("openDataDirectoryButton"));
+            const auto* const versionLabel = root->findChild<QQuickItem*>(QStringLiteral("versionLabel"));
             const auto* const animationsSwitch = root->findChild<QQuickItem*>(QStringLiteral("animationsSwitch"));
             if (!settingsContent || !themeSelector || settingsContent->width() <= 0.0
                 || themeSelector->width() < 240.0 || themeSelector->x() < 0.0
                 || !changeDataDirectoryButton || !changeDataDirectoryButton->isVisible()
-                || !changeDataDirectoryButton->isEnabled() || !animationsSwitch
+                || !changeDataDirectoryButton->isEnabled() || !openDataDirectoryButton
+                || !openDataDirectoryButton->isVisible() || !versionLabel || !animationsSwitch
                 || !controller.animationsEnabled()
                 || animationsSwitch->property("independentAnimationDuration").toInt() <= 0
-                || animationsSwitch->mapToScene(QPointF(animationsSwitch->width(), 0)).x()
-                    < themeSelector->mapToScene(QPointF(themeSelector->width(), 0)).x() + 4.0) {
+                || std::abs(animationsSwitch->mapToScene(QPointF(animationsSwitch->width(), 0)).x()
+                    - themeSelector->mapToScene(QPointF(themeSelector->width(), 0)).x()) > 1.0
+                || std::abs(versionLabel->mapToScene(QPointF(versionLabel->width(), 0)).x()
+                    - themeSelector->mapToScene(QPointF(themeSelector->width(), 0)).x()) > 1.0) {
                 fail("settings-layout");
                 return;
             }
@@ -628,6 +666,10 @@ int main(int argc, char* argv[])
                 return;
             }
             controller.setAnimationsEnabled(true);
+            if (!findVisualItem(root, QStringLiteral("tagEntryIcon"))) {
+                fail("tag-entry-icon");
+                return;
+            }
             auto* const dataDirectoryDialog = root->findChild<QObject*>(QStringLiteral("dataDirectoryDialog"));
             if (!dataDirectoryDialog) {
                 fail("data-directory-dialog-object");

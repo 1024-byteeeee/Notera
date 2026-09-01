@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <QDir>
+#include <QDesktopServices>
 #include <QFile>
 #include <QFileInfo>
 #include <QSettings>
@@ -242,6 +243,21 @@ QString ApplicationController::migrateDataDirectory(const QUrl& newDirectory)
     }
     emit dataDirectoryChanged();
     return {};
+}
+
+QString ApplicationController::openDataDirectory() const
+{
+    const auto path = AppDataPaths::root();
+    if (!QDir(path).exists()) {
+        return QStringLiteral("数据存储目录不存在。");
+    }
+    return QDesktopServices::openUrl(QUrl::fromLocalFile(path))
+        ? QString {} : QStringLiteral("无法打开数据存储目录。");
+}
+
+void ApplicationController::requestRestart()
+{
+    emit restartRequested();
 }
 
 bool ApplicationController::applyPendingDataMigration(QString* error)

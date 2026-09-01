@@ -83,7 +83,7 @@ Rectangle {
                         RowLayout {
                             anchors.fill: parent
                             anchors.leftMargin: 18
-                            anchors.rightMargin: 14
+                            anchors.rightMargin: 18
                             spacing: 16
 
                             ColumnLayout {
@@ -105,6 +105,7 @@ Rectangle {
                             Rectangle {
                                 id: themeSelector
                                 objectName: "themeSelector"
+                                Layout.alignment: Qt.AlignRight
                                 Layout.preferredWidth: 282
                                 Layout.preferredHeight: 38
                                 radius: Theme.radiusMd
@@ -142,7 +143,6 @@ Rectangle {
                                                     : parent.hovered ? Theme.buttonHover : "transparent"
                                                 border.width: appController.themeMode === index ? 1 : 0
                                                 border.color: Theme.selectedBorder
-                                                Behavior on color { ColorAnimation { duration: Motion.fast } }
                                             }
                                             onClicked: appController.themeMode = index
                                         }
@@ -163,7 +163,7 @@ Rectangle {
                         RowLayout {
                             anchors.fill: parent
                             anchors.leftMargin: 18
-                            anchors.rightMargin: 8
+                            anchors.rightMargin: 18
                             spacing: 16
 
                             ColumnLayout {
@@ -182,21 +182,16 @@ Rectangle {
                                 }
                             }
 
-                            Item {
-                                Layout.preferredWidth: 282
-                                Layout.fillHeight: true
-
-                                Switch {
-                                    id: animationsSwitch
-                                    objectName: "animationsSwitch"
-                                    readonly property int independentAnimationDuration: 160
-                                    anchors.right: parent.right
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    checked: appController.animationsEnabled
-                                    padding: 0
-                                    implicitWidth: 46
-                                    implicitHeight: 26
-                                    onToggled: appController.animationsEnabled = checked
+                            Switch {
+                                id: animationsSwitch
+                                objectName: "animationsSwitch"
+                                readonly property int independentAnimationDuration: 160
+                                Layout.alignment: Qt.AlignRight
+                                checked: appController.animationsEnabled
+                                padding: 0
+                                implicitWidth: 46
+                                implicitHeight: 26
+                                onToggled: appController.animationsEnabled = checked
 
                                     indicator: Rectangle {
                                         implicitWidth: 46
@@ -219,7 +214,6 @@ Rectangle {
                                     }
                                     contentItem: Item { }
                                 }
-                            }
                         }
                     }
                 }
@@ -357,10 +351,25 @@ Rectangle {
                                 }
                             }
 
-                            AppButton {
-                                objectName: "changeDataDirectoryButton"
-                                text: "更改"
-                                onClicked: dataDirDialog.open()
+                            RowLayout {
+                                Layout.alignment: Qt.AlignRight
+                                spacing: 8
+                                AppButton {
+                                    objectName: "openDataDirectoryButton"
+                                    text: "打开"
+                                    onClicked: {
+                                        const error = appController.openDataDirectory()
+                                        if (error.length > 0) {
+                                            migrateResultDialog.message = error
+                                            migrateResultDialog.open()
+                                        }
+                                    }
+                                }
+                                AppButton {
+                                    objectName: "changeDataDirectoryButton"
+                                    text: "更改"
+                                    onClicked: dataDirDialog.open()
+                                }
                             }
                         }
                     }
@@ -384,7 +393,13 @@ Rectangle {
                                 Label { text: "关于 Notera"; color: Theme.foreground; font.pixelSize: Theme.fontMd; font.weight: Font.Medium }
                                 Label { text: "简单的本地乐谱阅读器"; color: Theme.mutedForeground; font.pixelSize: Theme.fontXs }
                             }
-                            Label { text: "v0.1.2"; color: Theme.mutedForeground; font.pixelSize: Theme.fontSm }
+                            Label {
+                                objectName: "versionLabel"
+                                Layout.alignment: Qt.AlignRight
+                                text: "v0.1.2"
+                                color: Theme.mutedForeground
+                                font.pixelSize: Theme.fontSm
+                            }
                         }
                     }
                 }
@@ -413,8 +428,7 @@ Rectangle {
         onAccepted: {
             const error = appController.migrateDataDirectory(newDirectory)
             if (error === "" || error === undefined || error === null) {
-                migrateResultDialog.message = "已保存新的数据位置。\n\n请重启 Notera，数据会在启动数据库前安全迁移。"
-                migrateResultDialog.open()
+                appController.requestRestart()
             } else {
                 migrateResultDialog.message = "迁移失败：\n" + error
                 migrateResultDialog.open()

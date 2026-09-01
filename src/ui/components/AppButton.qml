@@ -9,6 +9,7 @@ Button {
     property bool primary: false
     property bool danger: false
     property string symbol: ""
+    readonly property int hoverTransitionDuration: 0
     readonly property real visualContentCenterX: contentContainer.x + contentRow.x + contentRow.childrenRect.x
         + contentRow.childrenRect.width / 2
 
@@ -56,10 +57,9 @@ Button {
             if (control.hovered) return control.primary ? Theme.accentHover : (control.danger ? Theme.dangerSoft : Theme.buttonHover)
             return control.primary ? Theme.accent : (control.danger ? Theme.dangerSoft : Theme.buttonBackground)
         }
+        Behavior on color { ColorAnimation { duration: 60 } }
         border.width: control.primary ? 0 : 1
         border.color: control.danger ? Theme.danger : Theme.buttonBorder
 
-        Behavior on color { ColorAnimation { duration: Motion.fast } }
-        Behavior on border.color { ColorAnimation { duration: Motion.fast } }
     }
 }
