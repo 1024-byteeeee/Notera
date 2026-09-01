@@ -20,7 +20,6 @@ Rectangle {
         height: 2
         z: 1000
         property var dragIds: []
-        Drag.active: root.dragInProgress
         Drag.keys: ["notera-library-items"]
         Drag.hotSpot.x: 1
         Drag.hotSpot.y: 1
@@ -253,6 +252,38 @@ Rectangle {
                 model: libraryService.entries
 
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+                // GridView 区域内的框选（红框区域）
+                DragHandler {
+                    id: gridRubberBand
+                    enabled: !root.dragInProgress
+                    target: null
+                    acceptedButtons: Qt.LeftButton
+                    acceptedDevices: PointerDevice.Mouse
+                    grabPermissions: PointerHandler.ApprovesTakeOverByAnything
+
+                    onActiveChanged: {
+                        if (!active) {
+                            libraryService.selection.clear()
+                            return
+                        }
+                        const p = grid.mapToItem(librarySurface, centroid.pressPosition.x, centroid.pressPosition.y)
+                        selectionBox.x = p.x
+                        selectionBox.y = p.y
+                        selectionBox.width = 0
+                        selectionBox.height = 0
+                    }
+                    onActiveTranslationChanged: {
+                        if (!active) return
+                        const start = grid.mapToItem(librarySurface, centroid.pressPosition.x, centroid.pressPosition.y)
+                        const cur = grid.mapToItem(librarySurface, centroid.pressPosition.x + activeTranslation.x, centroid.pressPosition.y + activeTranslation.y)
+                        selectionBox.x = Math.min(start.x, cur.x)
+                        selectionBox.y = Math.min(start.y, cur.y)
+                        selectionBox.width = Math.abs(cur.x - start.x)
+                        selectionBox.height = Math.abs(cur.y - start.y)
+                        root.updateRubberSelection()
+                    }
+                }
 
                 delegate: Item {
                     id: scoreDelegate
@@ -717,14 +748,8 @@ Rectangle {
             Rectangle {
                 id: selectionBox
                 objectName: "selectionBox"
-                visible: rubberBand.active
+                visible: rubberBand.active || gridRubberBand.active
                 z: 10
-                x: rubberBand.active ? Math.min(rubberBand.centroid.pressPosition.x,
-                    rubberBand.centroid.pressPosition.x + rubberBand.activeTranslation.x) : 0
-                y: rubberBand.active ? Math.min(rubberBand.centroid.pressPosition.y,
-                    rubberBand.centroid.pressPosition.y + rubberBand.activeTranslation.y) : 0
-                width: rubberBand.active ? Math.abs(rubberBand.activeTranslation.x) : 0
-                height: rubberBand.active ? Math.abs(rubberBand.activeTranslation.y) : 0
                 color: Theme.accent + "22"
                 border.width: 1
                 border.color: Theme.accent
@@ -739,11 +764,27 @@ Rectangle {
                 acceptedDevices: PointerDevice.Mouse
                 grabPermissions: PointerHandler.ApprovesTakeOverByAnything
 
-                onActiveTranslationChanged: {
-                    if (active) root.updateRubberSelection()
-                }
                 onActiveChanged: {
-                    if (!active) libraryService.selection.clear()
+                    if (!active) {
+                        libraryService.selection.clear()
+                        return
+                    }
+                    const p = centroid.pressPosition
+                    selectionBox.x = p.x
+                    selectionBox.y = p.y
+                    selectionBox.width = 0
+                    selectionBox.height = 0
+                }
+                onActiveTranslationChanged: {
+                    if (!active) return
+                    const start = centroid.pressPosition
+                    const curX = start.x + activeTranslation.x
+                    const curY = start.y + activeTranslation.y
+                    selectionBox.x = Math.min(start.x, curX)
+                    selectionBox.y = Math.min(start.y, curY)
+                    selectionBox.width = Math.abs(curX - start.x)
+                    selectionBox.height = Math.abs(curY - start.y)
+                    root.updateRubberSelection()
                 }
             }
 
