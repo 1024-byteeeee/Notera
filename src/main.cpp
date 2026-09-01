@@ -611,10 +611,26 @@ int main(int argc, char* argv[])
             const auto recentFirstFolderId = libraryService.folders()->data(
                 libraryService.folders()->index(1, 0), folderIdRole).toString();
             const auto tagId = libraryService.tags()->data(libraryService.tags()->index(0, 0), tagIdRole).toString();
+            int moveNoticeCount = 0;
+            const auto moveNoticeConnection = QObject::connect(&libraryService, &LibraryService::noticeOccurred,
+                root, [&moveNoticeCount](const QString& message) {
+                    if (message.startsWith(QStringLiteral("已移动"))) ++moveNoticeCount;
+                });
             if (!libraryService.moveItems({scoreId, secondScoreId}, folderId).isEmpty()) {
                 fail("batch-score-folder-assignment");
                 return;
             }
+            libraryService.setItemFolder(scoreId, folderId);
+            if (moveNoticeCount != 1) {
+                fail("single-move-noop-does-not-notify");
+                return;
+            }
+            if (!libraryService.moveItems({scoreId, secondScoreId}, folderId).isEmpty()
+                || moveNoticeCount != 1) {
+                fail("batch-move-noop-does-not-notify");
+                return;
+            }
+            QObject::disconnect(moveNoticeConnection);
             libraryService.setFilterMode(QStringLiteral("folder:") + folderId);
             if (scoreId.isEmpty() || secondScoreId.isEmpty() || folderId.isEmpty()
                 || libraryService.scores()->rowCount() != 2) {

@@ -49,7 +49,8 @@ public:
     [[nodiscard]] bool renameFolder(const QString& folderId, const QString& name, QString* error) const;
     [[nodiscard]] bool moveFolder(const QString& folderId, const QString& parentId, QString* error) const;
     [[nodiscard]] bool canMoveFolder(const QString& folderId, const QString& parentId, QString* error) const;
-    [[nodiscard]] bool moveItems(const QStringList& itemIds, const QString& folderId, QString* error);
+    [[nodiscard]] bool moveItems(const QStringList& itemIds, const QString& folderId,
+        int* changedCount, QString* error);
     [[nodiscard]] bool setItemsFavorite(const QStringList& itemIds, bool favorite, QString* error);
     [[nodiscard]] bool addItemsTag(const QStringList& itemIds, const QString& tagId, QString* error);
     [[nodiscard]] bool deleteFolder(const QString& folderId, QString* error);

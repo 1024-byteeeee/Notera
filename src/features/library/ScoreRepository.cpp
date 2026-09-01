@@ -852,11 +852,26 @@ bool ScoreRepository::moveFolder(const QString& folderId, const QString& parentI
     return false;
 }
 
-bool ScoreRepository::moveItems(const QStringList& itemIds, const QString& folderId, QString* error)
+bool ScoreRepository::moveItems(const QStringList& itemIds, const QString& folderId,
+    int* changedCount, QString* error)
 {
+    *changedCount = 0;
     if (!m_database.transaction()) { *error = m_database.lastError().text(); return false; }
     for (const auto& itemId : itemIds) {
         const auto type = itemTypeById(itemId, error);
+        if (type.isEmpty()) {
+            m_database.rollback();
+            if (error->isEmpty()) *error = QStringLiteral("项目不存在或目标文件夹无效。");
+            return false;
+        }
+        const auto currentFolderId = type == QStringLiteral("score")
+            ? scoreFolderId(itemId, error) : folderParent(itemId, error);
+        if (!error->isEmpty()) {
+            m_database.rollback();
+            return false;
+        }
+        if (currentFolderId == folderId) continue;
+
         bool succeeded = false;
         if (type == QStringLiteral("score")) {
             succeeded = setFolder(itemId, folderId, error);
@@ -868,6 +883,7 @@ bool ScoreRepository::moveItems(const QStringList& itemIds, const QString& folde
             if (error->isEmpty()) *error = QStringLiteral("项目不存在或目标文件夹无效。");
             return false;
         }
+        ++*changedCount;
     }
     if (m_database.commit()) return true;
     *error = m_database.lastError().text();

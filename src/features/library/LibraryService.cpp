@@ -563,6 +563,12 @@ QString LibraryService::scoreFolderId(const QString& scoreId)
 void LibraryService::setScoreFolder(const QString& scoreId, const QString& folderId)
 {
     QString error;
+    const auto currentFolderId = m_repository.scoreFolderId(scoreId, &error);
+    if (!error.isEmpty()) {
+        emit errorOccurred(QStringLiteral("无法确定乐谱所在目录。"));
+        return;
+    }
+    if (currentFolderId == folderId) return;
     if (!m_repository.setFolder(scoreId, folderId, &error)) {
         emit errorOccurred(QStringLiteral("设置文件夹失败。"));
         return;
@@ -615,6 +621,14 @@ void LibraryService::setItemFolder(const QString& itemId, const QString& folderI
 {
     QString error;
     const auto type = m_repository.itemTypeById(itemId, &error);
+    const auto currentFolderId = type == QStringLiteral("folder")
+        ? m_repository.folderParent(itemId, &error)
+        : type == QStringLiteral("score") ? m_repository.scoreFolderId(itemId, &error) : QString {};
+    if (!error.isEmpty()) {
+        emit errorOccurred(error);
+        return;
+    }
+    if (!type.isEmpty() && currentFolderId == folderId) return;
     const auto succeeded = type == QStringLiteral("folder")
         ? m_repository.moveFolder(itemId, folderId, &error)
         : type == QStringLiteral("score") && m_repository.setFolder(itemId, folderId, &error);
@@ -686,15 +700,17 @@ QString LibraryService::moveItems(const QVariantList& itemIds, const QString& fo
     const auto ids = uniqueItemIds(itemIds);
     if (ids.isEmpty()) return QStringLiteral("没有可移动的项目。");
     QString error;
-    if (!m_repository.moveItems(ids, folderId, &error)) {
+    int changedCount = 0;
+    if (!m_repository.moveItems(ids, folderId, &changedCount, &error)) {
         const auto message = error.isEmpty() ? QStringLiteral("移动项目失败。") : error;
         emit errorOccurred(message);
         return message;
     }
+    if (changedCount == 0) return {};
     m_selection.clear();
     reloadFolders();
     reload();
-    emit noticeOccurred(QStringLiteral("已移动 %1 个项目").arg(ids.size()));
+    emit noticeOccurred(QStringLiteral("已移动 %1 个项目").arg(changedCount));
     return {};
 }
 
