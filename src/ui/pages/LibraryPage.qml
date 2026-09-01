@@ -17,27 +17,7 @@ Rectangle {
     property real dragPreviewX: 0
     property real dragPreviewY: 0
 
-    Item {
-        id: internalDragSource
-        width: 2
-        height: 2
-        z: 1000
-        property var dragIds: []
-        Drag.keys: ["notera-library-items"]
-        Drag.supportedActions: Qt.MoveAction
-        Drag.hotSpot.x: 1
-        Drag.hotSpot.y: 1
-
-        Drag.onDragStarted: function(x, y) {
-            root.dragInProgress = true
-        }
-        Drag.onDragFinished: function() {
-            root.dragInProgress = false
-            root.dragItemIds = []
-        }
-    }
-
-    // 拖拽预览源 - 系统自动截取此元素图像作为跟随鼠标的半透明预览
+    // 拖拽预览源 - 可作为 Drag.source 让系统截取为跟随鼠标的半透明预览
     Rectangle {
         id: dragPreview
         x: -10000
@@ -313,6 +293,20 @@ Rectangle {
                     readonly property bool folderSubmenuEnabled: folderSubmenu.enabled
                     readonly property bool tagSubmenuEnabled: tagSubmenu.enabled
                     readonly property int folderSubmenuItemCount: folderSubmenu.count
+                    property var dragIds: []
+
+                    // 原生拖拽支持 - Automatic 模式由系统自动检测按下+移动
+                    Drag.dragType: Drag.Automatic
+                    Drag.supportedActions: Qt.MoveAction
+                    Drag.keys: ["notera-library-items"]
+
+                    Drag.onDragStarted: function(x, y) {
+                        root.dragInProgress = true
+                    }
+                    Drag.onDragFinished: function() {
+                        root.dragInProgress = false
+                        root.dragItemIds = []
+                    }
                     readonly property int tagSubmenuItemCount: tagSubmenu.count
                     readonly property int normalMenuArrowCount: favoriteMenuItem.visibleArrowCount
                     readonly property int folderSubmenuArrowCount: scoreMenu.openedOnce && scoreMenu.count > 3
@@ -443,38 +437,19 @@ Rectangle {
                             id: cardMouseArea
                             anchors.fill: parent
                             acceptedButtons: Qt.LeftButton
-                            property bool preparedDrag: false
-                            property real pressX: 0
-                            property real pressY: 0
 
                             onPressed: function(mouse) {
-                                pressX = mouse.x
-                                pressY = mouse.y
-                                preparedDrag = false
-                            }
-                            onPositionChanged: function(mouse) {
-                                if (preparedDrag) return
-                                if (Math.abs(mouse.x - pressX) < 8 && Math.abs(mouse.y - pressY) < 8)
-                                    return
-
-                                preparedDrag = true
+                                // 按下时准备拖拽数据，Drag.Automatic 会在移动时自动启动
                                 if (root.selectedCount > 0 && root.isSelected(scoreDelegate.itemId)) {
                                     root.dragItemIds = libraryService.selection.selectedIds
                                 } else {
                                     root.dragItemIds = [scoreDelegate.itemId]
                                 }
                                 root.dragThumbnailPath = scoreDelegate.thumbnailPath
-                                internalDragSource.dragIds = root.dragItemIds
-                                internalDragSource.Drag.mimeData = {
+                                scoreDelegate.dragIds = root.dragItemIds
+                                scoreDelegate.Drag.mimeData = {
                                     "application/x-notera-items": root.dragItemIds.join(",")
                                 }
-                                internalDragSource.Drag.start(Qt.MoveAction)
-                            }
-                            onReleased: {
-                                preparedDrag = false
-                            }
-                            onCanceled: {
-                                preparedDrag = false
                             }
                             onClicked: {
                                 if (root.selectedCount > 0) {
