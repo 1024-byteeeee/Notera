@@ -13,6 +13,9 @@ Rectangle {
     readonly property int selectedCount: libraryService.selection.count
     property bool dragInProgress: false
     property var dragItemIds: []
+    property string dragThumbnailPath: ""
+    property real dragPreviewX: 0
+    property real dragPreviewY: 0
 
     Item {
         id: internalDragSource
@@ -20,51 +23,58 @@ Rectangle {
         height: 2
         z: 1000
         property var dragIds: []
+        Drag.dragType: Drag.Automatic
+        Drag.source: dragPreview
         Drag.keys: ["notera-library-items"]
+        Drag.supportedActions: Qt.MoveAction
         Drag.hotSpot.x: 1
         Drag.hotSpot.y: 1
 
-        // 拖拽预览 - 跟随鼠标的半透明卡片
+        Drag.onDragStarted: function(x, y) {
+            root.dragInProgress = true
+        }
+        Drag.onDragFinished: function() {
+            root.dragInProgress = false
+            root.dragItemIds = []
+        }
+    }
+
+    // 拖拽预览源 - 系统自动截取此元素图像作为跟随鼠标的半透明预览
+    Rectangle {
+        id: dragPreview
+        visible: false
+        width: 110
+        height: 145
+        radius: Theme.radiusMd
+        opacity: 0.88
+        color: Theme.elevatedSurface
+        border.width: 1
+        border.color: Theme.accent
+
+        Image {
+            anchors.fill: parent
+            anchors.margins: 6
+            source: root.dragThumbnailPath
+            fillMode: Image.PreserveAspectFit
+            asynchronous: true
+        }
+
+        // 多项拖拽时右上角显示数量徽章
         Rectangle {
-            visible: root.dragInProgress && root.dragItemIds.length > 0
-            width: 150
-            height: 56
-            radius: Theme.radiusMd
-            color: Theme.elevatedSurface
-            border.width: 1
-            border.color: Theme.accent
-            opacity: 0.92
-            x: 14
-            y: 14
-            z: 1001
-
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 12
-                spacing: 8
-
-                Rectangle {
-                    Layout.preferredWidth: 32
-                    Layout.preferredHeight: 32
-                    radius: Theme.radiusSm
-                    color: Theme.accentSoft
-                    Label {
-                        anchors.centerIn: parent
-                        text: root.dragItemIds.length > 9 ? "9+" : root.dragItemIds.length
-                        color: Theme.accent
-                        font.pixelSize: Theme.fontMd
-                        font.weight: Font.Bold
-                    }
-                }
-                Label {
-                    Layout.fillWidth: true
-                    text: root.dragItemIds.length === 1 ? "移动 1 项" : "移动 " + root.dragItemIds.length + " 项"
-                    color: Theme.foreground
-                    font.pixelSize: Theme.fontSm
-                    font.weight: Font.Medium
-                    elide: Text.ElideRight
-                }
+            visible: root.dragItemIds.length > 1
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: -8
+            width: 26
+            height: 26
+            radius: 13
+            color: Theme.accent
+            Label {
+                anchors.centerIn: parent
+                text: root.dragItemIds.length > 9 ? "9+" : root.dragItemIds.length
+                color: Theme.selectedText
+                font.pixelSize: Theme.fontXs
+                font.weight: Font.Bold
             }
         }
     }
@@ -434,32 +444,38 @@ Rectangle {
                             id: cardMouseArea
                             anchors.fill: parent
                             acceptedButtons: Qt.LeftButton
-                            drag.target: internalDragSource
-                            drag.threshold: 8
                             property bool preparedDrag: false
+                            property real pressX: 0
+                            property real pressY: 0
+
                             onPressed: function(mouse) {
-                                const point = card.mapToItem(root, mouse.x, mouse.y)
-                                internalDragSource.x = point.x
-                                internalDragSource.y = point.y
+                                pressX = mouse.x
+                                pressY = mouse.y
+                                preparedDrag = false
                             }
-                            onPositionChanged: {
-                                if (!drag.active || preparedDrag) return
+                            onPositionChanged: function(mouse) {
+                                if (preparedDrag) return
+                                if (Math.abs(mouse.x - pressX) < 8 && Math.abs(mouse.y - pressY) < 8)
+                                    return
+
+                                preparedDrag = true
                                 if (root.selectedCount > 0 && root.isSelected(scoreDelegate.itemId)) {
                                     root.dragItemIds = libraryService.selection.selectedIds
                                 } else {
                                     root.dragItemIds = [scoreDelegate.itemId]
                                 }
+                                root.dragThumbnailPath = scoreDelegate.thumbnailPath
                                 internalDragSource.dragIds = root.dragItemIds
-                                preparedDrag = true
-                                root.dragInProgress = true
+                                internalDragSource.Drag.mimeData = {
+                                    "application/x-notera-items": root.dragItemIds.join(",")
+                                }
+                                internalDragSource.Drag.start(Qt.MoveAction)
                             }
                             onReleased: {
                                 preparedDrag = false
-                                root.dragInProgress = false
                             }
                             onCanceled: {
                                 preparedDrag = false
-                                root.dragInProgress = false
                             }
                             onClicked: {
                                 if (root.selectedCount > 0) {
