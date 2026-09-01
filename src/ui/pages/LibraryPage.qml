@@ -14,10 +14,8 @@ Rectangle {
     property bool dragInProgress: false
     property var dragItemIds: []
     property string dragThumbnailPath: ""
-    property real dragPreviewX: 0
-    property real dragPreviewY: 0
 
-    // 拖拽预览源 - 可作为 Drag.source 让系统截取为跟随鼠标的半透明预览
+    // 内部拖放源与跟随鼠标的预览。
     Rectangle {
         id: dragPreview
         x: -10000
@@ -29,6 +27,13 @@ Rectangle {
         color: Theme.elevatedSurface
         border.width: 1
         border.color: Theme.accent
+        property var dragIds: []
+        Drag.active: root.dragInProgress
+        Drag.dragType: Drag.Internal
+        Drag.supportedActions: Qt.MoveAction
+        Drag.keys: ["notera-library-items"]
+        Drag.hotSpot.x: width / 2
+        Drag.hotSpot.y: height / 2
 
         Image {
             anchors.fill: parent
@@ -60,6 +65,16 @@ Rectangle {
 
     function dragIds(drag) {
         return drag.source && drag.source.dragIds ? drag.source.dragIds : []
+    }
+    function finishInternalDrag() {
+        if (root.dragInProgress) dragPreview.Drag.drop()
+        root.dragInProgress = false
+        Qt.callLater(function() {
+            root.dragItemIds = []
+            dragPreview.dragIds = []
+            dragPreview.x = -10000
+            dragPreview.y = -10000
+        })
     }
     function canMoveAll(ids, folderId) {
         if (!ids || ids.length === 0) return false
@@ -232,7 +247,7 @@ Rectangle {
                 visible: count > 0
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
-                interactive: true
+                interactive: !gridRubberBand.active
                 cellWidth: {
                     const columns = Math.max(1, Math.floor(width / 218))
                     return Math.floor(width / columns)
@@ -252,11 +267,9 @@ Rectangle {
                     grabPermissions: PointerHandler.ApprovesTakeOverByAnything
 
                     onActiveChanged: {
-                        if (!active) {
-                            libraryService.selection.clear()
-                            return
-                        }
-                        const p = grid.mapToItem(librarySurface, centroid.pressPosition.x, centroid.pressPosition.y)
+                        if (!active) return
+                        const p = librarySurface.mapFromItem(null,
+                            centroid.scenePressPosition.x, centroid.scenePressPosition.y)
                         selectionBox.x = p.x
                         selectionBox.y = p.y
                         selectionBox.width = 0
@@ -264,8 +277,10 @@ Rectangle {
                     }
                     onActiveTranslationChanged: {
                         if (!active) return
-                        const start = grid.mapToItem(librarySurface, centroid.pressPosition.x, centroid.pressPosition.y)
-                        const cur = grid.mapToItem(librarySurface, centroid.pressPosition.x + activeTranslation.x, centroid.pressPosition.y + activeTranslation.y)
+                        const start = librarySurface.mapFromItem(null,
+                            centroid.scenePressPosition.x, centroid.scenePressPosition.y)
+                        const cur = librarySurface.mapFromItem(null,
+                            centroid.scenePosition.x, centroid.scenePosition.y)
                         selectionBox.x = Math.min(start.x, cur.x)
                         selectionBox.y = Math.min(start.y, cur.y)
                         selectionBox.width = Math.abs(cur.x - start.x)
@@ -293,20 +308,6 @@ Rectangle {
                     readonly property bool folderSubmenuEnabled: folderSubmenu.enabled
                     readonly property bool tagSubmenuEnabled: tagSubmenu.enabled
                     readonly property int folderSubmenuItemCount: folderSubmenu.count
-                    property var dragIds: []
-
-                    // 原生拖拽支持 - Automatic 模式由系统自动检测按下+移动
-                    Drag.dragType: Drag.Automatic
-                    Drag.supportedActions: Qt.MoveAction
-                    Drag.keys: ["notera-library-items"]
-
-                    Drag.onDragStarted: function(x, y) {
-                        root.dragInProgress = true
-                    }
-                    Drag.onDragFinished: function() {
-                        root.dragInProgress = false
-                        root.dragItemIds = []
-                    }
                     readonly property int tagSubmenuItemCount: tagSubmenu.count
                     readonly property int normalMenuArrowCount: favoriteMenuItem.visibleArrowCount
                     readonly property int folderSubmenuArrowCount: scoreMenu.openedOnce && scoreMenu.count > 3
@@ -433,27 +434,41 @@ Rectangle {
                             id: cardHover
                             cursorShape: Qt.PointingHandCursor
                         }
-                        TapHandler {
-                            id: cardTapHandler
+                        MouseArea {
+                            id: cardMouseArea
+                            anchors.fill: parent
                             objectName: scoreDelegate.itemType === "score" ? "scoreCardMouse" : "folderCardMouse"
                             acceptedButtons: Qt.LeftButton
-                            gesturePolicy: TapHandler.ReleaseWithinBounds
+                            drag.target: dragPreview
+                            drag.threshold: 8
+                            property bool preparedDrag: false
 
-                            onPressedChanged: {
-                                if (!pressed) return
-                                // 按下时准备拖拽数据，Drag.Automatic 会在移动时自动启动
+                            onPressed: function(mouse) {
                                 if (root.selectedCount > 0 && root.isSelected(scoreDelegate.itemId)) {
                                     root.dragItemIds = libraryService.selection.selectedIds
                                 } else {
                                     root.dragItemIds = [scoreDelegate.itemId]
                                 }
                                 root.dragThumbnailPath = scoreDelegate.thumbnailPath
-                                scoreDelegate.dragIds = root.dragItemIds
-                                scoreDelegate.Drag.mimeData = {
-                                    "application/x-notera-items": root.dragItemIds.join(",")
-                                }
+                                dragPreview.dragIds = root.dragItemIds
+                                const point = card.mapToItem(root, mouse.x, mouse.y)
+                                dragPreview.x = point.x - dragPreview.Drag.hotSpot.x
+                                dragPreview.y = point.y - dragPreview.Drag.hotSpot.y
                             }
-                            onTapped: {
+                            onPositionChanged: {
+                                if (!drag.active || preparedDrag) return
+                                preparedDrag = true
+                                root.dragInProgress = true
+                            }
+                            onReleased: {
+                                preparedDrag = false
+                                root.finishInternalDrag()
+                            }
+                            onCanceled: {
+                                preparedDrag = false
+                                root.finishInternalDrag()
+                            }
+                            onClicked: {
                                 if (root.selectedCount > 0) {
                                     libraryService.selection.toggle(scoreDelegate.itemId)
                                     return
@@ -482,7 +497,8 @@ Rectangle {
                             z: 5
                             enabled: scoreDelegate.itemType === "folder"
                             onEntered: function(drag) {
-                                drag.accepted = root.canMoveAll(root.dragIds(drag), scoreDelegate.itemId)
+                                const accepted = root.canMoveAll(root.dragIds(drag), scoreDelegate.itemId)
+                                drag.accepted = accepted
                             }
                             onDropped: function(drop) {
                                 if (!root.canMoveAll(root.dragIds(drop), scoreDelegate.itemId)) return
@@ -736,7 +752,7 @@ Rectangle {
                 }
             }
 
-            // 鼠标拖过空白或卡片后直接框选；矩形缩小时同步取消离开选区的项目。
+            // 鼠标在网格空白处框选；矩形缩小时同步取消离开选区的项目。
             Rectangle {
                 id: selectionBox
                 objectName: "selectionBox"

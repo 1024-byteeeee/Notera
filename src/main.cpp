@@ -96,6 +96,34 @@ bool clickItem(QObject* root, const QString& objectName, const Qt::MouseButton b
     return clickItemAt(root, objectName, button, 0.5, 0.5);
 }
 
+void sendMouseEvent(QQuickWindow* window, const QEvent::Type type, const QPointF& scenePosition,
+    const Qt::MouseButton button, const Qt::MouseButtons buttons)
+{
+    const auto globalPosition = QPointF(window->mapToGlobal(scenePosition.toPoint()));
+    QMouseEvent event(type, scenePosition, scenePosition, globalPosition,
+        button, buttons, Qt::NoModifier, QPointingDevice::primaryPointingDevice());
+    QCoreApplication::sendEvent(window, &event);
+    QCoreApplication::processEvents();
+}
+
+bool dragItemToItem(QObject* root, const QString& sourceName, const QString& targetName)
+{
+    auto* const source = findVisualItem(root, sourceName);
+    auto* const target = findVisualItem(root, targetName);
+    auto* const window = qobject_cast<QQuickWindow*>(root);
+    if (!source || !target || !window) return false;
+
+    const auto start = source->mapToScene(QPointF(source->width() / 2.0, source->height() / 2.0));
+    const auto end = target->mapToScene(QPointF(target->width() / 2.0, target->height() / 2.0));
+    sendMouseEvent(window, QEvent::MouseButtonPress, start, Qt::LeftButton, Qt::LeftButton);
+    for (int step = 1; step <= 8; ++step) {
+        sendMouseEvent(window, QEvent::MouseMove,
+            start + (end - start) * (static_cast<double>(step) / 8.0), Qt::NoButton, Qt::LeftButton);
+    }
+    sendMouseEvent(window, QEvent::MouseButtonRelease, end, Qt::LeftButton, Qt::NoButton);
+    return true;
+}
+
 bool popupIsOpen(QObject* root, const QString& objectName)
 {
     const auto* const popup = root->findChild<QObject*>(objectName);
@@ -448,8 +476,9 @@ int main(int argc, char* argv[])
 
             auto* const libraryPage = root->findChild<QObject*>(QStringLiteral("libraryPage"));
             auto* const librarySurface = findVisualItem(root, QStringLiteral("librarySurface"));
+            auto* const rubberSelectionGrid = findVisualItem(root, QStringLiteral("browserGrid"));
             auto* const selectionBox = findVisualItem(root, QStringLiteral("selectionBox"));
-            if (!libraryPage || !librarySurface || !selectionBox) {
+            if (!libraryPage || !librarySurface || !rubberSelectionGrid || !selectionBox || !window) {
                 fail("library-rubber-selection-objects");
                 return;
             }
@@ -469,6 +498,45 @@ int main(int argc, char* argv[])
                 fail("library-rubber-selection-shrink");
                 return;
             }
+
+            const auto rubberStart = rubberSelectionGrid->mapToScene(QPointF(rubberSelectionGrid->width() * 0.62,
+                rubberSelectionGrid->height() * 0.72));
+            const auto rubberEnd = rubberStart + QPointF(120.0, 90.0);
+            sendMouseEvent(window, QEvent::MouseButtonPress, rubberStart, Qt::LeftButton, Qt::LeftButton);
+            sendMouseEvent(window, QEvent::MouseMove, rubberEnd, Qt::NoButton, Qt::LeftButton);
+            const auto expectedStart = librarySurface->mapFromScene(rubberStart);
+            if (!selectionBox->isVisible()
+                || std::abs(selectionBox->x() - expectedStart.x()) > 4.0
+                || std::abs(selectionBox->y() - expectedStart.y()) > 4.0) {
+                fail("library-rubber-selection-real-pointer-origin");
+                return;
+            }
+            sendMouseEvent(window, QEvent::MouseButtonRelease, rubberEnd, Qt::LeftButton, Qt::NoButton);
+            const auto selectStart = rubberSelectionGrid->mapToScene(QPointF(
+                rubberSelectionGrid->width() * 0.9, rubberSelectionGrid->height() * 0.75));
+            const auto selectEnd = rubberSelectionGrid->mapToScene(QPointF(
+                rubberSelectionGrid->width() * 0.05, rubberSelectionGrid->height() * 0.05));
+            sendMouseEvent(window, QEvent::MouseButtonPress, selectStart, Qt::LeftButton, Qt::LeftButton);
+            sendMouseEvent(window, QEvent::MouseMove, selectEnd, Qt::NoButton, Qt::LeftButton);
+            sendMouseEvent(window, QEvent::MouseButtonRelease, selectEnd, Qt::LeftButton, Qt::NoButton);
+            if (libraryService.selection()->count() == 0) {
+                fail("library-rubber-selection-persists-after-release");
+                return;
+            }
+            libraryService.selection()->clear();
+
+            const auto dragScoreIdRole = libraryService.scores()->roleNames().key("scoreId", -1);
+            const auto dragFolderIdRole = libraryService.folders()->roleNames().key("itemId", -1);
+            const auto draggedScoreId = libraryService.scores()->data(
+                libraryService.scores()->index(0, 0), dragScoreIdRole).toString();
+            const auto dropFolderId = libraryService.folders()->data(
+                libraryService.folders()->index(0, 0), dragFolderIdRole).toString();
+            if (!dragItemToItem(root, QStringLiteral("scoreCardMouse"), QStringLiteral("folderCardMouse"))
+                || libraryService.scoreFolderId(draggedScoreId) != dropFolderId) {
+                fail("library-card-drag-moves-score-to-folder");
+                return;
+            }
+            libraryService.setItemFolder(draggedScoreId, QString {});
 
             if (!clickItem(root, QStringLiteral("folderNavItem"), Qt::RightButton)
                 || !popupIsOpen(root, QStringLiteral("folderContextMenu"))) {
