@@ -9,7 +9,7 @@
                     Description="本地优先的乐谱阅读器"
                     Target="[INSTALL_ROOT]bin\Notera.exe"
                     WorkingDirectory="INSTALL_ROOT" />
-          <RegistryValue Root="HKMU"
+          <RegistryValue Root="HKCU"
                          Key="Software\Notera\Notera"
                          Name="DesktopShortcut"
                          Type="integer"
