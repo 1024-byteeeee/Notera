@@ -23,7 +23,6 @@ Rectangle {
         height: 2
         z: 1000
         property var dragIds: []
-        Drag.dragType: Drag.Automatic
         Drag.source: dragPreview
         Drag.keys: ["notera-library-items"]
         Drag.supportedActions: Qt.MoveAction
@@ -42,7 +41,8 @@ Rectangle {
     // 拖拽预览源 - 系统自动截取此元素图像作为跟随鼠标的半透明预览
     Rectangle {
         id: dragPreview
-        visible: false
+        x: -10000
+        y: -10000
         width: 110
         height: 145
         radius: Theme.radiusMd
