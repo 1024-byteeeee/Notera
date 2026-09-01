@@ -2,6 +2,7 @@
 
 #include <QDateTime>
 #include <QString>
+#include <QStringList>
 
 struct Score {
     QString id;
@@ -13,6 +14,7 @@ struct Score {
     int pageCount {1};
     QString thumbnailPath;
     bool favorite {false};
+    QStringList tags;
     int lastPage {1};
     QDateTime createdAt;
     QDateTime updatedAt;

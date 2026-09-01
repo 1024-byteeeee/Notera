@@ -20,9 +20,9 @@ ApplicationController::ApplicationController(QObject* parent)
         m_themeMode = 0;
     }
     m_animationsEnabled = settings.value(QStringLiteral("appearance/animationsEnabled"), true).toBool();
-    m_defaultScrollSpeed = settings.value(QStringLiteral("reader/defaultScrollSpeed"), 45.0).toDouble();
+    m_defaultScrollSpeed = settings.value(QStringLiteral("reader/defaultScrollSpeed"), 15.0).toDouble();
     if (m_defaultScrollSpeed < 1.0 || m_defaultScrollSpeed > 256.0) {
-        m_defaultScrollSpeed = 45.0;
+        m_defaultScrollSpeed = 15.0;
     }
     m_autoScrollSpeed = m_defaultScrollSpeed;
 }

@@ -74,8 +74,15 @@ MenuItem {
         Item {
             Layout.preferredWidth: 20
             Layout.preferredHeight: 20
+            TagIcon {
+                visible: control.effectiveTagIcon
+                anchors.centerIn: parent
+                width: 16
+                height: 16
+                iconColor: control.danger ? Theme.danger : Theme.secondaryForeground
+            }
             Label {
-                visible: control.checkable
+                visible: control.checkable && !control.effectiveTagIcon
                 anchors.centerIn: parent
                 text: control.checked ? "✓" : ""
                 color: Theme.accent
@@ -90,12 +97,14 @@ MenuItem {
                 font.pixelSize: 15
                 font.weight: Font.Medium
             }
-            TagIcon {
-                visible: !control.checkable && control.effectiveTagIcon
-                anchors.centerIn: parent
-                width: 16
-                height: 16
-                iconColor: control.danger ? Theme.danger : Theme.secondaryForeground
+            Label {
+                visible: control.checkable && control.effectiveTagIcon && control.checked
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                text: "✓"
+                color: Theme.accent
+                font.pixelSize: 10
+                font.weight: Font.Bold
             }
         }
 

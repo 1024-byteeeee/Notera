@@ -14,9 +14,7 @@ permissions:
   contents: write
 
 env:
-  # Required by this repository's Node.js 20 policy. GitHub currently warns
-  # that Node 20 is deprecated for JavaScript actions.
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   macos-dmg:
@@ -26,10 +24,10 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -105,10 +103,10 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install WiX Toolset
         shell: powershell

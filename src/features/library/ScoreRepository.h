@@ -18,6 +18,7 @@ public:
     [[nodiscard]] QList<Score> listByTag(const QString& tagId, const QString& searchQuery, QString* error) const;
     [[nodiscard]] bool insert(const Score& score, const QString& folderId, QString* error) const;
     [[nodiscard]] bool setFavorite(const QString& scoreId, bool favorite, QString* error) const;
+    [[nodiscard]] bool setItemFavorite(const QString& itemId, bool favorite, QString* error) const;
     [[nodiscard]] bool markScoreOpened(const QString& scoreId, QString* error) const;
     [[nodiscard]] bool rename(const QString& scoreId, const QString& title, QString* error) const;
     [[nodiscard]] bool updateThumbnail(const QString& scoreId, const QString& thumbnailPath, QString* error) const;
@@ -26,6 +27,9 @@ public:
     [[nodiscard]] bool addTag(const QString& scoreId, const QString& tagId, QString* error) const;
     [[nodiscard]] bool removeTag(const QString& scoreId, const QString& tagId, QString* error) const;
     [[nodiscard]] QVariantList scoreTags(const QString& scoreId, QString* error) const;
+    [[nodiscard]] QVariantList itemTags(const QString& itemId, QString* error) const;
+    [[nodiscard]] bool addItemTag(const QString& itemId, const QString& tagId, QString* error) const;
+    [[nodiscard]] bool removeItemTag(const QString& itemId, const QString& tagId, QString* error) const;
     [[nodiscard]] QString itemTypeById(const QString& id, QString* error) const;
     [[nodiscard]] QString filePathById(const QString& scoreId, QString* error) const;
     [[nodiscard]] QString thumbnailPathById(const QString& scoreId, QString* error) const;
@@ -33,6 +37,8 @@ public:
 
     [[nodiscard]] QVariantList folders(QString* error) const;
     [[nodiscard]] QVariantList recentFolders(const QString& searchQuery, QString* error) const;
+    [[nodiscard]] QVariantList favoriteFolders(const QString& searchQuery, QString* error) const;
+    [[nodiscard]] QVariantList foldersByTag(const QString& tagId, const QString& searchQuery, QString* error) const;
     [[nodiscard]] QVariantList childFolders(const QString& parentId, QString* error) const;
     [[nodiscard]] QString folderParent(const QString& folderId, QString* error) const;
     [[nodiscard]] QString folderName(const QString& folderId, QString* error) const;
@@ -41,6 +47,8 @@ public:
     [[nodiscard]] bool createFolder(const QString& name, const QString& parentId, QString* error) const;
     [[nodiscard]] bool markFolderOpened(const QString& folderId, QString* error) const;
     [[nodiscard]] bool renameFolder(const QString& folderId, const QString& name, QString* error) const;
+    [[nodiscard]] bool moveFolder(const QString& folderId, const QString& parentId, QString* error) const;
+    [[nodiscard]] bool canMoveFolder(const QString& folderId, const QString& parentId, QString* error) const;
     [[nodiscard]] bool deleteFolder(const QString& folderId, QString* error);
     [[nodiscard]] QVariantList tags(QString* error) const;
     [[nodiscard]] bool createTag(const QString& name, QString* error) const;

@@ -32,6 +32,7 @@ QVariant LibraryEntryModel::data(const QModelIndex& index, const int role) const
     case FavoriteRole: return entry.favorite;
     case FilePathRole: return entry.filePath;
     case FileTypeRole: return entry.fileType;
+    case TagsRole: return entry.tags;
     default: return {};
     }
 }
@@ -41,7 +42,7 @@ QHash<int, QByteArray> LibraryEntryModel::roleNames() const
     return {{ItemTypeRole, "itemType"}, {ItemIdRole, "itemId"}, {TitleRole, "title"},
         {CreatedDateRole, "createdDate"}, {PageCountRole, "pageCount"},
         {ThumbnailPathRole, "thumbnailPath"}, {FavoriteRole, "favorite"},
-        {FilePathRole, "filePath"}, {FileTypeRole, "fileType"}};
+        {FilePathRole, "filePath"}, {FileTypeRole, "fileType"}, {TagsRole, "tags"}};
 }
 
 QVariantList LibraryEntryModel::itemIds() const
@@ -60,11 +61,13 @@ void LibraryEntryModel::replaceAll(const QVariantList& folders, const QList<Scor
         const auto folder = value.toMap();
         entries.append({QStringLiteral("folder"), folder.value(QStringLiteral("id")).toString(),
             folder.value(QStringLiteral("name")).toString(),
-            QDateTime::fromMSecsSinceEpoch(folder.value(QStringLiteral("createdAt")).toLongLong())});
+            QDateTime::fromMSecsSinceEpoch(folder.value(QStringLiteral("createdAt")).toLongLong()),
+            0, {}, folder.value(QStringLiteral("favorite")).toBool(), {}, {},
+            folder.value(QStringLiteral("tags")).toStringList()});
     }
     for (const auto& score : scores) {
         entries.append({QStringLiteral("score"), score.id, score.title, score.createdAt, score.pageCount,
-            score.thumbnailPath, score.favorite, score.filePath, score.fileType});
+            score.thumbnailPath, score.favorite, score.filePath, score.fileType, score.tags});
     }
 
     const auto previousCount = m_entries.size();

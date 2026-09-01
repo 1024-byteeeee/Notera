@@ -316,6 +316,14 @@ Rectangle {
                     }
                 }
 
+                Label {
+                    visible: libraryService.folders.count === 0
+                    Layout.leftMargin: 12
+                    text: "当前没有文件夹"
+                    color: Theme.faintForeground
+                    font.pixelSize: Theme.fontXs
+                }
+
                 RowLayout {
                     Layout.fillWidth: true
                     Layout.leftMargin: 8
@@ -362,6 +370,13 @@ Rectangle {
                             tagMenu.popup()
                         }
                     }
+                }
+                Label {
+                    visible: libraryService.tags.count === 0
+                    Layout.leftMargin: 12
+                    text: "当前没有标签"
+                    color: Theme.faintForeground
+                    font.pixelSize: Theme.fontXs
                 }
             }
         }

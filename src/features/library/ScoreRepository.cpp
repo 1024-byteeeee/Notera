@@ -12,6 +12,24 @@ qint64 milliseconds(const QDateTime& dateTime)
     return dateTime.isValid() ? dateTime.toMSecsSinceEpoch() : 0;
 }
 
+QStringList tagNamesForFolder(const QSqlDatabase& database, const QString& folderId, QString* error)
+{
+    QSqlQuery query(database);
+    query.prepare(QStringLiteral(R"(
+        SELECT tags.name FROM folder_tags
+        JOIN tags ON tags.id = folder_tags.tag_id
+        WHERE folder_tags.folder_id = ? ORDER BY tags.name COLLATE NOCASE
+    )"));
+    query.addBindValue(folderId);
+    if (!query.exec()) {
+        *error = query.lastError().text();
+        return {};
+    }
+    QStringList result;
+    while (query.next()) result.append(query.value(0).toString());
+    return result;
+}
+
 } // namespace
 
 ScoreRepository::ScoreRepository(QSqlDatabase database)
@@ -239,6 +257,24 @@ bool ScoreRepository::setFavorite(const QString& scoreId, const bool favorite, Q
     return false;
 }
 
+bool ScoreRepository::setItemFavorite(const QString& itemId, const bool favorite, QString* error) const
+{
+    const auto type = itemTypeById(itemId, error);
+    if (type == QStringLiteral("score")) return setFavorite(itemId, favorite, error);
+    if (type != QStringLiteral("folder")) {
+        *error = QStringLiteral("项目不存在。");
+        return false;
+    }
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("UPDATE folders SET favorite = ?, updated_at = ? WHERE id = ?"));
+    query.addBindValue(favorite);
+    query.addBindValue(QDateTime::currentMSecsSinceEpoch());
+    query.addBindValue(itemId);
+    if (query.exec() && query.numRowsAffected() == 1) return true;
+    *error = query.lastError().text();
+    return false;
+}
+
 bool ScoreRepository::markScoreOpened(const QString& scoreId, QString* error) const
 {
     QSqlQuery query(m_database);
@@ -338,6 +374,57 @@ QVariantList ScoreRepository::scoreTags(const QString& scoreId, QString* error) 
         result.append(QVariantMap{{"id", query.value(0)}, {"name", query.value(1)}});
     }
     return result;
+}
+
+QVariantList ScoreRepository::itemTags(const QString& itemId, QString* error) const
+{
+    const auto type = itemTypeById(itemId, error);
+    const auto table = type == QStringLiteral("folder") ? QStringLiteral("folder_tags")
+        : type == QStringLiteral("score") ? QStringLiteral("score_tags") : QString {};
+    const auto column = type == QStringLiteral("folder") ? QStringLiteral("folder_id") : QStringLiteral("score_id");
+    if (table.isEmpty()) return {};
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("SELECT tags.id, tags.name FROM %1 JOIN tags ON tags.id = %1.tag_id WHERE %1.%2 = ? ORDER BY tags.name COLLATE NOCASE").arg(table, column));
+    query.addBindValue(itemId);
+    if (!query.exec()) {
+        *error = query.lastError().text();
+        return {};
+    }
+    QVariantList result;
+    while (query.next()) result.append(QVariantMap{{"id", query.value(0)}, {"name", query.value(1)}});
+    return result;
+}
+
+bool ScoreRepository::addItemTag(const QString& itemId, const QString& tagId, QString* error) const
+{
+    const auto type = itemTypeById(itemId, error);
+    const auto table = type == QStringLiteral("folder") ? QStringLiteral("folder_tags")
+        : type == QStringLiteral("score") ? QStringLiteral("score_tags") : QString {};
+    const auto column = type == QStringLiteral("folder") ? QStringLiteral("folder_id") : QStringLiteral("score_id");
+    if (table.isEmpty()) return false;
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("INSERT OR IGNORE INTO %1 (%2, tag_id) VALUES (?, ?)").arg(table, column));
+    query.addBindValue(itemId);
+    query.addBindValue(tagId);
+    if (query.exec()) return true;
+    *error = query.lastError().text();
+    return false;
+}
+
+bool ScoreRepository::removeItemTag(const QString& itemId, const QString& tagId, QString* error) const
+{
+    const auto type = itemTypeById(itemId, error);
+    const auto table = type == QStringLiteral("folder") ? QStringLiteral("folder_tags")
+        : type == QStringLiteral("score") ? QStringLiteral("score_tags") : QString {};
+    const auto column = type == QStringLiteral("folder") ? QStringLiteral("folder_id") : QStringLiteral("score_id");
+    if (table.isEmpty()) return false;
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("DELETE FROM %1 WHERE %2 = ? AND tag_id = ?").arg(table, column));
+    query.addBindValue(itemId);
+    query.addBindValue(tagId);
+    if (query.exec()) return true;
+    *error = query.lastError().text();
+    return false;
 }
 
 QString ScoreRepository::itemTypeById(const QString& id, QString* error) const
@@ -477,7 +564,7 @@ QVariantList ScoreRepository::folders(QString* error) const
 {
     QSqlQuery query(m_database);
     if (!query.exec(QStringLiteral(R"(
-        SELECT id, name, parent_id, created_at FROM folders
+        SELECT id, name, parent_id, created_at, favorite FROM folders
         ORDER BY parent_id IS NULL DESC, name COLLATE NOCASE
     )"))) {
         *error = query.lastError().text();
@@ -489,7 +576,9 @@ QVariantList ScoreRepository::folders(QString* error) const
             {"id", query.value(0).toString()},
             {"name", query.value(1).toString()},
             {"parentId", query.value(2).isNull() ? QString() : query.value(2).toString()},
-            {"createdAt", query.value(3).toLongLong()}
+            {"createdAt", query.value(3).toLongLong()},
+            {"favorite", query.value(4).toBool()},
+            {"tags", tagNamesForFolder(m_database, query.value(0).toString(), error)}
         });
     }
     return result;
@@ -499,7 +588,7 @@ QVariantList ScoreRepository::recentFolders(const QString& searchQuery, QString*
 {
     QSqlQuery query(m_database);
     query.prepare(QStringLiteral(R"(
-        SELECT id, name, created_at FROM folders
+        SELECT id, name, created_at, favorite FROM folders
         WHERE name LIKE ?
         ORDER BY last_opened_at IS NULL, last_opened_at DESC, name COLLATE NOCASE, id
     )"));
@@ -511,7 +600,48 @@ QVariantList ScoreRepository::recentFolders(const QString& searchQuery, QString*
     QVariantList result;
     while (query.next()) {
         result.append(QVariantMap{{"id", query.value(0).toString()}, {"name", query.value(1).toString()},
-            {"createdAt", query.value(2).toLongLong()}});
+            {"createdAt", query.value(2).toLongLong()}, {"favorite", query.value(3).toBool()},
+            {"tags", tagNamesForFolder(m_database, query.value(0).toString(), error)}});
+    }
+    return result;
+}
+
+QVariantList ScoreRepository::favoriteFolders(const QString& searchQuery, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral(R"(
+        SELECT id, name, created_at, favorite FROM folders
+        WHERE favorite = 1 AND name LIKE ? ORDER BY name COLLATE NOCASE, id
+    )"));
+    query.addBindValue(QStringLiteral("%%1%").arg(searchQuery));
+    if (!query.exec()) { *error = query.lastError().text(); return {}; }
+    QVariantList result;
+    while (query.next()) {
+        const auto id = query.value(0).toString();
+        result.append(QVariantMap{{"id", id}, {"name", query.value(1).toString()},
+            {"createdAt", query.value(2).toLongLong()}, {"favorite", true},
+            {"tags", tagNamesForFolder(m_database, id, error)}});
+    }
+    return result;
+}
+
+QVariantList ScoreRepository::foldersByTag(const QString& tagId, const QString& searchQuery, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral(R"(
+        SELECT f.id, f.name, f.created_at, f.favorite FROM folders f
+        JOIN folder_tags ft ON ft.folder_id = f.id
+        WHERE ft.tag_id = ? AND f.name LIKE ? ORDER BY f.name COLLATE NOCASE, f.id
+    )"));
+    query.addBindValue(tagId);
+    query.addBindValue(QStringLiteral("%%1%").arg(searchQuery));
+    if (!query.exec()) { *error = query.lastError().text(); return {}; }
+    QVariantList result;
+    while (query.next()) {
+        const auto id = query.value(0).toString();
+        result.append(QVariantMap{{"id", id}, {"name", query.value(1).toString()},
+            {"createdAt", query.value(2).toLongLong()}, {"favorite", query.value(3).toBool()},
+            {"tags", tagNamesForFolder(m_database, id, error)}});
     }
     return result;
 }
@@ -523,7 +653,7 @@ QVariantList ScoreRepository::childFolders(const QString& parentId, QString* err
         ? QStringLiteral("parent_id IS NULL")
         : QStringLiteral("parent_id = ?");
     query.prepare(QStringLiteral(R"(
-        SELECT id, name, created_at FROM folders
+        SELECT id, name, created_at, favorite FROM folders
         WHERE %1
         ORDER BY name COLLATE NOCASE
     )").arg(condition));
@@ -535,7 +665,8 @@ QVariantList ScoreRepository::childFolders(const QString& parentId, QString* err
     QVariantList result;
     while (query.next()) {
         result.append(QVariantMap{{"id", query.value(0).toString()}, {"name", query.value(1).toString()},
-            {"createdAt", query.value(2).toLongLong()}});
+            {"createdAt", query.value(2).toLongLong()}, {"favorite", query.value(3).toBool()},
+            {"tags", tagNamesForFolder(m_database, query.value(0).toString(), error)}});
     }
     return result;
 }
@@ -676,6 +807,44 @@ bool ScoreRepository::renameFolder(const QString& folderId, const QString& name,
     QSqlQuery query(m_database);
     query.prepare(QStringLiteral("UPDATE folders SET name = ?, updated_at = ? WHERE id = ?"));
     query.addBindValue(name.trimmed());
+    query.addBindValue(QDateTime::currentMSecsSinceEpoch());
+    query.addBindValue(folderId);
+    if (query.exec() && query.numRowsAffected() == 1) return true;
+    *error = query.lastError().text();
+    return false;
+}
+
+bool ScoreRepository::canMoveFolder(const QString& folderId, const QString& parentId, QString* error) const
+{
+    if (folderId.isEmpty() || folderId == parentId) return false;
+    if (parentId.isEmpty()) return true;
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral(R"(
+        WITH RECURSIVE descendants(id) AS (
+            SELECT id FROM folders WHERE id = ?
+            UNION ALL
+            SELECT folders.id FROM folders JOIN descendants ON folders.parent_id = descendants.id
+        )
+        SELECT 1 FROM descendants WHERE id = ?
+    )"));
+    query.addBindValue(folderId);
+    query.addBindValue(parentId);
+    if (!query.exec()) {
+        *error = query.lastError().text();
+        return false;
+    }
+    return !query.next();
+}
+
+bool ScoreRepository::moveFolder(const QString& folderId, const QString& parentId, QString* error) const
+{
+    if (!canMoveFolder(folderId, parentId, error)) {
+        if (error->isEmpty()) *error = QStringLiteral("文件夹不能移动到自身或其子文件夹中。");
+        return false;
+    }
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("UPDATE folders SET parent_id = ?, updated_at = ? WHERE id = ?"));
+    query.addBindValue(parentId.isEmpty() ? QVariant {} : QVariant {parentId});
     query.addBindValue(QDateTime::currentMSecsSinceEpoch());
     query.addBindValue(folderId);
     if (query.exec() && query.numRowsAffected() == 1) return true;

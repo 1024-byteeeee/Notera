@@ -450,6 +450,17 @@ void LibraryService::toggleFavorite(const QString& scoreId, const bool favorite)
     reload();
 }
 
+void LibraryService::toggleItemFavorite(const QString& itemId, const bool favorite)
+{
+    QString error;
+    if (!m_repository.setItemFavorite(itemId, favorite, &error)) {
+        emit errorOccurred(QStringLiteral("更新收藏状态失败。"));
+        return;
+    }
+    reloadFolders();
+    reload();
+}
+
 void LibraryService::renameScore(const QString& scoreId, const QString& title)
 {
     if (title.trimmed().isEmpty()) {
@@ -600,6 +611,64 @@ bool LibraryService::scoreHasTag(const QString& scoreId, const QString& tagId)
     });
 }
 
+void LibraryService::setItemFolder(const QString& itemId, const QString& folderId)
+{
+    QString error;
+    const auto type = m_repository.itemTypeById(itemId, &error);
+    const auto succeeded = type == QStringLiteral("folder")
+        ? m_repository.moveFolder(itemId, folderId, &error)
+        : type == QStringLiteral("score") && m_repository.setFolder(itemId, folderId, &error);
+    if (!succeeded) {
+        emit errorOccurred(error.isEmpty() ? QStringLiteral("移动项目失败。") : error);
+        return;
+    }
+    reloadFolders();
+    reload();
+    emit noticeOccurred(folderId.isEmpty() ? QStringLiteral("已移出文件夹") : QStringLiteral("已移动到文件夹"));
+}
+
+void LibraryService::addItemTag(const QString& itemId, const QString& tagId)
+{
+    QString error;
+    if (!m_repository.addItemTag(itemId, tagId, &error)) {
+        emit errorOccurred(QStringLiteral("添加标签失败。"));
+        return;
+    }
+    reload();
+}
+
+void LibraryService::removeItemTag(const QString& itemId, const QString& tagId)
+{
+    QString error;
+    if (!m_repository.removeItemTag(itemId, tagId, &error)) {
+        emit errorOccurred(QStringLiteral("移除标签失败。"));
+        return;
+    }
+    reload();
+}
+
+QVariantList LibraryService::itemTags(const QString& itemId)
+{
+    QString error;
+    return m_repository.itemTags(itemId, &error);
+}
+
+bool LibraryService::itemHasTag(const QString& itemId, const QString& tagId)
+{
+    const auto values = itemTags(itemId);
+    return std::any_of(values.cbegin(), values.cend(), [&tagId](const QVariant& value) {
+        return value.toMap().value(QStringLiteral("id")).toString() == tagId;
+    });
+}
+
+bool LibraryService::canMoveItemToFolder(const QString& itemId, const QString& folderId)
+{
+    QString error;
+    const auto type = m_repository.itemTypeById(itemId, &error);
+    return type == QStringLiteral("score") || (type == QStringLiteral("folder")
+        && m_repository.canMoveFolder(itemId, folderId, &error));
+}
+
 void LibraryService::reload()
 {
     QString error;
@@ -607,6 +676,7 @@ void LibraryService::reload()
     QVariantList visibleFolders;
     if (m_filterMode == QStringLiteral("favorites")) {
         scores = m_repository.listFavorites(m_searchQuery, &error);
+        visibleFolders = m_repository.favoriteFolders(m_searchQuery, &error);
     } else if (m_filterMode == QStringLiteral("recent")) {
         scores = m_repository.listRecent(m_searchQuery, &error);
         visibleFolders = m_repository.recentFolders(m_searchQuery, &error);
@@ -614,7 +684,9 @@ void LibraryService::reload()
         scores = m_repository.listAtFolder(m_currentFolderId, m_searchQuery, &error);
         visibleFolders = m_repository.childFolders(m_currentFolderId, &error);
     } else if (m_filterMode.startsWith(QStringLiteral("tag:"))) {
-        scores = m_repository.listByTag(m_filterMode.mid(4), m_searchQuery, &error);
+        const auto tagId = m_filterMode.mid(4);
+        scores = m_repository.listByTag(tagId, m_searchQuery, &error);
+        visibleFolders = m_repository.foldersByTag(tagId, m_searchQuery, &error);
     } else {
         scores = m_repository.listAtFolder({}, m_searchQuery, &error);
         visibleFolders = m_repository.childFolders({}, &error);
@@ -622,6 +694,10 @@ void LibraryService::reload()
     if (!error.isEmpty()) {
         emit errorOccurred(QStringLiteral("加载乐谱库失败。"));
         return;
+    }
+    for (auto& score : scores) {
+        const auto values = m_repository.scoreTags(score.id, &error);
+        for (const auto& value : values) score.tags.append(value.toMap().value(QStringLiteral("name")).toString());
     }
     m_scores.replaceAll(scores);
     m_entries.replaceAll(visibleFolders, scores);

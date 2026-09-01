@@ -20,7 +20,8 @@ public:
         ThumbnailPathRole,
         FavoriteRole,
         FilePathRole,
-        FileTypeRole
+        FileTypeRole,
+        TagsRole
     };
     Q_ENUM(Role)
 
@@ -48,6 +49,7 @@ private:
         bool favorite {false};
         QString filePath;
         QString fileType;
+        QStringList tags;
     };
 
     QList<Entry> m_entries;

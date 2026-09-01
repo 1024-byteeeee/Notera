@@ -75,6 +75,6 @@ private:
     QString m_currentScoreId;
     QString m_currentScoreFolderId;
     int m_currentScorePageCount {0};
-    double m_autoScrollSpeed {45.0};
-    double m_defaultScrollSpeed {45.0};
+    double m_autoScrollSpeed {15.0};
+    double m_defaultScrollSpeed {15.0};
 };

@@ -45,6 +45,23 @@ Rectangle {
         return "乐谱库"
     }
 
+    readonly property string emptyTitle: {
+        if (libraryService.searchQuery.length > 0) return "没有符合条件的项目"
+        const filter = appController.libraryFilter
+        if (filter === "favorites") return "当前没有收藏内容"
+        if (filter === "recent") return "当前没有最近使用的项目"
+        if (filter.startsWith("tag:")) return "当前标签下没有项目"
+        if (filter.startsWith("folder:")) return "当前文件夹为空"
+        return libraryService.tags.count === 0 ? "乐谱库为空" : "乐谱库为空"
+    }
+    readonly property string emptyDescription: libraryService.searchQuery.length > 0
+        ? "换个关键词试试"
+        : appController.libraryFilter === "favorites" ? "收藏的文件夹和乐谱会显示在这里"
+        : appController.libraryFilter === "recent" ? "打开过的文件夹和乐谱会显示在这里"
+        : appController.libraryFilter.startsWith("tag:") ? "为文件夹或乐谱添加此标签后会显示在这里"
+        : appController.libraryFilter.startsWith("folder:") ? "可在这里新建文件夹或导入乐谱"
+        : "导入 PDF 或图片，开始建立你的乐谱库"
+
     Connections {
         target: appController
         function onLibraryFilterChanged() { libraryService.filterMode = appController.libraryFilter }
@@ -82,7 +99,7 @@ Rectangle {
                 Label {
                     text: (appController.libraryFilter === "all" || appController.libraryFilter.startsWith("folder:"))
                         ? libraryService.currentFolderBreadcrumb + "  ·  " + libraryService.entries.count + " 个项目"
-                        : (libraryService.scores.count > 0 ? libraryService.scores.count + " 份乐谱" : "这里还没有乐谱")
+                        : (libraryService.entries.count > 0 ? libraryService.entries.count + " 个项目" : root.emptyTitle)
                     color: Theme.mutedForeground
                     font.pixelSize: Theme.fontSm
                 }
@@ -162,7 +179,7 @@ Rectangle {
                     const columns = Math.max(1, Math.floor(width / 218))
                     return Math.floor(width / columns)
                 }
-                cellHeight: 304
+                cellHeight: 326
                 model: libraryService.entries
 
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
@@ -179,6 +196,7 @@ Rectangle {
                     required property bool favorite
                     required property string filePath
                     required property string fileType
+                    required property var tags
                     readonly property string scoreId: itemId
                     readonly property bool contextMenuOpenedOnce: scoreMenu.openedOnce
                     readonly property real contextMenuWidth: scoreMenu.implicitWidth
@@ -209,7 +227,7 @@ Rectangle {
                         id: card
                         objectName: scoreDelegate.itemType === "score" ? "scoreCardMouse" : "folderCardMouse"
                         width: Math.min(218, parent.width - 12)
-                        height: 288
+                        height: 310
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.top: parent.top
                         anchors.topMargin: 6
@@ -267,6 +285,35 @@ Rectangle {
                                 font.pixelSize: Theme.fontMd
                                 font.weight: Font.DemiBold
                                 elide: Text.ElideRight
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: scoreDelegate.tags.length > 0 ? 22 : 0
+                                visible: scoreDelegate.tags.length > 0
+                                spacing: 5
+                                Repeater {
+                                    model: Math.min(2, scoreDelegate.tags.length)
+                                    delegate: Rectangle {
+                                        required property int index
+                                        Layout.preferredWidth: tagText.implicitWidth + 20
+                                        Layout.preferredHeight: 22
+                                        radius: 8
+                                        color: Theme.accentSoft
+                                        Row {
+                                            anchors.centerIn: parent
+                                            spacing: 4
+                                            TagIcon { width: 11; height: 11; iconColor: Theme.accent }
+                                            Label { id: tagText; text: scoreDelegate.tags[index]; color: Theme.secondaryForeground; font.pixelSize: Theme.fontXs }
+                                        }
+                                    }
+                                }
+                                Label {
+                                    visible: scoreDelegate.tags.length > 2
+                                    text: "+" + (scoreDelegate.tags.length - 2)
+                                    color: Theme.mutedForeground
+                                    font.pixelSize: Theme.fontXs
+                                }
+                                Item { Layout.fillWidth: true }
                             }
                             Label {
                                 Layout.fillWidth: true
@@ -340,8 +387,8 @@ Rectangle {
                     // 收藏按钮 - 悬浮放大五角星，无框
                     Item {
                         id: favoriteBtn
-                        objectName: scoreDelegate.itemType === "score" ? "favoriteButton" : ""
-                        visible: scoreDelegate.itemType === "score"
+                        objectName: scoreDelegate.itemType === "score" ? "favoriteButton" : "folderFavoriteButton"
+                        visible: true
                         z: 2
                         anchors.right: card.right
                         anchors.top: card.top
@@ -366,7 +413,7 @@ Rectangle {
                         TapHandler {
                             acceptedButtons: Qt.LeftButton
                             gesturePolicy: TapHandler.ReleaseWithinBounds
-                            onTapped: libraryService.toggleFavorite(scoreDelegate.scoreId, !scoreDelegate.favorite)
+                            onTapped: libraryService.toggleItemFavorite(scoreDelegate.itemId, !scoreDelegate.favorite)
                         }
                     }
 
@@ -377,7 +424,7 @@ Rectangle {
                             id: favoriteMenuItem
                             symbol: scoreDelegate.favorite ? "★" : "☆"
                             text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
-                            onTriggered: libraryService.toggleFavorite(scoreDelegate.scoreId, !scoreDelegate.favorite)
+                            onTriggered: libraryService.toggleItemFavorite(scoreDelegate.itemId, !scoreDelegate.favorite)
                         }
                         AppMenuItem {
                             symbol: "✎"
@@ -399,7 +446,7 @@ Rectangle {
                             AppMenuItem {
                                 symbol: "↖"
                                 text: "无（移出文件夹）"
-                                onTriggered: libraryService.setScoreFolder(scoreDelegate.scoreId, "")
+                                onTriggered: libraryService.setItemFolder(scoreDelegate.itemId, "")
                             }
                             AppMenuSeparator { }
                             Instantiator {
@@ -409,7 +456,8 @@ Rectangle {
                                     required property string name
                                     text: name
                                     symbol: "▣"
-                                    onTriggered: libraryService.setScoreFolder(scoreDelegate.scoreId, itemId)
+                                    enabled: libraryService.canMoveItemToFolder(scoreDelegate.itemId, itemId)
+                                    onTriggered: libraryService.setItemFolder(scoreDelegate.itemId, itemId)
                                 }
                                 onObjectAdded: function(index, object) {
                                     folderSubmenu.insertItem(index + 2, object)
@@ -434,12 +482,12 @@ Rectangle {
                                     text: name
                                     tagIcon: true
                                     checkable: true
-                                    checked: libraryService.scoreHasTag(scoreDelegate.scoreId, itemId)
+                                    checked: libraryService.itemHasTag(scoreDelegate.itemId, itemId)
                                     onTriggered: {
                                         if (checked) {
-                                            libraryService.addScoreTag(scoreDelegate.scoreId, itemId)
+                                            libraryService.addItemTag(scoreDelegate.itemId, itemId)
                                         } else {
-                                            libraryService.removeScoreTag(scoreDelegate.scoreId, itemId)
+                                            libraryService.removeItemTag(scoreDelegate.itemId, itemId)
                                         }
                                     }
                                 }
@@ -470,6 +518,11 @@ Rectangle {
                     AppMenu {
                         id: folderCardMenu
                         AppMenuItem {
+                            symbol: scoreDelegate.favorite ? "★" : "☆"
+                            text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
+                            onTriggered: libraryService.toggleItemFavorite(scoreDelegate.itemId, !scoreDelegate.favorite)
+                        }
+                        AppMenuItem {
                             symbol: "↗"
                             text: "打开"
                             onTriggered: libraryService.enterFolder(scoreDelegate.itemId)
@@ -481,6 +534,53 @@ Rectangle {
                                 renameFolderDialog.targetId = scoreDelegate.itemId
                                 renameFolderDialog.value = scoreDelegate.title
                                 renameFolderDialog.open()
+                            }
+                        }
+                        AppMenuSeparator { }
+                        AppMenu {
+                            id: folderMoveSubmenu
+                            title: "移动到文件夹"
+                            symbol: "▣"
+                            enabled: libraryService.folders.count > 0
+                            AppMenuItem {
+                                symbol: "↖"
+                                text: "无（移出文件夹）"
+                                onTriggered: libraryService.setItemFolder(scoreDelegate.itemId, "")
+                            }
+                            AppMenuSeparator { }
+                            Instantiator {
+                                model: libraryService.folders
+                                delegate: AppMenuItem {
+                                    required property string itemId
+                                    required property string name
+                                    text: name
+                                    symbol: "▣"
+                                    enabled: libraryService.canMoveItemToFolder(scoreDelegate.itemId, itemId)
+                                    onTriggered: libraryService.setItemFolder(scoreDelegate.itemId, itemId)
+                                }
+                                onObjectAdded: function(index, object) { folderMoveSubmenu.insertItem(index + 2, object) }
+                                onObjectRemoved: function(index, object) { folderMoveSubmenu.removeItem(object) }
+                            }
+                        }
+                        AppMenu {
+                            id: folderTagSubmenu
+                            title: "标签"
+                            tagIcon: true
+                            enabled: libraryService.tags.count > 0
+                            Instantiator {
+                                model: libraryService.tags
+                                delegate: AppMenuItem {
+                                    required property string itemId
+                                    required property string name
+                                    text: name
+                                    tagIcon: true
+                                    checkable: true
+                                    checked: libraryService.itemHasTag(scoreDelegate.itemId, itemId)
+                                    onTriggered: checked ? libraryService.addItemTag(scoreDelegate.itemId, itemId)
+                                        : libraryService.removeItemTag(scoreDelegate.itemId, itemId)
+                                }
+                                onObjectAdded: function(index, object) { folderTagSubmenu.insertItem(index, object) }
+                                onObjectRemoved: function(index, object) { folderTagSubmenu.removeItem(object) }
                             }
                         }
                         AppMenuSeparator { }
@@ -553,15 +653,14 @@ Rectangle {
                 }
                 Label {
                     Layout.alignment: Qt.AlignHCenter
-                    text: libraryService.searchQuery.length > 0 ? "没有符合条件的项目"
-                        : appController.libraryFilter === "favorites" ? "还没有收藏的乐谱" : "乐谱库为空"
+                    text: root.emptyTitle
                     color: Theme.foreground
                     font.pixelSize: Theme.fontLg
                     font.weight: Font.DemiBold
                 }
                 Label {
                     Layout.alignment: Qt.AlignHCenter
-                    text: libraryService.searchQuery.length > 0 ? "换个关键词试试" : "导入 PDF 或图片，开始建立你的乐谱库"
+                    text: root.emptyDescription
                     color: Theme.mutedForeground
                     font.pixelSize: Theme.fontSm
                 }

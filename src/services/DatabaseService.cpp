@@ -161,5 +161,35 @@ bool DatabaseService::applyMigrations(QString* error)
         }
     }
 
+    // v5: folders participate in favorites and the shared tag system.
+    if (version < 5) {
+        if (!m_database.transaction()) {
+            *error = m_database.lastError().text();
+            return false;
+        }
+        const auto succeeded = query.exec(QStringLiteral(
+            "ALTER TABLE folders ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0"))
+            && query.exec(QStringLiteral(R"(
+                CREATE TABLE IF NOT EXISTS folder_tags (
+                    folder_id TEXT NOT NULL,
+                    tag_id TEXT NOT NULL,
+                    PRIMARY KEY (folder_id, tag_id),
+                    FOREIGN KEY(folder_id) REFERENCES folders(id) ON DELETE CASCADE,
+                    FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE
+                )
+            )"))
+            && query.exec(QStringLiteral("CREATE INDEX IF NOT EXISTS idx_folder_tags_tag_id ON folder_tags(tag_id)"))
+            && query.exec(QStringLiteral("PRAGMA user_version = 5"));
+        if (!succeeded) {
+            m_database.rollback();
+            *error = query.lastError().text();
+            return false;
+        }
+        if (!m_database.commit()) {
+            *error = m_database.lastError().text();
+            return false;
+        }
+    }
+
     return true;
 }

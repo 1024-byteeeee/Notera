@@ -527,6 +527,36 @@ int main(int argc, char* argv[])
                 fail("score-tag-removal");
                 return;
             }
+            libraryService.addItemTag(folderId, tagId);
+            libraryService.setFilterMode(QStringLiteral("tag:") + tagId);
+            const auto entryTypeRoleForTags = libraryService.entries()->roleNames().key("itemType", -1);
+            const auto entryTagsRole = libraryService.entries()->roleNames().key("tags", -1);
+            if (!libraryService.itemHasTag(folderId, tagId)
+                || libraryService.entries()->rowCount() != 1
+                || libraryService.entries()->data(libraryService.entries()->index(0, 0), entryTypeRoleForTags).toString()
+                    != QStringLiteral("folder")
+                || libraryService.entries()->data(libraryService.entries()->index(0, 0), entryTagsRole).toStringList().isEmpty()) {
+                fail("folder-tag-assignment-and-display");
+                return;
+            }
+            libraryService.toggleItemFavorite(folderId, true);
+            libraryService.setFilterMode(QStringLiteral("favorites"));
+            if (libraryService.entries()->rowCount() < 1
+                || libraryService.entries()->data(libraryService.entries()->index(0, 0), entryTypeRoleForTags).toString()
+                    != QStringLiteral("folder")) {
+                fail("folder-favorite-filter");
+                return;
+            }
+            if (!libraryService.canMoveItemToFolder(folderId, recentFirstFolderId)) {
+                fail("folder-move-valid-target");
+                return;
+            }
+            libraryService.setItemFolder(folderId, recentFirstFolderId);
+            if (libraryService.canMoveItemToFolder(recentFirstFolderId, folderId)) {
+                fail("folder-move-cycle-guard");
+                return;
+            }
+            libraryService.setItemFolder(folderId, QString {});
             libraryService.setFilterMode(QStringLiteral("folder:") + folderId);
 
             const auto favoriteRole = libraryService.scores()->roleNames().key("favorite", -1);
