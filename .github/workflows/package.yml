@@ -174,24 +174,26 @@ jobs:
           $msi = Get-ChildItem build/windows-x64/packages/*.msi | Select-Object -First 1
           if (-not $msi) { throw "MSI package was not generated" }
 
-          $inspectDir = "build/windows-x64/msi-inspect"
-          $wxs = "build/windows-x64/msi-inspect.wxs"
-          dark.exe -nologo -x $inspectDir -o $wxs $msi.FullName
-          if ($LASTEXITCODE -ne 0) { throw "Failed to inspect MSI" }
-
-          $source = Get-Content $wxs -Raw
-          $required = @(
-            'Language="2052"',
-            'Id="NoteraOptionsDlg"',
-            'Property="INSTALLDESKTOPSHORTCUT"',
-            'Id="DesktopShortcutFeature"',
-            'Id="NoteraDesktopShortcut"'
+          $installer = New-Object -ComObject WindowsInstaller.Installer
+          $database = $installer.GetType().InvokeMember(
+            "OpenDatabase", "InvokeMethod", $null, $installer, @($msi.FullName, 0)
           )
-          foreach ($marker in $required) {
-            if (-not $source.Contains($marker)) {
-              throw "MSI validation failed: missing $marker"
-            }
+
+          function Assert-MsiRow([string]$query, [string]$description) {
+            $view = $database.GetType().InvokeMember(
+              "OpenView", "InvokeMethod", $null, $database, @($query)
+            )
+            $view.GetType().InvokeMember("Execute", "InvokeMethod", $null, $view, $null)
+            $record = $view.GetType().InvokeMember("Fetch", "InvokeMethod", $null, $view, $null)
+            $view.GetType().InvokeMember("Close", "InvokeMethod", $null, $view, $null)
+            if (-not $record) { throw "MSI validation failed: $description" }
           }
+
+          Assert-MsiRow "SELECT ``Value`` FROM ``Property`` WHERE ``Property`` = 'ProductLanguage' AND ``Value`` = '2052'" "installer language is not Simplified Chinese"
+          Assert-MsiRow "SELECT ``Dialog`` FROM ``Dialog`` WHERE ``Dialog`` = 'NoteraOptionsDlg'" "options dialog is missing"
+          Assert-MsiRow "SELECT ``Control`` FROM ``Control`` WHERE ``Dialog_`` = 'NoteraOptionsDlg' AND ``Control`` = 'DesktopShortcut' AND ``Property`` = 'INSTALLDESKTOPSHORTCUT'" "desktop shortcut checkbox is missing"
+          Assert-MsiRow "SELECT ``Feature`` FROM ``Feature`` WHERE ``Feature`` = 'DesktopShortcutFeature'" "desktop shortcut feature is missing"
+          Assert-MsiRow "SELECT ``Shortcut`` FROM ``Shortcut`` WHERE ``Shortcut`` = 'NoteraDesktopShortcut'" "desktop shortcut is missing"
 
       - name: Upload MSI
         uses: actions/upload-artifact@v7
