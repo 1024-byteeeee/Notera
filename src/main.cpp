@@ -371,7 +371,7 @@ int main(int argc, char* argv[])
             query.exec(QStringLiteral("INSERT INTO tags (id, name) VALUES ('smoke-tag', 'MERGE-SMOKE-TAG')"));
             query.exec(QStringLiteral("INSERT INTO folders (id, name, created_at, updated_at, parent_id, favorite) VALUES ('smoke-folder', 'MERGE-SMOKE-FOLDER', 1, 1, NULL, 0)"));
             query.exec(QStringLiteral("INSERT INTO folder_tags (folder_id, tag_id) VALUES ('smoke-folder', 'smoke-tag')"));
-            QSqlQuery insert(query);
+            QSqlQuery insert(database);
             insert.prepare(QStringLiteral("INSERT INTO scores (id, title, composer, file_name, file_path, file_type, page_count, favorite, last_page, created_at, updated_at, folder_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"));
             insert.addBindValue(QStringLiteral("smoke-score"));
             insert.addBindValue(QStringLiteral("MERGE-SMOKE-SCORE"));
