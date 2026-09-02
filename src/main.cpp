@@ -243,6 +243,11 @@ int main(int argc, char* argv[])
         qWarning() << "Data directory migration failed:" << migrationError;
         if (arguments.contains(QStringLiteral("--storage-migration-smoke-test"))) return 1;
     }
+    QString restoreError;
+    if (!ApplicationController::applyPendingBackupRestore(&restoreError)) {
+        qWarning() << "Database restore failed:" << restoreError;
+        return 1;
+    }
     if (arguments.contains(QStringLiteral("--clear-data-smoke-test"))) {
         const auto clearRoot = AppDataPaths::root();
         QDir().mkpath(clearRoot + QStringLiteral("/database"));

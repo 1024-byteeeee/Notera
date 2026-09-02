@@ -9,6 +9,7 @@
 #include <QPainter>
 #include <QPdfDocument>
 #include <QStandardPaths>
+#include <QRegularExpression>
 #include <QUrl>
 #include <QUuid>
 
@@ -25,6 +26,29 @@ int pageCountForFile(const QString& filePath, const QString& fileType)
     QPdfDocument document;
     document.load(filePath);
     return document.status() == QPdfDocument::Status::Ready ? std::max(1, document.pageCount()) : 1;
+}
+
+QString safeExportName(QString name)
+{
+    name = name.trimmed();
+    name.replace(QRegularExpression(QStringLiteral(R"([<>:"/\\|?*\x00-\x1F])")), QStringLiteral("_"));
+    while (name.endsWith(QLatin1Char('.')) || name.endsWith(QLatin1Char(' '))) name.chop(1);
+    return name.isEmpty() ? QStringLiteral("未命名") : name;
+}
+
+QString availableExportPath(const QString& requestedPath)
+{
+    if (!QFileInfo::exists(requestedPath)) return requestedPath;
+    const QFileInfo info(requestedPath);
+    const auto suffix = info.completeSuffix();
+    const auto base = suffix.isEmpty() ? info.fileName()
+        : info.fileName().left(info.fileName().size() - suffix.size() - 1);
+    for (int index = 2; ; ++index) {
+        const auto fileName = suffix.isEmpty() ? QStringLiteral("%1 (%2)").arg(base).arg(index)
+            : QStringLiteral("%1 (%2).%3").arg(base).arg(index).arg(suffix);
+        const auto candidate = info.dir().filePath(fileName);
+        if (!QFileInfo::exists(candidate)) return candidate;
+    }
 }
 
 }
@@ -731,6 +755,57 @@ QString LibraryService::tagItems(const QVariantList& itemIds, const QString& tag
     }
     reload();
     emit noticeOccurred(QStringLiteral("已为 %1 个项目添加标签").arg(ids.size()));
+    return {};
+}
+
+QString LibraryService::saveScoreAs(const QString& scoreId, const QUrl& destination)
+{
+    if (!destination.isValid() || !destination.isLocalFile()) return QStringLiteral("请选择本机保存位置。");
+    QString error;
+    const auto sourcePath = m_repository.filePathById(scoreId, &error);
+    if (sourcePath.isEmpty() || !QFileInfo::exists(sourcePath)) return QStringLiteral("找不到乐谱源文件。");
+    auto destinationPath = QDir::cleanPath(destination.toLocalFile());
+    if (QFileInfo(destinationPath).suffix().isEmpty()) {
+        destinationPath += QLatin1Char('.') + QFileInfo(sourcePath).suffix();
+    }
+    if (QFileInfo(sourcePath).canonicalFilePath() == QFileInfo(destinationPath).canonicalFilePath()) {
+        return QStringLiteral("保存位置与源文件相同。");
+    }
+    if (QFileInfo::exists(destinationPath) && !QFile::remove(destinationPath)) {
+        return QStringLiteral("无法覆盖目标文件。");
+    }
+    if (!QFile::copy(sourcePath, destinationPath)) return QStringLiteral("另存乐谱失败。");
+    emit noticeOccurred(QStringLiteral("乐谱已另存为"));
+    return {};
+}
+
+QString LibraryService::saveFolderAs(const QString& folderId, const QUrl& destinationDirectory)
+{
+    if (!destinationDirectory.isValid() || !destinationDirectory.isLocalFile()) {
+        return QStringLiteral("请选择本机文件夹。");
+    }
+    QString error;
+    const auto entries = m_repository.folderExportEntries(folderId, &error);
+    if (!error.isEmpty() || entries.isEmpty()) return QStringLiteral("无法读取文件夹内容。");
+    const auto destinationRoot = QDir::cleanPath(destinationDirectory.toLocalFile());
+    int copied = 0;
+    for (const auto& value : entries) {
+        const auto entry = value.toMap();
+        const auto rawSegments = entry.value(QStringLiteral("relativePath")).toString().split(QLatin1Char('/'), Qt::SkipEmptyParts);
+        QStringList safeSegments;
+        for (const auto& segment : rawSegments) safeSegments.append(safeExportName(segment));
+        const auto folderPath = QDir(destinationRoot).filePath(safeSegments.join(QLatin1Char('/')));
+        if (!QDir().mkpath(folderPath)) return QStringLiteral("无法创建导出文件夹。");
+        const auto sourcePath = entry.value(QStringLiteral("filePath")).toString();
+        if (sourcePath.isEmpty()) continue;
+        const auto suffix = QFileInfo(sourcePath).suffix();
+        auto fileName = safeExportName(entry.value(QStringLiteral("title")).toString());
+        if (!suffix.isEmpty()) fileName += QLatin1Char('.') + suffix;
+        const auto targetPath = availableExportPath(QDir(folderPath).filePath(fileName));
+        if (!QFile::copy(sourcePath, targetPath)) return QStringLiteral("导出文件夹时复制乐谱失败。");
+        ++copied;
+    }
+    emit noticeOccurred(QStringLiteral("文件夹已另存，导出 %1 份乐谱").arg(copied));
     return {};
 }
 

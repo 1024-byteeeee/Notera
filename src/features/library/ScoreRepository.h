@@ -44,6 +44,7 @@ public:
     [[nodiscard]] QString folderName(const QString& folderId, QString* error) const;
     [[nodiscard]] QString folderBreadcrumb(const QString& folderId, QString* error) const;
     [[nodiscard]] QVariantList folderScoresRecursive(const QString& folderId, QString* error) const;
+    [[nodiscard]] QVariantList folderExportEntries(const QString& folderId, QString* error) const;
     [[nodiscard]] bool createFolder(const QString& name, const QString& parentId, QString* error) const;
     [[nodiscard]] bool markFolderOpened(const QString& folderId, QString* error) const;
     [[nodiscard]] bool renameFolder(const QString& folderId, const QString& name, QString* error) const;

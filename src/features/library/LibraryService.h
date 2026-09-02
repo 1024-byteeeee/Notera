@@ -65,6 +65,8 @@ public:
     Q_INVOKABLE QString moveItems(const QVariantList& itemIds, const QString& folderId);
     Q_INVOKABLE QString favoriteItems(const QVariantList& itemIds);
     Q_INVOKABLE QString tagItems(const QVariantList& itemIds, const QString& tagId);
+    Q_INVOKABLE QString saveScoreAs(const QString& scoreId, const QUrl& destination);
+    Q_INVOKABLE QString saveFolderAs(const QString& folderId, const QUrl& destinationDirectory);
     Q_INVOKABLE void createFolder(const QString& name);
     Q_INVOKABLE void renameFolder(const QString& folderId, const QString& name);
     Q_INVOKABLE void deleteFolder(const QString& folderId);

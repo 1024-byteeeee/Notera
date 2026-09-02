@@ -2,14 +2,20 @@
 #include "platform/AppDataPaths.h"
 
 #include <algorithm>
+#include <QCoreApplication>
 #include <QDir>
 #include <QDesktopServices>
+#include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSettings>
 #include <QSqlDatabase>
+#include <QSqlError>
 #include <QSqlQuery>
 #include <QStandardPaths>
+#include <QUuid>
 
 ApplicationController::ApplicationController(QObject* parent)
     : QObject(parent)
@@ -209,6 +215,76 @@ static bool removeDirectoryRecursively(const QString& path)
     return dir.removeRecursively();
 }
 
+static QString escapedSqlString(QString value)
+{
+    return value.replace(QLatin1Char('\''), QStringLiteral("''"));
+}
+
+static bool writeBackupManifest(const QString& backupRoot, const QString& sourceRoot, QString* error)
+{
+    QFile file(backupRoot + QStringLiteral("/manifest.json"));
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        *error = QStringLiteral("无法写入备份清单。");
+        return false;
+    }
+    const QJsonObject manifest {
+        {QStringLiteral("format"), QStringLiteral("notera-backup")},
+        {QStringLiteral("formatVersion"), 1},
+        {QStringLiteral("applicationVersion"), QCoreApplication::applicationVersion()},
+        {QStringLiteral("createdAt"), QDateTime::currentDateTimeUtc().toString(Qt::ISODate)},
+        {QStringLiteral("sourceRoot"), sourceRoot}
+    };
+    if (file.write(QJsonDocument(manifest).toJson(QJsonDocument::Indented)) < 0) {
+        *error = QStringLiteral("无法写入备份清单。");
+        return false;
+    }
+    return true;
+}
+
+static bool readBackupManifest(const QString& backupRoot, QJsonObject* manifest, QString* error)
+{
+    QFile file(backupRoot + QStringLiteral("/manifest.json"));
+    if (!file.open(QIODevice::ReadOnly)) {
+        *error = QStringLiteral("所选目录不是 Notera 数据库备份。");
+        return false;
+    }
+    QJsonParseError parseError;
+    const auto document = QJsonDocument::fromJson(file.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        *error = QStringLiteral("备份清单已损坏。");
+        return false;
+    }
+    *manifest = document.object();
+    if (manifest->value(QStringLiteral("format")).toString() != QStringLiteral("notera-backup")
+        || manifest->value(QStringLiteral("formatVersion")).toInt() != 1
+        || !QFileInfo::exists(backupRoot + QStringLiteral("/database/notera.db"))) {
+        *error = QStringLiteral("备份格式不受支持或数据库文件缺失。");
+        return false;
+    }
+    return true;
+}
+
+static bool validateBackupDatabase(const QString& databasePath, QString* error)
+{
+    const auto connectionName = QStringLiteral("notera_backup_validation_")
+        + QUuid::createUuid().toString(QUuid::WithoutBraces);
+    bool valid = false;
+    {
+        auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+        database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
+        database.setDatabaseName(databasePath);
+        if (database.open()) {
+            QSqlQuery query(database);
+            valid = query.exec(QStringLiteral("PRAGMA integrity_check")) && query.next()
+                && query.value(0).toString() == QStringLiteral("ok");
+        }
+        if (!valid) *error = QStringLiteral("备份数据库完整性校验失败。");
+        database.close();
+    }
+    QSqlDatabase::removeDatabase(connectionName);
+    return valid;
+}
+
 QString ApplicationController::migrateDataDirectory(const QUrl& newDirectory)
 {
     if (!newDirectory.isValid() || !newDirectory.isLocalFile()) {
@@ -253,6 +329,138 @@ QString ApplicationController::openDataDirectory() const
     }
     return QDesktopServices::openUrl(QUrl::fromLocalFile(path))
         ? QString {} : QStringLiteral("无法打开数据存储目录。");
+}
+
+QString ApplicationController::exportDatabaseBackup(const QUrl& destinationDirectory) const
+{
+    if (!destinationDirectory.isValid() || !destinationDirectory.isLocalFile()) {
+        return QStringLiteral("请选择本机文件夹。");
+    }
+    const auto parentPath = QDir::cleanPath(destinationDirectory.toLocalFile());
+    if (!QDir(parentPath).exists()) return QStringLiteral("目标文件夹不存在。");
+    const auto backupName = QStringLiteral("Notera-backup-%1.notera-backup")
+        .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss")));
+    const auto backupRoot = QDir(parentPath).filePath(backupName);
+    if (!QDir().mkpath(backupRoot + QStringLiteral("/database"))) {
+        return QStringLiteral("无法创建备份目录。");
+    }
+
+    QString error;
+    const auto snapshotPath = backupRoot + QStringLiteral("/database/notera.db");
+    auto database = QSqlDatabase::database(QStringLiteral("notera-library"), false);
+    QSqlQuery query(database);
+    const auto snapshotSql = QStringLiteral("VACUUM INTO '%1'").arg(escapedSqlString(snapshotPath));
+    if (!database.isOpen() || !query.exec(snapshotSql)) {
+        removeDirectoryRecursively(backupRoot);
+        return QStringLiteral("创建数据库一致性快照失败：%1").arg(query.lastError().text());
+    }
+
+    const auto sourceRoot = AppDataPaths::root();
+    const QStringList directories {QStringLiteral("library"), QStringLiteral("thumbnails"),
+        QStringLiteral("annotations")};
+    for (const auto& directory : directories) {
+        if (!copyDirectoryRecursively(sourceRoot + QLatin1Char('/') + directory,
+                backupRoot + QLatin1Char('/') + directory, &error)) {
+            removeDirectoryRecursively(backupRoot);
+            return error;
+        }
+    }
+    if (!writeBackupManifest(backupRoot, sourceRoot, &error)) {
+        removeDirectoryRecursively(backupRoot);
+        return error;
+    }
+    return {};
+}
+
+QString ApplicationController::importDatabaseBackup(const QUrl& backupDirectory)
+{
+    if (!backupDirectory.isValid() || !backupDirectory.isLocalFile()) {
+        return QStringLiteral("请选择本机备份文件夹。");
+    }
+    const auto backupRoot = QDir::cleanPath(backupDirectory.toLocalFile());
+    QJsonObject manifest;
+    QString error;
+    if (!readBackupManifest(backupRoot, &manifest, &error)
+        || !validateBackupDatabase(backupRoot + QStringLiteral("/database/notera.db"), &error)) {
+        return error;
+    }
+
+    const auto currentRoot = QDir::cleanPath(AppDataPaths::root());
+    const auto parent = QFileInfo(currentRoot).absolutePath();
+    const auto stagedRoot = QDir(parent).filePath(QStringLiteral(".notera-restore-")
+        + QUuid::createUuid().toString(QUuid::WithoutBraces));
+    if (!copyDirectoryRecursively(backupRoot, stagedRoot, &error)) {
+        removeDirectoryRecursively(stagedRoot);
+        return error;
+    }
+    QSettings settings;
+    settings.setValue(QStringLiteral("storage/pendingBackupRestore"), stagedRoot);
+    settings.sync();
+    if (settings.status() != QSettings::NoError) {
+        removeDirectoryRecursively(stagedRoot);
+        return QStringLiteral("无法保存数据库导入任务。");
+    }
+    emit restartRequested();
+    return {};
+}
+
+bool ApplicationController::applyPendingBackupRestore(QString* error)
+{
+    QSettings settings;
+    const auto stagedRoot = QDir::cleanPath(
+        settings.value(QStringLiteral("storage/pendingBackupRestore")).toString());
+    if (stagedRoot.isEmpty()) return true;
+    QJsonObject manifest;
+    if (!readBackupManifest(stagedRoot, &manifest, error)
+        || !validateBackupDatabase(stagedRoot + QStringLiteral("/database/notera.db"), error)) {
+        return false;
+    }
+
+    const auto currentRoot = QDir::cleanPath(AppDataPaths::root());
+    const auto rollbackRoot = QDir(QFileInfo(currentRoot).absolutePath()).filePath(
+        QStringLiteral(".notera-rollback-") + QUuid::createUuid().toString(QUuid::WithoutBraces));
+    if (QDir(currentRoot).exists() && !QDir().rename(currentRoot, rollbackRoot)) {
+        *error = QStringLiteral("无法暂存当前数据，数据库导入已取消。");
+        return false;
+    }
+    if (!QDir().rename(stagedRoot, currentRoot)) {
+        if (QDir(rollbackRoot).exists()) QDir().rename(rollbackRoot, currentRoot);
+        *error = QStringLiteral("无法启用导入的数据，原数据已保留。");
+        return false;
+    }
+
+    const auto databasePath = currentRoot + QStringLiteral("/database/notera.db");
+    const auto connectionName = QStringLiteral("notera_backup_path_update");
+    bool updated = false;
+    {
+        auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+        database.setDatabaseName(databasePath);
+        if (database.open() && database.transaction()) {
+            const auto sourceRoot = manifest.value(QStringLiteral("sourceRoot")).toString();
+            QSqlQuery query(database);
+            query.prepare(QStringLiteral("UPDATE scores SET file_path = REPLACE(file_path, ?, ?)"));
+            query.addBindValue(sourceRoot);
+            query.addBindValue(currentRoot);
+            const auto filesUpdated = query.exec();
+            query.prepare(QStringLiteral("UPDATE scores SET thumbnail_path = REPLACE(thumbnail_path, ?, ?) WHERE thumbnail_path IS NOT NULL"));
+            query.addBindValue(sourceRoot);
+            query.addBindValue(currentRoot);
+            updated = filesUpdated && query.exec() && database.commit();
+            if (!updated) database.rollback();
+        }
+        database.close();
+    }
+    QSqlDatabase::removeDatabase(connectionName);
+    if (!updated) {
+        removeDirectoryRecursively(currentRoot);
+        QDir().rename(rollbackRoot, currentRoot);
+        *error = QStringLiteral("无法更新导入数据库中的资源路径，原数据已恢复。");
+        return false;
+    }
+    removeDirectoryRecursively(rollbackRoot);
+    settings.remove(QStringLiteral("storage/pendingBackupRestore"));
+    settings.sync();
+    return settings.status() == QSettings::NoError;
 }
 
 void ApplicationController::requestRestart()

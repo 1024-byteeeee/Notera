@@ -745,6 +745,33 @@ QVariantList ScoreRepository::folderScoresRecursive(const QString& folderId, QSt
     return result;
 }
 
+QVariantList ScoreRepository::folderExportEntries(const QString& folderId, QString* error) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral(R"(
+        WITH RECURSIVE tree(id, relative_path) AS (
+            SELECT id, name FROM folders WHERE id = ?
+            UNION ALL
+            SELECT folders.id, tree.relative_path || '/' || folders.name
+            FROM folders JOIN tree ON folders.parent_id = tree.id
+        )
+        SELECT tree.relative_path, scores.title, scores.file_path
+        FROM tree LEFT JOIN scores ON scores.folder_id = tree.id
+        ORDER BY tree.relative_path COLLATE NOCASE, scores.title COLLATE NOCASE
+    )"));
+    query.addBindValue(folderId);
+    if (!query.exec()) {
+        *error = query.lastError().text();
+        return {};
+    }
+    QVariantList result;
+    while (query.next()) {
+        result.append(QVariantMap {{QStringLiteral("relativePath"), query.value(0)},
+            {QStringLiteral("title"), query.value(1)}, {QStringLiteral("filePath"), query.value(2)}});
+    }
+    return result;
+}
+
 bool ScoreRepository::createFolder(const QString& name, const QString& parentId, QString* error) const
 {
     QSqlQuery query(m_database);

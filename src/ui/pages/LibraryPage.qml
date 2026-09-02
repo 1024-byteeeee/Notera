@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
+import QtCore
 import Notera
 import "../components"
 
@@ -566,6 +567,15 @@ Rectangle {
                                 renameDialog.open()
                             }
                         }
+                        AppMenuItem {
+                            symbol: "export"
+                            text: "另存为"
+                            onTriggered: {
+                                saveAsDialog.scoreId = scoreDelegate.scoreId
+                                saveAsDialog.defaultName = scoreDelegate.filePath.split("/").pop()
+                                saveAsDialog.open()
+                            }
+                        }
                         AppMenuSeparator { }
 
                         AppMenu {
@@ -663,6 +673,15 @@ Rectangle {
                                 renameFolderDialog.targetId = scoreDelegate.itemId
                                 renameFolderDialog.value = scoreDelegate.title
                                 renameFolderDialog.open()
+                            }
+                        }
+                        AppMenuItem {
+                            symbol: "export"
+                            text: "另存为"
+                            onTriggered: {
+                                saveFolderAsDialog.folderId = scoreDelegate.itemId
+                                saveFolderAsDialog.folderName = scoreDelegate.title
+                                saveFolderAsDialog.open()
                             }
                         }
                         AppMenuSeparator { }
@@ -818,7 +837,7 @@ Rectangle {
             Rectangle {
                 anchors.fill: parent
                 anchors.margins: 8
-                visible: dropArea.containsDrag && !dropArea.internalDragHover
+                visible: dropArea.containsDrag && dropArea.hasExternalUrls
                 radius: Theme.radiusLg
                 color: Theme.accentSoft
                 border.width: 2
@@ -835,16 +854,18 @@ Rectangle {
 
             DropArea {
                 id: dropArea
-                property bool internalDragHover: false
+                property bool hasExternalUrls: false
                 anchors.fill: parent
                 z: 1
-                onEntered: function(drag) { internalDragHover = root.dragIds(drag).length > 0 }
-                onExited: internalDragHover = false
+                onEntered: function(drag) {
+                    hasExternalUrls = drag.urls.length > 0
+                }
+                onExited: hasExternalUrls = false
                 onDropped: function(drop) {
-                    internalDragHover = false
-                    const internalIds = root.dragIds(drop)
-                    if (internalIds.length > 0) {
-                        libraryService.moveItems(internalIds, "")
+                    hasExternalUrls = false
+                    // 内部拖放（移动乐谱/文件夹）仅在文件夹卡片上生效；
+                    // 松开在空白区域时不修改数据库，项目自动回到原位置。
+                    if (root.dragIds(drop).length > 0) {
                         drop.acceptProposedAction()
                         return
                     }
@@ -1007,5 +1028,40 @@ Rectangle {
             libraryService.deleteItems(batchDeleteDialog.selectedIds)
             root.clearSelection()
         }
+    }
+
+    FileDialog {
+        id: saveAsDialog
+        property string scoreId: ""
+        property string defaultName: ""
+        title: "另存为"
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: ""
+        onAccepted: {
+            const error = libraryService.saveScoreAs(scoreId, selectedFile)
+            saveAsResultDialog.title = error.length > 0 ? "另存为失败" : "另存为成功"
+            saveAsResultDialog.message = error.length > 0 ? error : "乐谱已保存到所选位置。"
+            saveAsResultDialog.open()
+        }
+    }
+
+    FolderDialog {
+        id: saveFolderAsDialog
+        property string folderId: ""
+        property string folderName: ""
+        title: "选择导出目标目录"
+        currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
+        onAccepted: {
+            const error = libraryService.saveFolderAs(folderId, selectedFolder)
+            saveAsResultDialog.title = error.length > 0 ? "导出失败" : "导出成功"
+            saveAsResultDialog.message = error.length > 0 ? error : "文件夹已导出到所选位置。"
+            saveAsResultDialog.open()
+        }
+    }
+
+    ConfirmDialog {
+        id: saveAsResultDialog
+        title: "另存为结果"
+        confirmText: "确定"
     }
 }

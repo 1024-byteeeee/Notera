@@ -379,6 +379,84 @@ Rectangle {
 
                     Rectangle {
                         Layout.fillWidth: true
+                        implicitHeight: backupLayout.implicitHeight + 40
+                        radius: Theme.radiusLg
+                        color: Theme.surface
+                        border.width: 1
+                        border.color: Theme.border
+
+                        ColumnLayout {
+                            id: backupLayout
+                            anchors.fill: parent
+                            anchors.margins: 20
+                            spacing: 12
+                            Label {
+                                text: "数据备份"
+                                color: Theme.foreground
+                                font.pixelSize: Theme.fontLg
+                                font.weight: Font.DemiBold
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                implicitHeight: 72
+                                radius: Theme.radiusMd
+                                color: Theme.elevatedSurface
+                                border.width: 1
+                                border.color: Theme.border
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 18
+                                    anchors.rightMargin: 18
+                                    spacing: 16
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 3
+                                        Label { text: "导出数据库备份"; color: Theme.foreground; font.pixelSize: Theme.fontMd; font.weight: Font.Medium }
+                                        Label { text: "导出完整备份包（数据库、乐谱、缩略图），可跨设备恢复"; color: Theme.secondaryForeground; font.pixelSize: Theme.fontXs }
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                    AppButton {
+                                        objectName: "exportBackupButton"
+                                        text: "导出"
+                                        onClicked: exportBackupDialog.open()
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                implicitHeight: 72
+                                radius: Theme.radiusMd
+                                color: Theme.elevatedSurface
+                                border.width: 1
+                                border.color: Theme.border
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 18
+                                    anchors.rightMargin: 18
+                                    spacing: 16
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 3
+                                        Label { text: "导入数据库备份"; color: Theme.foreground; font.pixelSize: Theme.fontMd; font.weight: Font.Medium }
+                                        Label { text: "从备份包恢复数据，将替换当前所有数据并自动重启"; color: Theme.secondaryForeground; font.pixelSize: Theme.fontXs }
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                    AppButton {
+                                        objectName: "importBackupButton"
+                                        text: "导入"
+                                        onClicked: importBackupDialog.open()
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
                         implicitHeight: 64
                         radius: Theme.radiusMd
                         color: Theme.elevatedSurface
@@ -468,6 +546,56 @@ Rectangle {
             migrateConfirmDialog.newDirectory = selectedFolder
             migrateConfirmDialog.open()
         }
+    }
+
+    FolderDialog {
+        id: exportBackupDialog
+        objectName: "exportBackupDialog"
+        title: "选择备份保存位置"
+        currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
+        onAccepted: {
+            const error = appController.exportDatabaseBackup(selectedFolder)
+            backupResultDialog.title = error.length > 0 ? "导出失败" : "导出成功"
+            backupResultDialog.message = error.length > 0
+                ? error
+                : "备份已导出到所选目录。"
+            backupResultDialog.open()
+        }
+    }
+
+    FolderDialog {
+        id: importBackupDialog
+        objectName: "importBackupDialog"
+        title: "选择备份目录（.notera-backup）"
+        currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
+        onAccepted: {
+            importConfirmDialog.backupDirectory = selectedFolder
+            importConfirmDialog.message = "导入将替换当前所有乐谱、文件夹、标签和设置，此操作不可撤销。\n\n是否继续？"
+            importConfirmDialog.open()
+        }
+    }
+
+    ConfirmDialog {
+        id: importConfirmDialog
+        objectName: "importConfirmDialog"
+        property url backupDirectory: ""
+        title: "导入数据库备份？"
+        confirmText: "开始导入"
+        onAccepted: {
+            const error = appController.importDatabaseBackup(backupDirectory)
+            if (error.length > 0) {
+                backupResultDialog.title = "导入失败"
+                backupResultDialog.message = error
+                backupResultDialog.open()
+            }
+        }
+    }
+
+    ConfirmDialog {
+        id: backupResultDialog
+        objectName: "backupResultDialog"
+        title: "备份结果"
+        confirmText: "确定"
     }
 
     ConfirmDialog {
