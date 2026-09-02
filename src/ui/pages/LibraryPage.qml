@@ -289,12 +289,12 @@ Rectangle {
                     readonly property int folderSubmenuItemCount: folderSubmenu.count
                     readonly property int tagSubmenuItemCount: tagSubmenu.count
                     readonly property int normalMenuArrowCount: favoriteMenuItem.visibleArrowCount
-                    readonly property int folderSubmenuArrowCount: scoreMenu.openedOnce && scoreMenu.count > 4
-                        && scoreMenu.itemAt(4) ? scoreMenu.itemAt(4).visibleArrowCount : -1
-                    readonly property real folderSubmenuArrowWidth: scoreMenu.openedOnce && scoreMenu.count > 4
-                        && scoreMenu.itemAt(4) ? scoreMenu.itemAt(4).arrowVisualWidth : -1
-                    readonly property real folderSubmenuArrowRightInset: scoreMenu.openedOnce && scoreMenu.count > 4
-                        && scoreMenu.itemAt(4) ? scoreMenu.itemAt(4).arrowRightInset : -1
+                    readonly property int folderSubmenuArrowCount: scoreMenu.openedOnce && scoreMenu.count > 6
+                        && scoreMenu.itemAt(6) ? scoreMenu.itemAt(6).visibleArrowCount : -1
+                    readonly property real folderSubmenuArrowWidth: scoreMenu.openedOnce && scoreMenu.count > 6
+                        && scoreMenu.itemAt(6) ? scoreMenu.itemAt(6).arrowVisualWidth : -1
+                    readonly property real folderSubmenuArrowRightInset: scoreMenu.openedOnce && scoreMenu.count > 6
+                        && scoreMenu.itemAt(6) ? scoreMenu.itemAt(6).arrowRightInset : -1
                     readonly property bool tagMenuHasDefaultCheckIndicator: tagSubmenu.count > 0
                         && tagSubmenu.itemAt(0).indicator.visible
                         && tagSubmenu.itemAt(0).indicator.implicitWidth > 0
@@ -578,28 +578,58 @@ Rectangle {
                                 saveAsDialog.open()
                             }
                         }
+                        AppMenuItem {
+                            symbol: "copy"
+                            text: "复制"
+                            onTriggered: {
+                                const ids = libraryService.selection.count > 0
+                                    ? libraryService.selection.itemIds
+                                    : [scoreDelegate.itemId]
+                                libraryService.copyItems(ids)
+                            }
+                        }
+                        AppMenuItem {
+                            symbol: "cut"
+                            text: "剪切"
+                            onTriggered: {
+                                const ids = libraryService.selection.count > 0
+                                    ? libraryService.selection.itemIds
+                                    : [scoreDelegate.itemId]
+                                libraryService.cutItems(ids)
+                            }
+                        }
                         AppMenuSeparator { }
 
                         AppMenu {
                             id: folderSubmenu
                             title: "移动到文件夹"
                             symbol: "folder"
-                            enabled: libraryService.folders.count > 0
+                            enabled: rootChildFolderModel.count > 0
                             AppMenuItem {
                                 symbol: "folder-up"
                                 text: "无（移出文件夹）"
-                                onTriggered: libraryService.setItemFolder(scoreDelegate.itemId, "")
+                                onTriggered: {
+                                    const ids = libraryService.selection.count > 0
+                                        ? libraryService.selection.itemIds
+                                        : [scoreDelegate.itemId]
+                                    libraryService.moveItems(ids, "")
+                                }
                             }
                             AppMenuSeparator { }
                             Instantiator {
-                                model: libraryService.folders
+                                id: childFolderInstantiator
+                                model: rootChildFolderModel
                                 delegate: AppMenuItem {
                                     required property string itemId
                                     required property string name
                                     text: name
                                     symbol: "folder"
-                                    enabled: libraryService.canMoveItemToFolder(scoreDelegate.itemId, itemId)
-                                    onTriggered: libraryService.setItemFolder(scoreDelegate.itemId, itemId)
+                                    onTriggered: {
+                                        const ids = libraryService.selection.count > 0
+                                            ? libraryService.selection.itemIds
+                                            : [scoreDelegate.itemId]
+                                        libraryService.moveItems(ids, itemId)
+                                    }
                                 }
                                 onObjectAdded: function(index, object) {
                                     folderSubmenu.insertItem(index + 2, object)
@@ -939,6 +969,18 @@ Rectangle {
         }
     }
 
+    ListModel {
+        id: rootChildFolderModel
+        function refresh() {
+            clear()
+            const folders = libraryService.childFolders(libraryService.currentFolderId)
+            for (let i = 0; i < folders.length; i++) {
+                append({ itemId: folders[i].id, name: folders[i].name })
+            }
+        }
+        Component.onCompleted: refresh()
+    }
+
     AppMenu {
         id: blankContextMenu
         objectName: "blankContextMenu"
@@ -946,6 +988,13 @@ Rectangle {
         AppMenuItem { text: "新建标签"; tagIcon: true; onTriggered: newTagDialog.open() }
         AppMenuSeparator { visible: !appController.libraryFilter.startsWith("tag:") }
         AppMenuItem { text: "导入乐谱"; symbol: "import"; visible: !appController.libraryFilter.startsWith("tag:"); onTriggered: fileDialog.open() }
+        AppMenuSeparator { visible: libraryService.clipboardItems.length > 0 }
+        AppMenuItem {
+            text: libraryService.clipboardMode === "cut" ? "粘贴（移动）" : "粘贴"
+            symbol: "paste"
+            visible: libraryService.clipboardItems.length > 0
+            onTriggered: libraryService.pasteItems()
+        }
     }
 
     AppDialog {
@@ -1065,5 +1114,140 @@ Rectangle {
         id: saveAsResultDialog
         title: "另存为结果"
         confirmText: "确定"
+    }
+
+    Dialog {
+        id: conflictDialog
+        property string conflictName: ""
+        property int conflictIndex: 0
+        property int conflictTotal: 0
+        property bool applyToAll: false
+
+        parent: Overlay.overlay
+        x: parent ? Math.round((parent.width - width) / 2) : 0
+        y: parent ? Math.round((parent.height - height) / 2) : 0
+        width: parent ? Math.min(420, parent.width - 48) : 420
+        popupType: Popup.Item
+        modal: true
+        focus: true
+        padding: 22
+        closePolicy: Popup.NoAutoClose
+        transformOrigin: Item.Center
+
+        enter: Transition {
+            ParallelAnimation {
+                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
+                NumberAnimation { property: "scale"; from: 0.97; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
+            }
+        }
+        exit: Transition {
+            ParallelAnimation {
+                NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Motion.fast; easing.type: Easing.InCubic }
+                NumberAnimation { property: "scale"; from: 1; to: 0.985; duration: Motion.fast; easing.type: Easing.InCubic }
+            }
+        }
+
+        header: Label {
+            leftPadding: 22; rightPadding: 22; topPadding: 20; bottomPadding: 4
+            text: "文件冲突"
+            color: Theme.foreground
+            font.pixelSize: Theme.fontLg
+            font.weight: Font.DemiBold
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 14
+            Label {
+                Layout.fillWidth: true
+                text: "目标位置已存在同名项目：\n" + conflictDialog.conflictName
+                color: Theme.secondaryForeground
+                font.pixelSize: Theme.fontMd
+                wrapMode: Text.WordWrap
+            }
+            Label {
+                Layout.fillWidth: true
+                text: (conflictDialog.conflictIndex + 1) + " / " + conflictDialog.conflictTotal
+                color: Theme.mutedForeground
+                font.pixelSize: Theme.fontSm
+            }
+            CheckBox {
+                id: applyAllCheck
+                text: "应用到所有冲突项"
+                checked: conflictDialog.applyToAll
+                onToggled: conflictDialog.applyToAll = checked
+                indicator: Rectangle {
+                    implicitWidth: 18; implicitHeight: 18
+                    radius: 5
+                    color: applyAllCheck.checked ? Theme.accent : "transparent"
+                    border.width: 1.5
+                    border.color: applyAllCheck.checked ? Theme.accent : Theme.strongBorder
+                    AppIcon {
+                        anchors.centerIn: parent
+                        width: 12; height: 12
+                        iconName: applyAllCheck.checked ? "check" : ""
+                        iconColor: "white"
+                    }
+                }
+                contentItem: Label {
+                    text: applyAllCheck.text
+                    color: Theme.foreground
+                    font.pixelSize: Theme.fontMd
+                    leftPadding: 8
+                }
+            }
+        }
+
+        footer: Item {
+            implicitHeight: 62
+            RowLayout {
+                anchors.right: parent.right
+                anchors.rightMargin: 22
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 10
+                AppButton {
+                    text: "取消"
+                    onClicked: {
+                        libraryService.resolvePasteConflict("cancel", false)
+                        conflictDialog.close()
+                    }
+                }
+                AppButton {
+                    text: "重命名"
+                    onClicked: {
+                        libraryService.resolvePasteConflict("rename", conflictDialog.applyToAll)
+                        conflictDialog.close()
+                    }
+                }
+                AppButton {
+                    text: "覆盖"
+                    primary: true
+                    onClicked: {
+                        libraryService.resolvePasteConflict("overwrite", conflictDialog.applyToAll)
+                        conflictDialog.close()
+                    }
+                }
+            }
+        }
+
+        background: Rectangle {
+            radius: Theme.radiusLg
+            color: Theme.surface
+            border.width: 1
+            border.color: Theme.strongBorder
+        }
+    }
+
+    Connections {
+        target: libraryService
+        function onPasteConflict(sourceName, targetName, index, total) {
+            conflictDialog.conflictName = sourceName
+            conflictDialog.conflictIndex = index
+            conflictDialog.conflictTotal = total
+            conflictDialog.applyToAll = false
+            conflictDialog.open()
+        }
+        function onCurrentFolderChanged() {
+            rootChildFolderModel.refresh()
+        }
     }
 }

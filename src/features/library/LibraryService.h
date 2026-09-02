@@ -24,6 +24,8 @@ class LibraryService final : public QObject
     Q_PROPERTY(QString currentFolderName READ currentFolderName NOTIFY currentFolderChanged)
     Q_PROPERTY(QString currentFolderBreadcrumb READ currentFolderBreadcrumb NOTIFY currentFolderChanged)
     Q_PROPERTY(bool canGoUp READ canGoUp NOTIFY currentFolderChanged)
+    Q_PROPERTY(QVariantList clipboardItems READ clipboardItems NOTIFY clipboardChanged)
+    Q_PROPERTY(QString clipboardMode READ clipboardMode NOTIFY clipboardChanged)
 
 public:
     explicit LibraryService(QObject* parent = nullptr);
@@ -41,6 +43,8 @@ public:
     [[nodiscard]] QString currentFolderName() const;
     [[nodiscard]] QString currentFolderBreadcrumb() const;
     [[nodiscard]] bool canGoUp() const;
+    [[nodiscard]] QVariantList clipboardItems() const;
+    [[nodiscard]] QString clipboardMode() const;
 
     Q_INVOKABLE void importLocalFile(const QUrl& url);
     Q_INVOKABLE void importAndStitchImages(const QStringList& filePaths);
@@ -63,6 +67,12 @@ public:
     Q_INVOKABLE bool itemHasTag(const QString& itemId, const QString& tagId);
     Q_INVOKABLE bool canMoveItemToFolder(const QString& itemId, const QString& folderId);
     Q_INVOKABLE QString moveItems(const QVariantList& itemIds, const QString& folderId);
+    Q_INVOKABLE QVariantList childFolders(const QString& folderId);
+    Q_INVOKABLE void copyItems(const QVariantList& itemIds);
+    Q_INVOKABLE void cutItems(const QVariantList& itemIds);
+    Q_INVOKABLE void clearClipboard();
+    Q_INVOKABLE void pasteItems();
+    Q_INVOKABLE void resolvePasteConflict(const QString& action, bool applyToAll);
     Q_INVOKABLE QString favoriteItems(const QVariantList& itemIds);
     Q_INVOKABLE QString tagItems(const QVariantList& itemIds, const QString& tagId);
     Q_INVOKABLE QString saveScoreAs(const QString& scoreId, const QUrl& destination);
@@ -88,12 +98,20 @@ signals:
     void errorOccurred(QString message);
     void noticeOccurred(QString message);
     void importRequested();
+    void clipboardChanged();
+    void pasteConflict(QString sourceName, QString targetName, int index, int total);
+    void pasteFinished(int processedCount);
 
 private:
     void reload();
     void reloadFolders();
     void reloadTags();
     void importFile(const QString& sourcePath, const QString& titleOverride = {});
+    void continuePaste();
+    QString copyScoreToFolder(const QString& scoreId, const QString& targetFolderId, const QString& conflictAction);
+    QString copyFolderRecursive(const QString& folderId, const QString& targetParentId, const QString& conflictAction);
+    QString uniqueNameInFolder(const QString& baseName, const QString& folderId, bool isFolder);
+    bool nameExistsInFolder(const QString& name, const QString& folderId, bool isFolder);
 
     DatabaseService m_databaseService;
     ScoreRepository m_repository;
@@ -108,4 +126,11 @@ private:
     QString m_currentFolderId;
     QString m_currentFolderName {QStringLiteral("乐谱库")};
     QString m_currentFolderBreadcrumb {QStringLiteral("乐谱库")};
+    QVariantList m_clipboardItems;
+    QString m_clipboardMode {QStringLiteral("none")};
+    QVariantList m_pasteQueue;
+    int m_pasteIndex {0};
+    QString m_pasteTargetFolderId;
+    QString m_pendingConflictAction;
+    bool m_pasteApplyToAll {false};
 };

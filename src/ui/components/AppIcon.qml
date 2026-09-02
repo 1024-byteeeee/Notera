@@ -27,7 +27,7 @@ Canvas {
             "▾": "chevron-down", "▸": "chevron-right", "⌕": "search",
             "←": "back", "‹": "previous", "›": "next", "▶": "play",
             "⏸": "pause", "↶": "rotate-left", "↷": "rotate-right",
-            "⌚": "metronome"
+            "⌚": "metronome", "⧉": "copy", "✂": "cut", "📋": "paste"
         }
         return aliases[value] || value
     }
@@ -126,6 +126,20 @@ Canvas {
             line([[12, 7], [12, 18]])
             circle(12, 11, 1.8, true)
             line([[4, 20], [20, 20]])
+        } else if (name === "copy") {
+            rect(8, 8, 11, 11)
+            line([[8, 12], [5, 12], [5, 19], [12, 19], [12, 16]])
+        } else if (name === "cut") {
+            circle(7, 17, 2.5, false)
+            circle(17, 17, 2.5, false)
+            line([[8.8, 15.2], [19, 5]])
+            line([[15.2, 15.2], [5, 5]])
+        } else if (name === "paste") {
+            rect(6, 7, 12, 13)
+            rect(9, 4, 6, 4)
+            line([[9, 11], [15, 11]])
+            line([[9, 14], [15, 14]])
+            line([[9, 17], [13, 17]])
         }
     }
 }

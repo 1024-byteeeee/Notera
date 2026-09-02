@@ -900,3 +900,278 @@ void LibraryService::importFile(const QString& sourcePath, const QString& titleO
     reload();
     emit noticeOccurred(QStringLiteral("已导入 %1").arg(score.title));
 }
+
+QVariantList LibraryService::childFolders(const QString& folderId)
+{
+    QString error;
+    return m_repository.childFolders(folderId, &error);
+}
+
+QVariantList LibraryService::clipboardItems() const { return m_clipboardItems; }
+QString LibraryService::clipboardMode() const { return m_clipboardMode; }
+
+void LibraryService::copyItems(const QVariantList& itemIds)
+{
+    m_clipboardItems = itemIds;
+    m_clipboardMode = QStringLiteral("copy");
+    emit clipboardChanged();
+}
+
+void LibraryService::cutItems(const QVariantList& itemIds)
+{
+    m_clipboardItems = itemIds;
+    m_clipboardMode = QStringLiteral("cut");
+    emit clipboardChanged();
+}
+
+void LibraryService::clearClipboard()
+{
+    m_clipboardItems.clear();
+    m_clipboardMode = QStringLiteral("none");
+    emit clipboardChanged();
+}
+
+bool LibraryService::nameExistsInFolder(const QString& name, const QString& folderId, bool isFolder)
+{
+    QString error;
+    if (isFolder) {
+        const auto folders = m_repository.childFolders(folderId, &error);
+        for (const auto& f : folders) {
+            if (f.toMap().value(QStringLiteral("name")).toString() == name) return true;
+        }
+        return false;
+    }
+    const auto scores = m_repository.listAtFolder(folderId, QString(), &error);
+    for (const auto& s : scores) {
+        if (s.title == name) return true;
+    }
+    return false;
+}
+
+QString LibraryService::uniqueNameInFolder(const QString& baseName, const QString& folderId, bool isFolder)
+{
+    if (!nameExistsInFolder(baseName, folderId, isFolder)) return baseName;
+    int n = 2;
+    while (true) {
+        const auto candidate = QStringLiteral("%1 (%2)").arg(baseName).arg(n);
+        if (!nameExistsInFolder(candidate, folderId, isFolder)) return candidate;
+        ++n;
+    }
+}
+
+QString LibraryService::copyScoreToFolder(const QString& scoreId, const QString& targetFolderId, const QString& conflictAction)
+{
+    QString error;
+    const auto sourcePath = m_repository.filePathById(scoreId, &error);
+    if (sourcePath.isEmpty() || !QFileInfo::exists(sourcePath)) return QStringLiteral("找不到源乐谱文件。");
+
+    const auto scores = m_repository.listAtFolder(targetFolderId, QString(), &error);
+    QString sourceTitle;
+    for (const auto& s : scores) {
+        if (s.id == scoreId) { sourceTitle = s.title; break; }
+    }
+    if (sourceTitle.isEmpty()) {
+        const auto all = m_repository.list(QString(), &error);
+        for (const auto& s : all) {
+            if (s.id == scoreId) { sourceTitle = s.title; break; }
+        }
+    }
+
+    QString targetTitle = sourceTitle;
+    if (nameExistsInFolder(sourceTitle, targetFolderId, false)) {
+        if (conflictAction == QStringLiteral("skip")) return {};
+        if (conflictAction == QStringLiteral("rename")) {
+            targetTitle = uniqueNameInFolder(sourceTitle, targetFolderId, false);
+        } else if (conflictAction == QStringLiteral("overwrite")) {
+            for (const auto& s : scores) {
+                if (s.title == sourceTitle) {
+                    m_repository.remove(s.id, &error);
+                    FileService::removeFile(m_repository.filePathById(s.id, &error), &error);
+                    break;
+                }
+            }
+        }
+    }
+
+    const auto newId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    const auto storedPath = FileService::copyScoreIntoLibrary(sourcePath, newId, &error);
+    if (storedPath.isEmpty()) return error.isEmpty() ? QStringLiteral("复制文件失败。") : error;
+
+    const auto now = QDateTime::currentDateTimeUtc();
+    Score score {
+        .id = newId,
+        .title = targetTitle,
+        .fileName = QFileInfo(storedPath).fileName(),
+        .filePath = storedPath,
+        .fileType = FileService::canonicalSuffix(sourcePath),
+        .pageCount = pageCountForFile(storedPath, FileService::canonicalSuffix(sourcePath)),
+        .createdAt = now,
+        .updatedAt = now
+    };
+    if (!m_repository.insert(score, targetFolderId, &error)) {
+        FileService::removeFile(storedPath, &error);
+        return QStringLiteral("创建乐谱记录失败。");
+    }
+    if (FileService::isSupportedScoreFile(score.filePath)) {
+        m_thumbnailGenerator.generate(score.id, score.filePath, score.fileType);
+    }
+    return {};
+}
+
+QString LibraryService::copyFolderRecursive(const QString& folderId, const QString& targetParentId, const QString& conflictAction)
+{
+    QString error;
+    const auto sourceName = m_repository.folderName(folderId, &error);
+    if (sourceName.isEmpty()) return QStringLiteral("找不到源文件夹。");
+
+    QString targetName = sourceName;
+    if (nameExistsInFolder(sourceName, targetParentId, true)) {
+        if (conflictAction == QStringLiteral("skip")) return {};
+        if (conflictAction == QStringLiteral("rename")) {
+            targetName = uniqueNameInFolder(sourceName, targetParentId, true);
+        } else if (conflictAction == QStringLiteral("overwrite")) {
+            const auto children = m_repository.childFolders(targetParentId, &error);
+            for (const auto& f : children) {
+                if (f.toMap().value(QStringLiteral("name")).toString() == sourceName) {
+                    m_repository.deleteFolder(f.toMap().value(QStringLiteral("itemId")).toString(), &error);
+                    break;
+                }
+            }
+        }
+    }
+
+    const auto newFolderId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    if (!m_repository.createFolder(targetName, targetParentId, &error)) {
+        return QStringLiteral("创建文件夹失败。");
+    }
+
+    const auto childScores = m_repository.listAtFolder(folderId, QString(), &error);
+    for (const auto& s : childScores) {
+        copyScoreToFolder(s.id, newFolderId, conflictAction);
+    }
+
+    const auto childFolders = m_repository.childFolders(folderId, &error);
+    for (const auto& f : childFolders) {
+        copyFolderRecursive(f.toMap().value(QStringLiteral("itemId")).toString(), newFolderId, conflictAction);
+    }
+    return {};
+}
+
+void LibraryService::pasteItems()
+{
+    if (m_clipboardItems.isEmpty() || m_clipboardMode == QStringLiteral("none")) return;
+    m_pasteQueue = m_clipboardItems;
+    m_pasteIndex = 0;
+    m_pasteTargetFolderId = m_currentFolderId;
+    m_pendingConflictAction.clear();
+    m_pasteApplyToAll = false;
+    continuePaste();
+}
+
+void LibraryService::resolvePasteConflict(const QString& action, bool applyToAll)
+{
+    m_pendingConflictAction = action;
+    m_pasteApplyToAll = applyToAll;
+    if (action == QStringLiteral("cancel")) {
+        m_pasteQueue.clear();
+        m_pasteIndex = 0;
+        reloadFolders();
+        reload();
+        emit pasteFinished(0);
+        return;
+    }
+    continuePaste();
+}
+
+void LibraryService::continuePaste()
+{
+    QString error;
+    int processed = 0;
+    while (m_pasteIndex < m_pasteQueue.size()) {
+        const auto itemId = m_pasteQueue[m_pasteIndex].toString();
+        const auto type = m_repository.itemTypeById(itemId, &error);
+        if (type.isEmpty()) { ++m_pasteIndex; continue; }
+
+        const auto currentParent = type == QStringLiteral("folder")
+            ? m_repository.folderParent(itemId, &error)
+            : m_repository.scoreFolderId(itemId, &error);
+        if (currentParent == m_pasteTargetFolderId && m_clipboardMode == QStringLiteral("cut")) {
+            ++m_pasteIndex;
+            continue;
+        }
+
+        QString itemName;
+        bool isFolder = type == QStringLiteral("folder");
+        if (isFolder) {
+            itemName = m_repository.folderName(itemId, &error);
+        } else {
+            const auto all = m_repository.list(QString(), &error);
+            for (const auto& s : all) {
+                if (s.id == itemId) { itemName = s.title; break; }
+            }
+        }
+
+        const bool hasConflict = nameExistsInFolder(itemName, m_pasteTargetFolderId, isFolder);
+        QString action = m_pasteApplyToAll ? m_pendingConflictAction : QString();
+        if (hasConflict && action.isEmpty()) {
+            emit pasteConflict(itemName, itemName, m_pasteIndex, m_pasteQueue.size());
+            return;
+        }
+        if (hasConflict && action.isEmpty()) action = QStringLiteral("rename");
+
+        if (m_clipboardMode == QStringLiteral("cut")) {
+            if (hasConflict) {
+                if (action == QStringLiteral("skip")) { ++m_pasteIndex; continue; }
+                if (action == QStringLiteral("overwrite")) {
+                    if (isFolder) {
+                        const auto children = m_repository.childFolders(m_pasteTargetFolderId, &error);
+                        for (const auto& f : children) {
+                            if (f.toMap().value(QStringLiteral("name")).toString() == itemName) {
+                                m_repository.deleteFolder(f.toMap().value(QStringLiteral("itemId")).toString(), &error);
+                                break;
+                            }
+                        }
+                    } else {
+                        const auto scores = m_repository.listAtFolder(m_pasteTargetFolderId, QString(), &error);
+                        for (const auto& s : scores) {
+                            if (s.title == itemName) {
+                                m_repository.remove(s.id, &error);
+                                FileService::removeFile(m_repository.filePathById(s.id, &error), &error);
+                                break;
+                            }
+                        }
+                    }
+                } else if (action == QStringLiteral("rename")) {
+                    if (isFolder) {
+                        m_repository.renameFolder(itemId, uniqueNameInFolder(itemName, m_pasteTargetFolderId, true), &error);
+                    }
+                }
+            }
+            if (isFolder) {
+                m_repository.moveFolder(itemId, m_pasteTargetFolderId, &error);
+            } else {
+                m_repository.setFolder(itemId, m_pasteTargetFolderId, &error);
+            }
+        } else {
+            if (isFolder) {
+                copyFolderRecursive(itemId, m_pasteTargetFolderId, action);
+            } else {
+                copyScoreToFolder(itemId, m_pasteTargetFolderId, action);
+            }
+        }
+        ++processed;
+        ++m_pasteIndex;
+    }
+
+    if (m_clipboardMode == QStringLiteral("cut")) {
+        clearClipboard();
+    }
+    reloadFolders();
+    reload();
+    if (processed > 0) {
+        emit noticeOccurred(m_clipboardMode == QStringLiteral("cut")
+            ? QStringLiteral("已移动 %1 个项目").arg(processed)
+            : QStringLiteral("已复制 %1 个项目").arg(processed));
+    }
+    emit pasteFinished(processed);
+}
