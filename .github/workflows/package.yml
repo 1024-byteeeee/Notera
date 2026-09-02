@@ -61,6 +61,14 @@ jobs:
           path: notera-*-smoke.png
           if-no-files-found: warn
 
+      - name: Clean stale DMG mount
+        run: |
+          if [ -d "/Volumes/Notera" ]; then
+            echo "Detaching stale /Volumes/Notera"
+            hdiutil detach "/Volumes/Notera" -force || true
+            sleep 2
+          fi
+
       - name: Create DMG
         run: cpack --config build/macos-arm64/CPackConfig.cmake -G DragNDrop
 
