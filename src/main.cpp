@@ -670,7 +670,7 @@ int main(int argc, char* argv[])
                 insertInnerFolder.prepare(QStringLiteral("INSERT INTO folders (id, name, parent_id, created_at, updated_at) VALUES (?,?,?,?,?)"));
                 insertInnerFolder.addBindValue(QStringLiteral("clip-smoke-inner-folder"));
                 insertInnerFolder.addBindValue(QStringLiteral("CLIP-SMOKE-INNER-FOLDER"));
-                insertInnerFolder.addBindValue(QString());
+                insertInnerFolder.addBindValue(QVariant()); // 根目录 parent_id 必须为 NULL，不能是空字符串
                 insertInnerFolder.addBindValue(now);
                 insertInnerFolder.addBindValue(now);
                 if (!insertInnerFolder.exec()) {
@@ -693,6 +693,48 @@ int main(int argc, char* argv[])
                 insertInnerScore.addBindValue(QStringLiteral("clip-smoke-inner-folder"));
                 if (!insertInnerScore.exec()) {
                     qWarning() << "[clipboard-smoke] FAIL: insert inner score" << insertInnerScore.lastError().text();
+                    return 1;
+                }
+                // 嵌套文件夹冲突测试：A 内含 B，B 内含乐谱
+                testImage.save(libDir + QStringLiteral("/nested-score.png"));
+                QSqlQuery insertNestedA(database);
+                insertNestedA.prepare(QStringLiteral("INSERT INTO folders (id, name, parent_id, created_at, updated_at) VALUES (?,?,?,?,?)"));
+                insertNestedA.addBindValue(QStringLiteral("nested-a"));
+                insertNestedA.addBindValue(QStringLiteral("NESTED-A"));
+                insertNestedA.addBindValue(QVariant()); // 根目录 parent_id 必须为 NULL
+                insertNestedA.addBindValue(now);
+                insertNestedA.addBindValue(now);
+                if (!insertNestedA.exec()) {
+                    qWarning() << "[clipboard-smoke] FAIL: insert nested-a" << insertNestedA.lastError().text();
+                    return 1;
+                }
+                QSqlQuery insertNestedB(database);
+                insertNestedB.prepare(QStringLiteral("INSERT INTO folders (id, name, parent_id, created_at, updated_at) VALUES (?,?,?,?,?)"));
+                insertNestedB.addBindValue(QStringLiteral("nested-b"));
+                insertNestedB.addBindValue(QStringLiteral("NESTED-B"));
+                insertNestedB.addBindValue(QStringLiteral("nested-a"));
+                insertNestedB.addBindValue(now);
+                insertNestedB.addBindValue(now);
+                if (!insertNestedB.exec()) {
+                    qWarning() << "[clipboard-smoke] FAIL: insert nested-b" << insertNestedB.lastError().text();
+                    return 1;
+                }
+                QSqlQuery insertNestedScore(database);
+                insertNestedScore.prepare(QStringLiteral("INSERT INTO scores (id, title, composer, file_name, file_path, file_type, page_count, favorite, last_page, created_at, updated_at, folder_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"));
+                insertNestedScore.addBindValue(QStringLiteral("nested-score"));
+                insertNestedScore.addBindValue(QStringLiteral("NESTED-SCORE"));
+                insertNestedScore.addBindValue(QString());
+                insertNestedScore.addBindValue(QStringLiteral("nested-score.png"));
+                insertNestedScore.addBindValue(libDir + QStringLiteral("/nested-score.png"));
+                insertNestedScore.addBindValue(QStringLiteral("png"));
+                insertNestedScore.addBindValue(1);
+                insertNestedScore.addBindValue(0);
+                insertNestedScore.addBindValue(1);
+                insertNestedScore.addBindValue(now);
+                insertNestedScore.addBindValue(now);
+                insertNestedScore.addBindValue(QStringLiteral("nested-b"));
+                if (!insertNestedScore.exec()) {
+                    qWarning() << "[clipboard-smoke] FAIL: insert nested score" << insertNestedScore.lastError().text();
                     return 1;
                 }
                 database.close();
@@ -781,9 +823,10 @@ int main(int argc, char* argv[])
 
         // 文件夹内部冲突测试：复制同名文件夹到根目录，文件夹自动合并，内部乐谱逐个冲突弹窗
         {
+            QObject ctx; // 块结束时自动断开所有以此为 context 的连接
             QEventLoop innerLoop;
             bool innerConflictFired = false;
-            QObject::connect(&libraryService, &LibraryService::pasteConflict, [&](const QString&, const QString&, int, int) {
+            QObject::connect(&libraryService, &LibraryService::pasteConflict, &ctx, [&](const QString&, const QString&, int, int) {
                 innerConflictFired = true;
                 innerLoop.quit();
             });
@@ -799,7 +842,7 @@ int main(int argc, char* argv[])
             // 选"保留两者"(rename)，不应用到所有
             libraryService.resolvePasteConflict(QStringLiteral("rename"), false);
             QEventLoop innerDone;
-            QObject::connect(&libraryService, &LibraryService::pasteFinished, [&](int) { innerDone.quit(); });
+            QObject::connect(&libraryService, &LibraryService::pasteFinished, &ctx, [&](int) { innerDone.quit(); });
             QTimer::singleShot(800, &innerDone, &QEventLoop::quit);
             innerDone.exec();
             // 验证文件夹内有 2 个乐谱（原始 + 重命名副本）
@@ -810,7 +853,39 @@ int main(int argc, char* argv[])
             }
         }
 
-        qWarning() << "[clipboard-smoke] PASS: multi-copy, conflict per-item, cut, folder-inner-conflict all work";
+        // 嵌套文件夹冲突测试：A 内含 B，B 内含乐谱；复制 A 到根目录，深层乐谱应冲突弹窗
+        {
+            QObject ctx; // 块结束时自动断开所有以此为 context 的连接
+            QEventLoop nestedLoop;
+            bool nestedConflictFired = false;
+            QObject::connect(&libraryService, &LibraryService::pasteConflict, &ctx, [&](const QString&, const QString&, int, int) {
+                nestedConflictFired = true;
+                nestedLoop.quit();
+            });
+            libraryService.copyItems({QStringLiteral("nested-a")});
+            libraryService.goToLibraryRoot();
+            libraryService.pasteItems();
+            QTimer::singleShot(800, &nestedLoop, &QEventLoop::quit);
+            nestedLoop.exec();
+            if (!nestedConflictFired) {
+                qWarning() << "[clipboard-smoke] FAIL: nested folder inner score conflict did not fire (subfolder expansion broken)";
+                return 1;
+            }
+            // 选"保留两者"(rename)，不应用到所有
+            libraryService.resolvePasteConflict(QStringLiteral("rename"), false);
+            QEventLoop nestedDone;
+            QObject::connect(&libraryService, &LibraryService::pasteFinished, &ctx, [&](int) { nestedDone.quit(); });
+            QTimer::singleShot(800, &nestedDone, &QEventLoop::quit);
+            nestedDone.exec();
+            // 验证 NESTED-B 内有 2 个乐谱（原始 + 重命名副本）
+            const auto nestedScores = libraryService.scoresInFolder(QStringLiteral("nested-b"));
+            if (nestedScores.size() != 2) {
+                qWarning() << "[clipboard-smoke] FAIL: nested folder B expected 2 scores after rename, got" << nestedScores.size();
+                return 1;
+            }
+        }
+
+        qWarning() << "[clipboard-smoke] PASS: multi-copy, conflict per-item, cut, folder-inner-conflict, nested-folder-conflict all work";
         return 0;
     }
 

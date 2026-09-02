@@ -1157,11 +1157,18 @@ QString LibraryService::getOrCreateFolder(const QString& name, const QString& pa
             return f.toMap().value(QStringLiteral("id")).toString();
         }
     }
-    const auto newId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    // createFolder 内部自己生成 UUID，创建后必须重新查询获取真实 id
     if (!m_repository.createFolder(name, parentId, &error)) {
         emit errorOccurred(QStringLiteral("创建文件夹失败：%1").arg(name));
+        return {};
     }
-    return newId;
+    const auto updated = m_repository.childFolders(parentId, &error);
+    for (const auto& f : updated) {
+        if (f.toMap().value(QStringLiteral("name")).toString() == name) {
+            return f.toMap().value(QStringLiteral("id")).toString();
+        }
+    }
+    return {};
 }
 
 void LibraryService::expandFolderToQueue(const QString& sourceFolderId, const QString& targetFolderId)
@@ -1183,7 +1190,7 @@ void LibraryService::expandFolderToQueue(const QString& sourceFolderId, const QS
     const auto subFolders = m_repository.childFolders(sourceFolderId, &error);
     for (const auto& f : subFolders) {
         m_pasteQueue.insert(m_pasteIndex + 1 + insertOffset, QVariantMap{
-            {QStringLiteral("itemId"), f.toMap().value(QStringLiteral("itemId")).toString()},
+            {QStringLiteral("itemId"), f.toMap().value(QStringLiteral("id")).toString()},
             {QStringLiteral("targetFolderId"), targetFolderId}
         });
         ++insertOffset;
