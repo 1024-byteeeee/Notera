@@ -77,6 +77,13 @@ Rectangle {
         }
     }
 
+    Connections {
+        target: libraryService
+        function onFoldersChanged() {
+            root.refreshVisibleFolders()
+        }
+    }
+
     Component.onCompleted: root.refreshVisibleFolders()
 
     component NavItem: Rectangle {

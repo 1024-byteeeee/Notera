@@ -173,6 +173,7 @@ int main(int argc, char* argv[])
         || arguments.contains(QStringLiteral("--stitch-smoke-test"))
         || arguments.contains(QStringLiteral("--reader-smoke-test"))
         || arguments.contains(QStringLiteral("--ui-smoke-test"))
+        || arguments.contains(QStringLiteral("--folder-rename-smoke-test"))
         || arguments.contains(QStringLiteral("--storage-migration-smoke-test"))
         || arguments.contains(QStringLiteral("--clear-data-smoke-test"));
     if (isSmokeTest) {
@@ -333,6 +334,15 @@ int main(int argc, char* argv[])
         return libraryService.scores()->rowCount() == previousCount + 1 ? 0 : 1;
     }
 
+    QString renameSmokeFolderId;
+    if (arguments.contains(QStringLiteral("--folder-rename-smoke-test"))) {
+        libraryService.createFolder(QStringLiteral("重命名前"));
+        if (libraryService.folders()->rowCount() != 1) return 1;
+        renameSmokeFolderId = libraryService.folders()->get(0).toMap()
+            .value(QStringLiteral("itemId")).toString();
+        if (renameSmokeFolderId.isEmpty()) return 1;
+    }
+
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("appController"), &controller);
     engine.rootContext()->setContextProperty(QStringLiteral("libraryService"), &libraryService);
@@ -340,6 +350,36 @@ int main(int argc, char* argv[])
 
     if (engine.rootObjects().isEmpty()) {
         return 1;
+    }
+
+    if (arguments.contains(QStringLiteral("--folder-rename-smoke-test"))) {
+        auto* const root = engine.rootObjects().constFirst();
+        QTimer::singleShot(250, root, [root, renameSmokeFolderId, &libraryService] {
+            auto findFolderNavItem = [root, &renameSmokeFolderId]() -> QObject* {
+                auto* const sidebar = findVisualItem(root, QStringLiteral("sidebar"));
+                if (!sidebar) return nullptr;
+                const auto visit = [&](auto&& self, QQuickItem* item) -> QObject* {
+                    if (item->objectName() == QStringLiteral("folderNavItem")
+                        && item->property("navId").toString() == QStringLiteral("folder:") + renameSmokeFolderId) {
+                        return item;
+                    }
+                    for (auto* const child : item->childItems()) {
+                        if (auto* const match = self(self, child)) return match;
+                    }
+                    return nullptr;
+                };
+                return visit(visit, sidebar);
+            };
+            auto* const before = findFolderNavItem();
+            if (!before || before->property("label").toString() != QStringLiteral("重命名前")) {
+                QCoreApplication::exit(1);
+                return;
+            }
+            libraryService.renameFolder(renameSmokeFolderId, QStringLiteral("重命名后"));
+            QCoreApplication::processEvents();
+            auto* const after = findFolderNavItem();
+            QCoreApplication::exit(after && after->property("label").toString() == QStringLiteral("重命名后") ? 0 : 1);
+        });
     }
 
     if (arguments.contains(QStringLiteral("--theme-smoke-test"))) {

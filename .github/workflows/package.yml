@@ -82,6 +82,7 @@ jobs:
           "$bundle_path/Contents/MacOS/Notera" --import-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --stitch-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --reader-smoke-test
+          "$bundle_path/Contents/MacOS/Notera" --folder-rename-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --storage-migration-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --clear-data-smoke-test
           "$bundle_path/Contents/MacOS/Notera" >notera-startup.log 2>&1 &
@@ -158,9 +159,10 @@ jobs:
         shell: powershell
         run: cmake --build --preset windows-x64 --parallel
 
-      - name: Smoke test data directory migration
+      - name: Smoke test Windows behaviors
         shell: powershell
         run: |
+          build/windows-x64/Release/Notera.exe --folder-rename-smoke-test
           build/windows-x64/Release/Notera.exe --storage-migration-smoke-test
           build/windows-x64/Release/Notera.exe --clear-data-smoke-test
 
