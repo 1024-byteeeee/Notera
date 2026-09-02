@@ -661,6 +661,16 @@ Rectangle {
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
         property int flashBeat: -1
+        property var noteValues: [1, 2, 4, 8, 16, 32]
+
+        function nextNoteValue(current) {
+            const idx = noteValues.indexOf(current)
+            return idx >= 0 && idx < noteValues.length - 1 ? noteValues[idx + 1] : current
+        }
+        function prevNoteValue(current) {
+            const idx = noteValues.indexOf(current)
+            return idx > 0 ? noteValues[idx - 1] : current
+        }
 
         onAboutToShow: {
             const btn = metronomeSettingsButton
@@ -791,17 +801,6 @@ Rectangle {
                     text: "拍号"
                     color: Theme.mutedForeground
                     font.pixelSize: Theme.fontSm
-                }
-
-                property var noteValues: [1, 2, 4, 8, 16, 32]
-
-                function nextNoteValue(current) {
-                    const idx = noteValues.indexOf(current)
-                    return idx >= 0 && idx < noteValues.length - 1 ? noteValues[idx + 1] : current
-                }
-                function prevNoteValue(current) {
-                    const idx = noteValues.indexOf(current)
-                    return idx > 0 ? noteValues[idx - 1] : current
                 }
 
                 RowLayout {
