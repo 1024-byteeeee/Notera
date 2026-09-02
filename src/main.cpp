@@ -1497,6 +1497,21 @@ int main(int argc, char* argv[])
                 return;
             }
             libraryService.goToLibraryRoot();
+            // 触发冲突弹窗验证布局：复制已有文件夹到同位置触发同名冲突
+            libraryService.copyItems({folderId});
+            libraryService.pasteItems();
+            {
+                QEventLoop conflictWait;
+                QTimer::singleShot(300, &conflictWait, &QEventLoop::quit);
+                conflictWait.exec();
+            }
+            if (!window->grabWindow().save(QStringLiteral("notera-conflict-dialog-smoke.png"))) {
+                fail("conflict-dialog-screenshot");
+                return;
+            }
+            libraryService.resolvePasteConflict(QStringLiteral("cancel"), false);
+            QCoreApplication::processEvents();
+
             const auto folderScores = libraryService.scoresInFolder(folderId);
             QStringList storedFilePaths;
             for (const auto& value : folderScores) {

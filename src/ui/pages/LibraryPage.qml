@@ -1291,29 +1291,34 @@ Rectangle {
                 color: Theme.mutedForeground
                 font.pixelSize: Theme.fontSm
             }
-            CheckBox {
-                id: applyAllCheck
-                text: "应用到所有冲突项"
-                checked: conflictDialog.applyToAll
-                onToggled: conflictDialog.applyToAll = checked
-                indicator: Rectangle {
-                    implicitWidth: 18; implicitHeight: 18
+            Row {
+                id: applyAllRow
+                spacing: 8
+                property bool checked: conflictDialog.applyToAll
+                onCheckedChanged: conflictDialog.applyToAll = checked
+
+                Rectangle {
+                    width: 18; height: 18
                     radius: 5
-                    color: applyAllCheck.checked ? Theme.accent : "transparent"
+                    color: applyAllRow.checked ? Theme.accent : "transparent"
                     border.width: 1.5
-                    border.color: applyAllCheck.checked ? Theme.accent : Theme.strongBorder
+                    border.color: applyAllRow.checked ? Theme.accent : Theme.strongBorder
+                    anchors.verticalCenter: parent.verticalCenter
                     AppIcon {
                         anchors.centerIn: parent
                         width: 12; height: 12
-                        iconName: applyAllCheck.checked ? "check" : ""
+                        iconName: applyAllRow.checked ? "check" : ""
                         iconColor: "white"
                     }
                 }
-                contentItem: Label {
-                    text: applyAllCheck.text
+                Label {
+                    text: "应用到所有冲突项"
                     color: Theme.foreground
                     font.pixelSize: Theme.fontMd
-                    leftPadding: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+                TapHandler {
+                    onTapped: applyAllRow.checked = !applyAllRow.checked
                 }
             }
             Label {
