@@ -25,6 +25,7 @@
 #include <QFile>
 #include <QSettings>
 #include <QSqlDatabase>
+#include <QSqlError>
 #include <QSqlQuery>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -182,7 +183,8 @@ int main(int argc, char* argv[])
         || arguments.contains(QStringLiteral("--ui-smoke-test"))
         || arguments.contains(QStringLiteral("--folder-rename-smoke-test"))
         || arguments.contains(QStringLiteral("--storage-migration-smoke-test"))
-        || arguments.contains(QStringLiteral("--clear-data-smoke-test"));
+        || arguments.contains(QStringLiteral("--clear-data-smoke-test"))
+        || arguments.contains(QStringLiteral("--clipboard-smoke-test"));
     if (isSmokeTest) {
         QStandardPaths::setTestModeEnabled(true);
         app.setApplicationName(QStringLiteral("NoteraTest"));
@@ -559,6 +561,194 @@ int main(int argc, char* argv[])
             }
             QSqlDatabase::removeDatabase(connection);
         }
+        return 0;
+    }
+
+    if (arguments.contains(QStringLiteral("--clipboard-smoke-test"))) {
+        // 验证：多选复制/剪切、冲突弹窗不勾选"应用到所有"时单次决策生效、剪切后源消失
+        const auto libDir = AppDataPaths::libraryDirectory();
+        const auto dbPath = AppDataPaths::databaseDirectory() + QStringLiteral("/notera.db");
+        QDir().mkpath(libDir);
+        QDir().mkpath(AppDataPaths::databaseDirectory());
+
+        // 1. 预清理
+        {
+            const auto connection = QStringLiteral("clipboard_smoke_preclean");
+            {
+                auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+                database.setDatabaseName(dbPath);
+                if (database.open()) {
+                    QVariantList paths;
+                    {
+                        QSqlQuery query(database);
+                        query.exec(QStringLiteral("SELECT file_path FROM scores WHERE title LIKE 'CLIPBOARD-SMOKE%'"));
+                        while (query.next()) paths.append(query.value(0).toString());
+                        query.exec(QStringLiteral("DELETE FROM scores WHERE title LIKE 'CLIPBOARD-SMOKE%'"));
+                        query.exec(QStringLiteral("DELETE FROM folders WHERE name LIKE 'CLIPBOARD-SMOKE%'"));
+                    }
+                    database.close();
+                    for (const auto& p : paths) QFile::remove(p.toString());
+                }
+            }
+            QSqlDatabase::removeDatabase(connection);
+        }
+
+        // 2. 创建测试数据：2 个乐谱（根目录）+ 1 个目标文件夹
+        QImage testImage(160, 220, QImage::Format_RGB32);
+        testImage.fill(Qt::blue);
+        const auto file1 = libDir + QStringLiteral("/clipboard-smoke-1.png");
+        const auto file2 = libDir + QStringLiteral("/clipboard-smoke-2.png");
+        if (!testImage.save(file1) || !testImage.save(file2)) {
+            qWarning() << "[clipboard-smoke] FAIL: cannot save test images";
+            return 1;
+        }
+        const auto now = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
+        {
+            const auto connection = QStringLiteral("clipboard_smoke_setup");
+            {
+                auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+                database.setDatabaseName(dbPath);
+                if (!database.open()) {
+                    qWarning() << "[clipboard-smoke] FAIL: cannot open database";
+                    return 1;
+                }
+                QSqlQuery insert(database);
+                insert.prepare(QStringLiteral("INSERT INTO folders (id, name, created_at, updated_at, parent_id, favorite) VALUES (?,?,?,?,NULL,0)"));
+                insert.addBindValue(QStringLiteral("clip-smoke-target"));
+                insert.addBindValue(QStringLiteral("CLIPBOARD-SMOKE-TARGET"));
+                insert.addBindValue(now);
+                insert.addBindValue(now);
+                if (!insert.exec()) {
+                    qWarning() << "[clipboard-smoke] FAIL: insert folder" << insert.lastError().text();
+                    return 1;
+                }
+                insert.prepare(QStringLiteral("INSERT INTO scores (id, title, composer, file_name, file_path, file_type, page_count, favorite, last_page, created_at, updated_at, folder_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,NULL)"));
+                const QList<QPair<QString,QString>> scores = {
+                    {QStringLiteral("clip-smoke-1"), QStringLiteral("CLIPBOARD-SMOKE-1")},
+                    {QStringLiteral("clip-smoke-2"), QStringLiteral("CLIPBOARD-SMOKE-2")}
+                };
+                for (const auto& [id, title] : scores) {
+                    insert.addBindValue(id);
+                    insert.addBindValue(title);
+                    insert.addBindValue(QString());
+                    insert.addBindValue(QStringLiteral("clipboard-smoke-") + id.right(1) + QStringLiteral(".png"));
+                    insert.addBindValue(libDir + QStringLiteral("/clipboard-smoke-") + id.right(1) + QStringLiteral(".png"));
+                    insert.addBindValue(QStringLiteral("png"));
+                    insert.addBindValue(1);
+                    insert.addBindValue(0);
+                    insert.addBindValue(1);
+                    insert.addBindValue(now);
+                    insert.addBindValue(now);
+                    if (!insert.exec()) {
+                        qWarning() << "[clipboard-smoke] FAIL: insert score" << id << insert.lastError().text();
+                        return 1;
+                    }
+                }
+                // 额外创建一个用于剪切测试的乐谱，放在目标文件夹里，名字唯一避免冲突
+                testImage.save(libDir + QStringLiteral("/clipboard-smoke-cut.png"));
+                QSqlQuery insertCut(database);
+                insertCut.prepare(QStringLiteral("INSERT INTO scores (id, title, composer, file_name, file_path, file_type, page_count, favorite, last_page, created_at, updated_at, folder_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"));
+                insertCut.addBindValue(QStringLiteral("clip-smoke-cut"));
+                insertCut.addBindValue(QStringLiteral("CLIPBOARD-SMOKE-CUT"));
+                insertCut.addBindValue(QString());
+                insertCut.addBindValue(QStringLiteral("clipboard-smoke-cut.png"));
+                insertCut.addBindValue(libDir + QStringLiteral("/clipboard-smoke-cut.png"));
+                insertCut.addBindValue(QStringLiteral("png"));
+                insertCut.addBindValue(1);
+                insertCut.addBindValue(0);
+                insertCut.addBindValue(1);
+                insertCut.addBindValue(now);
+                insertCut.addBindValue(now);
+                insertCut.addBindValue(QString()); // 放在根目录，避免干扰复制测试计数
+                if (!insertCut.exec()) {
+                    qWarning() << "[clipboard-smoke] FAIL: insert cut score" << insertCut.lastError().text();
+                    return 1;
+                }
+                database.close();
+            }
+            QSqlDatabase::removeDatabase(connection);
+        }
+
+        // 3. 多选复制到目标文件夹（无冲突）
+        libraryService.goToLibraryRoot();
+        libraryService.enterFolder(QStringLiteral("clip-smoke-target"));
+        if (libraryService.currentFolderId() != QStringLiteral("clip-smoke-target")) {
+            qWarning() << "[clipboard-smoke] FAIL: cannot enter target folder";
+            return 1;
+        }
+        libraryService.copyItems({QStringLiteral("clip-smoke-1"), QStringLiteral("clip-smoke-2")});
+        if (libraryService.clipboardItems().size() != 2 || libraryService.clipboardMode() != QStringLiteral("copy")) {
+            qWarning() << "[clipboard-smoke] FAIL: clipboard not set after multi-copy";
+            return 1;
+        }
+        libraryService.pasteItems();
+        {
+            const auto inTarget = libraryService.scoresInFolder(QStringLiteral("clip-smoke-target"));
+            if (inTarget.size() != 2) {
+                qWarning() << "[clipboard-smoke] FAIL: expected 2 scores after multi-copy, got" << inTarget.size();
+                return 1;
+            }
+        }
+
+        // 4. 再次复制到同一目标文件夹（有冲突），不勾选"应用到所有"：
+        //    第一个冲突选"保留两者"(rename)，第二个选"跳过"(skip)
+        libraryService.copyItems({QStringLiteral("clip-smoke-1"), QStringLiteral("clip-smoke-2")});
+        libraryService.pasteItems(); // 遇到第一个冲突，emit pasteConflict 后暂停
+        // 不勾选 applyToAll，选 rename → 应只对当前项生效，然后遇到第二个冲突暂停
+        libraryService.resolvePasteConflict(QStringLiteral("rename"), false);
+        // 第二个冲突选 skip → 应跳过，完成
+        libraryService.resolvePasteConflict(QStringLiteral("skip"), false);
+        {
+            const auto inTarget = libraryService.scoresInFolder(QStringLiteral("clip-smoke-target"));
+            // 原始 2 个 + 重命名 1 个（CLIPBOARD-SMOKE-1 副本）= 3 个；第二个被跳过
+            if (inTarget.size() != 3) {
+                qWarning() << "[clipboard-smoke] FAIL: expected 3 scores after conflict (rename+skip), got" << inTarget.size();
+                for (const auto& s : inTarget) qWarning() << "  " << s.toMap().value("title").toString();
+                return 1;
+            }
+            bool hasRenamed = false;
+            for (const auto& s : inTarget) {
+                const auto t = s.toMap().value(QStringLiteral("title")).toString();
+                if (t.startsWith(QStringLiteral("CLIPBOARD-SMOKE-1")) && t != QStringLiteral("CLIPBOARD-SMOKE-1")) hasRenamed = true;
+            }
+            if (!hasRenamed) {
+                qWarning() << "[clipboard-smoke] FAIL: renamed copy not found";
+                return 1;
+            }
+        }
+
+        // 5. 测试剪切：把根目录的 CLIPBOARD-SMOKE-CUT 剪切到目标文件夹，验证源消失、目标出现
+        libraryService.goToLibraryRoot();
+        libraryService.cutItems({QStringLiteral("clip-smoke-cut")});
+        if (libraryService.clipboardMode() != QStringLiteral("cut")) {
+            qWarning() << "[clipboard-smoke] FAIL: clipboard mode not cut";
+            return 1;
+        }
+        libraryService.enterFolder(QStringLiteral("clip-smoke-target"));
+        libraryService.pasteItems(); // 目标文件夹无同名冲突，直接移动
+        {
+            const auto inRoot = libraryService.scoresInFolder(QString());
+            bool foundInRoot = false;
+            for (const auto& s : inRoot) {
+                if (s.toMap().value(QStringLiteral("id")).toString() == QStringLiteral("clip-smoke-cut")) foundInRoot = true;
+            }
+            const auto inTarget = libraryService.scoresInFolder(QStringLiteral("clip-smoke-target"));
+            bool foundInTarget = false;
+            for (const auto& s : inTarget) {
+                if (s.toMap().value(QStringLiteral("id")).toString() == QStringLiteral("clip-smoke-cut")) foundInTarget = true;
+            }
+            if (foundInRoot || !foundInTarget) {
+                qWarning() << "[clipboard-smoke] FAIL: cut did not move score (inRoot=" << foundInRoot << " inTarget=" << foundInTarget << ")";
+                return 1;
+            }
+            // 剪切完成后 clipboard 应被清空
+            if (libraryService.clipboardMode() != QStringLiteral("none") || !libraryService.clipboardItems().isEmpty()) {
+                qWarning() << "[clipboard-smoke] FAIL: clipboard not cleared after cut paste";
+                return 1;
+            }
+        }
+
+        qWarning() << "[clipboard-smoke] PASS: multi-copy, conflict per-item, cut all work";
         return 0;
     }
 

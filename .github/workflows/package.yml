@@ -99,6 +99,7 @@ jobs:
           "$bundle_path/Contents/MacOS/Notera" --stitch-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --reader-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --merge-smoke-test
+          "$bundle_path/Contents/MacOS/Notera" --clipboard-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --folder-rename-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --storage-migration-smoke-test
           "$bundle_path/Contents/MacOS/Notera" --clear-data-smoke-test

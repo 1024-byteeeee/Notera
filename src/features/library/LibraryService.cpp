@@ -1203,7 +1203,8 @@ void LibraryService::continuePaste()
         }
 
         const bool hasConflict = nameExistsInFolder(itemName, m_pasteTargetFolderId, isFolder);
-        QString action = m_pasteApplyToAll ? m_pendingConflictAction : QString();
+        // 当前项总是应用用户刚做出的决策；applyToAll 只决定后续项是否复用该决策
+        QString action = m_pendingConflictAction;
         if (hasConflict && action.isEmpty()) {
             emit pasteConflict(itemName, itemName, m_pasteIndex, m_pasteQueue.size());
             return;
@@ -1263,6 +1264,8 @@ void LibraryService::continuePaste()
         }
         ++processed;
         ++m_pasteIndex;
+        // 非"应用到所有"时，当前项决策用完即清空，下一项冲突时重新弹窗
+        if (!m_pasteApplyToAll) m_pendingConflictAction.clear();
     }
 
     if (m_clipboardMode == QStringLiteral("cut")) {
@@ -1652,7 +1655,8 @@ void LibraryService::continueMerge()
         QString existingScoreId;
         if (!hash.isEmpty() && m_mergeHashIndex.contains(hash)) existingScoreId = m_mergeHashIndex.value(hash);
 
-        QString action = m_mergeApplyToAll ? m_mergeConflictAction : QString();
+        // 当前项总是应用用户刚做出的决策；applyToAll 只决定后续项是否复用
+        QString action = m_mergeConflictAction;
         if (!existingScoreId.isEmpty() && action.isEmpty()) {
             emit mergeConflict(title, m_mergeScoreTitles.value(existingScoreId), m_mergeIndex, m_mergeQueue.size());
             return;
@@ -1680,6 +1684,8 @@ void LibraryService::continueMerge()
         importBackupScore(item, targetFolderId);
         ++processed;
         ++m_mergeIndex;
+        // 非"应用到所有"时，当前项决策用完即清空，下一项冲突时重新弹窗
+        if (!m_mergeApplyToAll) m_mergeConflictAction.clear();
     }
 
     reloadFolders();

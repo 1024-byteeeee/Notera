@@ -100,6 +100,14 @@ Rectangle {
         const selectionRevision = root.selectedCount
         return selectionRevision >= 0 && libraryService.selection.contains(id)
     }
+    function isCutItem(id) {
+        if (libraryService.clipboardMode !== "cut") return false
+        const items = libraryService.clipboardItems
+        for (let i = 0; i < items.length; i++) {
+            if (items[i] === id) return true
+        }
+        return false
+    }
 
     function updateRubberSelection() {
         const ids = []
@@ -316,6 +324,8 @@ Rectangle {
                         anchors.top: parent.top
                         anchors.topMargin: 6
                         radius: Theme.radiusMd
+                        opacity: root.isCutItem(scoreDelegate.itemId) ? 0.4 : 1.0
+                        Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
                         color: folderDrop.containsDrag ? Theme.accentSoft : (root.isSelected(scoreDelegate.itemId) ? Theme.accentSoft : (cardHover.hovered ? Theme.cardHover : Theme.cardBackground))
                         Behavior on color { ColorAnimation { duration: 150; easing.type: Easing.OutCubic } }
                         border.width: folderDrop.containsDrag ? 2 : (root.isSelected(scoreDelegate.itemId) ? 2 : 1)
@@ -560,7 +570,7 @@ Rectangle {
                             text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
                             onTriggered: {
                                 const ids = libraryService.selection.count > 0
-                                    ? libraryService.selection.itemIds
+                                    ? libraryService.selection.selectedIds
                                     : [scoreDelegate.itemId]
                                 libraryService.favoriteItems(ids)
                             }
@@ -588,7 +598,7 @@ Rectangle {
                             text: "复制"
                             onTriggered: {
                                 const ids = libraryService.selection.count > 0
-                                    ? libraryService.selection.itemIds
+                                    ? libraryService.selection.selectedIds
                                     : [scoreDelegate.itemId]
                                 libraryService.copyItems(ids)
                             }
@@ -598,7 +608,7 @@ Rectangle {
                             text: "剪切"
                             onTriggered: {
                                 const ids = libraryService.selection.count > 0
-                                    ? libraryService.selection.itemIds
+                                    ? libraryService.selection.selectedIds
                                     : [scoreDelegate.itemId]
                                 libraryService.cutItems(ids)
                             }
@@ -615,7 +625,7 @@ Rectangle {
                                 text: "无（移出文件夹）"
                                 onTriggered: {
                                     const ids = libraryService.selection.count > 0
-                                        ? libraryService.selection.itemIds
+                                        ? libraryService.selection.selectedIds
                                         : [scoreDelegate.itemId]
                                     libraryService.moveItems(ids, "")
                                 }
@@ -631,7 +641,7 @@ Rectangle {
                                     symbol: "folder"
                                     onTriggered: {
                                         const ids = libraryService.selection.count > 0
-                                            ? libraryService.selection.itemIds
+                                            ? libraryService.selection.selectedIds
                                             : [scoreDelegate.itemId]
                                         libraryService.moveItems(ids, itemId)
                                     }
@@ -661,7 +671,7 @@ Rectangle {
                                     checked: libraryService.itemHasTag(scoreDelegate.itemId, itemId)
                                     onTriggered: {
                                         const ids = libraryService.selection.count > 0
-                                            ? libraryService.selection.itemIds
+                                            ? libraryService.selection.selectedIds
                                             : [scoreDelegate.itemId]
                                         if (ids.length > 1) {
                                             let allTagged = true
@@ -713,7 +723,7 @@ Rectangle {
                             text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
                             onTriggered: {
                                 const ids = libraryService.selection.count > 0
-                                    ? libraryService.selection.itemIds
+                                    ? libraryService.selection.selectedIds
                                     : [scoreDelegate.itemId]
                                 libraryService.favoriteItems(ids)
                             }
@@ -746,7 +756,7 @@ Rectangle {
                             text: "复制"
                             onTriggered: {
                                 const ids = libraryService.selection.count > 0
-                                    ? libraryService.selection.itemIds
+                                    ? libraryService.selection.selectedIds
                                     : [scoreDelegate.itemId]
                                 libraryService.copyItems(ids)
                             }
@@ -756,7 +766,7 @@ Rectangle {
                             text: "剪切"
                             onTriggered: {
                                 const ids = libraryService.selection.count > 0
-                                    ? libraryService.selection.itemIds
+                                    ? libraryService.selection.selectedIds
                                     : [scoreDelegate.itemId]
                                 libraryService.cutItems(ids)
                             }
@@ -772,7 +782,7 @@ Rectangle {
                                 text: "无（移出文件夹）"
                                 onTriggered: {
                                     const ids = libraryService.selection.count > 0
-                                        ? libraryService.selection.itemIds
+                                        ? libraryService.selection.selectedIds
                                         : [scoreDelegate.itemId]
                                     libraryService.moveItems(ids, "")
                                 }
@@ -787,7 +797,7 @@ Rectangle {
                                     symbol: "folder"
                                     onTriggered: {
                                         const ids = libraryService.selection.count > 0
-                                            ? libraryService.selection.itemIds
+                                            ? libraryService.selection.selectedIds
                                             : [scoreDelegate.itemId]
                                         libraryService.moveItems(ids, itemId)
                                     }
@@ -812,7 +822,7 @@ Rectangle {
                                     checked: libraryService.itemHasTag(scoreDelegate.itemId, itemId)
                                     onTriggered: {
                                         const ids = libraryService.selection.count > 0
-                                            ? libraryService.selection.itemIds
+                                            ? libraryService.selection.selectedIds
                                             : [scoreDelegate.itemId]
                                         if (ids.length > 1) {
                                             let allTagged = true
@@ -1028,6 +1038,28 @@ Rectangle {
                 }
 
                 AppButton {
+                    text: "复制"
+                    Layout.preferredWidth: 64
+                    enabled: root.selectedCount > 0
+                    onClicked: libraryService.copyItems(libraryService.selection.selectedIds)
+                }
+
+                AppButton {
+                    text: "剪切"
+                    Layout.preferredWidth: 64
+                    enabled: root.selectedCount > 0
+                    onClicked: libraryService.cutItems(libraryService.selection.selectedIds)
+                }
+
+                AppButton {
+                    text: "粘贴"
+                    Layout.preferredWidth: 64
+                    enabled: libraryService.clipboardItems.length > 0
+                    visible: libraryService.clipboardItems.length > 0
+                    onClicked: libraryService.pasteItems()
+                }
+
+                AppButton {
                     text: "删除"
                     danger: true
                     Layout.preferredWidth: 70
@@ -1215,11 +1247,11 @@ Rectangle {
         parent: Overlay.overlay
         x: parent ? Math.round((parent.width - width) / 2) : 0
         y: parent ? Math.round((parent.height - height) / 2) : 0
-        width: parent ? Math.min(420, parent.width - 48) : 420
+        width: parent ? Math.min(480, parent.width - 48) : 480
         popupType: Popup.Item
         modal: true
         focus: true
-        padding: 22
+        padding: 24
         closePolicy: Popup.NoAutoClose
         transformOrigin: Item.Center
 
@@ -1237,7 +1269,7 @@ Rectangle {
         }
 
         header: Label {
-            leftPadding: 22; rightPadding: 22; topPadding: 20; bottomPadding: 4
+            leftPadding: 24; rightPadding: 24; topPadding: 20; bottomPadding: 4
             text: "文件冲突"
             color: Theme.foreground
             font.pixelSize: Theme.fontLg
@@ -1245,7 +1277,7 @@ Rectangle {
         }
 
         contentItem: ColumnLayout {
-            spacing: 14
+            spacing: 12
             Label {
                 Layout.fillWidth: true
                 text: "目标位置已存在同名项目：\n" + conflictDialog.conflictName
@@ -1286,7 +1318,7 @@ Rectangle {
             }
             Label {
                 Layout.fillWidth: true
-                text: "替换 = 覆盖目标 · 保留两者 = 自动重命名副本 · 跳过 = 保留当前继续 · 取消 = 中止"
+                text: "替换=覆盖目标 · 保留两者=自动重命名 · 跳过=保留当前 · 取消=中止全部"
                 color: Theme.mutedForeground
                 font.pixelSize: Theme.fontXs
                 wrapMode: Text.WordWrap
@@ -1294,10 +1326,10 @@ Rectangle {
         }
 
         footer: Item {
-            implicitHeight: 62
+            implicitHeight: 56
             RowLayout {
                 anchors.right: parent.right
-                anchors.rightMargin: 22
+                anchors.rightMargin: 24
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 10
                 AppButton {
