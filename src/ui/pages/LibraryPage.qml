@@ -75,7 +75,9 @@ Rectangle {
         return normalized.startsWith("/") ? "file://" + normalized : "file:///" + normalized
     }
     function finishInternalDrag() {
-        if (root.dragInProgress) dragPreview.Drag.drop()
+        if (root.dragInProgress) {
+            try { dragPreview.Drag.drop() } catch (e) {}
+        }
         root.dragInProgress = false
         Qt.callLater(function() {
             root.dragItemIds = []
@@ -287,12 +289,12 @@ Rectangle {
                     readonly property int folderSubmenuItemCount: folderSubmenu.count
                     readonly property int tagSubmenuItemCount: tagSubmenu.count
                     readonly property int normalMenuArrowCount: favoriteMenuItem.visibleArrowCount
-                    readonly property int folderSubmenuArrowCount: scoreMenu.openedOnce && scoreMenu.count > 3
-                        && scoreMenu.itemAt(3) ? scoreMenu.itemAt(3).visibleArrowCount : -1
-                    readonly property real folderSubmenuArrowWidth: scoreMenu.openedOnce && scoreMenu.count > 3
-                        && scoreMenu.itemAt(3) ? scoreMenu.itemAt(3).arrowVisualWidth : -1
-                    readonly property real folderSubmenuArrowRightInset: scoreMenu.openedOnce && scoreMenu.count > 3
-                        && scoreMenu.itemAt(3) ? scoreMenu.itemAt(3).arrowRightInset : -1
+                    readonly property int folderSubmenuArrowCount: scoreMenu.openedOnce && scoreMenu.count > 4
+                        && scoreMenu.itemAt(4) ? scoreMenu.itemAt(4).visibleArrowCount : -1
+                    readonly property real folderSubmenuArrowWidth: scoreMenu.openedOnce && scoreMenu.count > 4
+                        && scoreMenu.itemAt(4) ? scoreMenu.itemAt(4).arrowVisualWidth : -1
+                    readonly property real folderSubmenuArrowRightInset: scoreMenu.openedOnce && scoreMenu.count > 4
+                        && scoreMenu.itemAt(4) ? scoreMenu.itemAt(4).arrowRightInset : -1
                     readonly property bool tagMenuHasDefaultCheckIndicator: tagSubmenu.count > 0
                         && tagSubmenu.itemAt(0).indicator.visible
                         && tagSubmenu.itemAt(0).indicator.implicitWidth > 0

@@ -291,6 +291,7 @@ Rectangle {
 
         Flickable {
             id: collectionsFlick
+            objectName: "collectionsFlick"
             Layout.fillWidth: true
             Layout.fillHeight: true
             contentWidth: width
@@ -302,6 +303,7 @@ Rectangle {
 
             ColumnLayout {
                 id: collectionsLayout
+                objectName: "collectionsLayout"
                 width: collectionsFlick.width
                 spacing: 4
 

@@ -132,6 +132,7 @@ bool dragItemToItem(QObject* root, const QString& sourceName, const QString& tar
         }
     }
     sendMouseEvent(window, QEvent::MouseButtonRelease, end, Qt::LeftButton, Qt::NoButton);
+    QCoreApplication::processEvents();
     return previewReady;
 }
 
@@ -647,6 +648,7 @@ int main(int argc, char* argv[])
                 return;
             }
             libraryService.setItemFolder(draggedScoreId, QString {});
+            for (int i = 0; i < 10; ++i) QCoreApplication::processEvents();
 
             if (!clickItem(root, QStringLiteral("folderNavItem"), Qt::RightButton)
                 || !popupIsOpen(root, QStringLiteral("folderContextMenu"))) {
