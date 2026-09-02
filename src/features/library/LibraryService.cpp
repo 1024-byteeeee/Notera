@@ -1,18 +1,28 @@
 #include "features/library/LibraryService.h"
 
 #include <algorithm>
+#include <functional>
 #include <QBuffer>
+#include <QCryptographicHash>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QImage>
 #include <QImageReader>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QPainter>
 #include <QPdfDocument>
-#include <QStandardPaths>
 #include <QRegularExpression>
+#include <QSqlDatabase>
+#include <QSqlError>
+#include <QSqlQuery>
+#include <QStandardPaths>
 #include <QUrl>
 #include <QUuid>
+#include <QtCore/private/qzipreader_p.h>
 
+#include "platform/AppDataPaths.h"
 #include "services/FileService.h"
 
 namespace {
@@ -49,6 +59,83 @@ QString availableExportPath(const QString& requestedPath)
         const auto candidate = info.dir().filePath(fileName);
         if (!QFileInfo::exists(candidate)) return candidate;
     }
+}
+
+bool unzipBackupToDirectory(const QString& zipPath, const QString& dstDir, QString* error)
+{
+    QZipReader reader(zipPath);
+    if (!reader.exists()) {
+        *error = QStringLiteral("无法打开备份压缩包。");
+        return false;
+    }
+    const auto entries = reader.fileInfoList();
+    for (const auto& entry : entries) {
+        const auto targetPath = QDir(dstDir).filePath(entry.filePath);
+        if (entry.isDir) {
+            if (!QDir().mkpath(targetPath)) {
+                *error = QStringLiteral("无法创建目录：%1").arg(targetPath);
+                return false;
+            }
+        } else {
+            if (!QDir().mkpath(QFileInfo(targetPath).absolutePath())) {
+                *error = QStringLiteral("无法创建目录：%1").arg(QFileInfo(targetPath).absolutePath());
+                return false;
+            }
+            QFile file(targetPath);
+            if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+                *error = QStringLiteral("无法写入文件：%1").arg(targetPath);
+                return false;
+            }
+            file.write(reader.fileData(entry.filePath));
+            file.close();
+        }
+    }
+    reader.close();
+    return true;
+}
+
+bool readBackupManifest(const QString& backupRoot, QJsonObject* manifest, QString* error)
+{
+    QFile file(backupRoot + QStringLiteral("/manifest.json"));
+    if (!file.open(QIODevice::ReadOnly)) {
+        *error = QStringLiteral("所选文件不是 Notera 数据库备份。");
+        return false;
+    }
+    QJsonParseError parseError;
+    const auto document = QJsonDocument::fromJson(file.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        *error = QStringLiteral("备份清单已损坏。");
+        return false;
+    }
+    *manifest = document.object();
+    if (manifest->value(QStringLiteral("format")).toString() != QStringLiteral("notera-backup")
+        || manifest->value(QStringLiteral("formatVersion")).toInt() != 1
+        || !QFileInfo::exists(backupRoot + QStringLiteral("/database/notera.db"))) {
+        *error = QStringLiteral("备份格式不受支持或数据库文件缺失。");
+        return false;
+    }
+    return true;
+}
+
+bool validateBackupDatabase(const QString& databasePath, QString* error)
+{
+    const auto connectionName = QStringLiteral("notera_merge_validation_")
+        + QUuid::createUuid().toString(QUuid::WithoutBraces);
+    bool valid = false;
+    {
+        auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+        database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
+        database.setDatabaseName(databasePath);
+        if (database.open()) {
+            QSqlQuery query(database);
+            valid = query.exec(QStringLiteral("PRAGMA integrity_check")) && query.next()
+                && query.value(0).toString() == QStringLiteral("ok");
+        }
+        if (!valid) *error = QStringLiteral("备份数据库完整性校验失败。");
+        database.close();
+    }
+    QSqlDatabase::removeDatabase(connectionName);
+    return valid;
 }
 
 }
@@ -1174,4 +1261,425 @@ void LibraryService::continuePaste()
             : QStringLiteral("已复制 %1 个项目").arg(processed));
     }
     emit pasteFinished(processed);
+}
+
+QString LibraryService::sha256OfFile(const QString& path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) return {};
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    hash.addData(&file);
+    return QString::fromLatin1(hash.result().toHex());
+}
+
+void LibraryService::cleanupMergeState()
+{
+    m_mergeTempDir.reset();
+    m_mergeBackupRoot.clear();
+    m_mergeQueue.clear();
+    m_mergeIndex = 0;
+    m_mergeConflictAction.clear();
+    m_mergeApplyToAll = false;
+    m_mergeFolderMap.clear();
+    m_mergeTagMap.clear();
+    m_mergeHashIndex.clear();
+    m_mergeScoreTitles.clear();
+}
+
+QVariantMap LibraryService::probeDatabaseBackup(const QUrl& backupFile)
+{
+    QVariantMap result;
+    result[QStringLiteral("valid")] = false;
+    if (!backupFile.isValid() || !backupFile.isLocalFile()) {
+        result[QStringLiteral("error")] = QStringLiteral("请选择本机备份文件。");
+        return result;
+    }
+    const auto zipPath = QDir::cleanPath(backupFile.toLocalFile());
+    if (!QFileInfo::exists(zipPath)) {
+        result[QStringLiteral("error")] = QStringLiteral("备份文件不存在。");
+        return result;
+    }
+    QTemporaryDir tempDir;
+    if (!tempDir.isValid()) {
+        result[QStringLiteral("error")] = QStringLiteral("无法创建临时目录。");
+        return result;
+    }
+    QString error;
+    if (!unzipBackupToDirectory(zipPath, tempDir.path(), &error)) {
+        result[QStringLiteral("error")] = error;
+        return result;
+    }
+    QJsonObject manifest;
+    if (!readBackupManifest(tempDir.path(), &manifest, &error)) {
+        result[QStringLiteral("error")] = error;
+        return result;
+    }
+    const auto databasePath = tempDir.path() + QStringLiteral("/database/notera.db");
+    if (!validateBackupDatabase(databasePath, &error)) {
+        result[QStringLiteral("error")] = error;
+        return result;
+    }
+    const auto connectionName = QStringLiteral("notera_merge_probe_")
+        + QUuid::createUuid().toString(QUuid::WithoutBraces);
+    {
+        auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+        database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
+        database.setDatabaseName(databasePath);
+        if (database.open()) {
+            QSqlQuery query(database);
+            if (query.exec(QStringLiteral("SELECT COUNT(*) FROM scores")) && query.next())
+                result[QStringLiteral("scoreCount")] = query.value(0).toInt();
+            if (query.exec(QStringLiteral("SELECT COUNT(*) FROM folders")) && query.next())
+                result[QStringLiteral("folderCount")] = query.value(0).toInt();
+            if (query.exec(QStringLiteral("SELECT COUNT(*) FROM tags")) && query.next())
+                result[QStringLiteral("tagCount")] = query.value(0).toInt();
+        }
+        database.close();
+    }
+    QSqlDatabase::removeDatabase(connectionName);
+    result[QStringLiteral("valid")] = true;
+    result[QStringLiteral("createdAt")] = manifest.value(QStringLiteral("createdAt")).toString();
+    result[QStringLiteral("applicationVersion")] = manifest.value(QStringLiteral("applicationVersion")).toString();
+    return result;
+}
+
+QString LibraryService::importDatabaseBackupMerged(const QUrl& backupFile)
+{
+    if (!backupFile.isValid() || !backupFile.isLocalFile()) return QStringLiteral("请选择本机备份文件。");
+    const auto zipPath = QDir::cleanPath(backupFile.toLocalFile());
+    if (!QFileInfo::exists(zipPath)) return QStringLiteral("备份文件不存在。");
+
+    cleanupMergeState();
+    m_mergeTempDir.reset(new QTemporaryDir);
+    if (!m_mergeTempDir->isValid()) return QStringLiteral("无法创建临时目录。");
+    m_mergeBackupRoot = m_mergeTempDir->path();
+
+    QString error;
+    if (!unzipBackupToDirectory(zipPath, m_mergeBackupRoot, &error)) return error;
+    QJsonObject manifest;
+    if (!readBackupManifest(m_mergeBackupRoot, &manifest, &error)) return error;
+    if (!validateBackupDatabase(m_mergeBackupRoot + QStringLiteral("/database/notera.db"), &error)) return error;
+
+    const auto databasePath = m_mergeBackupRoot + QStringLiteral("/database/notera.db");
+    const auto connectionName = QStringLiteral("notera_merge_backup_")
+        + QUuid::createUuid().toString(QUuid::WithoutBraces);
+
+    QVariantList backupTags;
+    QVariantList backupFolders;
+    QVariantList backupScores;
+    QHash<QString, QList<QString>> tagsByFolder;
+    QHash<QString, QList<QString>> tagsByScore;
+    QHash<QString, QVariantList> annotationsByScore;
+
+    {
+        auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+        database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
+        database.setDatabaseName(databasePath);
+        if (!database.open()) {
+            QSqlDatabase::removeDatabase(connectionName);
+            cleanupMergeState();
+            return QStringLiteral("无法读取备份数据库。");
+        }
+        QSqlQuery query(database);
+
+        if (query.exec(QStringLiteral("SELECT id, name FROM tags"))) {
+            while (query.next()) {
+                backupTags.append(QVariantMap{
+                    {QStringLiteral("id"), query.value(0).toString()},
+                    {QStringLiteral("name"), query.value(1).toString()}
+                });
+            }
+        }
+        if (query.exec(QStringLiteral("SELECT id, name, parent_id, favorite, created_at, updated_at FROM folders"))) {
+            while (query.next()) {
+                const auto parent = query.value(2);
+                backupFolders.append(QVariantMap{
+                    {QStringLiteral("id"), query.value(0).toString()},
+                    {QStringLiteral("name"), query.value(1).toString()},
+                    {QStringLiteral("parentId"), parent.isNull() ? QString() : parent.toString()},
+                    {QStringLiteral("favorite"), query.value(3).toInt() != 0},
+                    {QStringLiteral("createdAt"), query.value(4).toLongLong()},
+                    {QStringLiteral("updatedAt"), query.value(5).toLongLong()}
+                });
+            }
+        }
+        if (query.exec(QStringLiteral("SELECT folder_id, tag_id FROM folder_tags"))) {
+            while (query.next()) {
+                tagsByFolder[query.value(0).toString()].append(query.value(1).toString());
+            }
+        }
+        if (query.exec(QStringLiteral("SELECT id, title, composer, file_name, file_path, file_type, page_count, favorite, last_page, created_at, updated_at, last_opened_at, folder_id FROM scores"))) {
+            while (query.next()) {
+                const auto lastOpened = query.value(11);
+                const auto folder = query.value(12);
+                backupScores.append(QVariantMap{
+                    {QStringLiteral("id"), query.value(0).toString()},
+                    {QStringLiteral("title"), query.value(1).toString()},
+                    {QStringLiteral("composer"), query.value(2).toString()},
+                    {QStringLiteral("fileName"), query.value(3).toString()},
+                    {QStringLiteral("filePath"), query.value(4).toString()},
+                    {QStringLiteral("fileType"), query.value(5).toString()},
+                    {QStringLiteral("pageCount"), query.value(6).toInt()},
+                    {QStringLiteral("favorite"), query.value(7).toInt() != 0},
+                    {QStringLiteral("lastPage"), query.value(8).toInt()},
+                    {QStringLiteral("createdAt"), query.value(9).toLongLong()},
+                    {QStringLiteral("updatedAt"), query.value(10).toLongLong()},
+                    {QStringLiteral("lastOpenedAt"), lastOpened.isNull() ? QVariant(qint64(0)) : QVariant(lastOpened.toLongLong())},
+                    {QStringLiteral("folderId"), folder.isNull() ? QString() : folder.toString()}
+                });
+            }
+        }
+        if (query.exec(QStringLiteral("SELECT score_id, tag_id FROM score_tags"))) {
+            while (query.next()) {
+                tagsByScore[query.value(0).toString()].append(query.value(1).toString());
+            }
+        }
+        if (query.exec(QStringLiteral("SELECT score_id, page, type, data, created_at, updated_at FROM annotations"))) {
+            while (query.next()) {
+                annotationsByScore[query.value(0).toString()].append(QVariantMap{
+                    {QStringLiteral("page"), query.value(1).toInt()},
+                    {QStringLiteral("type"), query.value(2).toString()},
+                    {QStringLiteral("data"), query.value(3).toString()},
+                    {QStringLiteral("createdAt"), query.value(4).toLongLong()},
+                    {QStringLiteral("updatedAt"), query.value(5).toLongLong()}
+                });
+            }
+        }
+        database.close();
+    }
+    QSqlDatabase::removeDatabase(connectionName);
+
+    // 1. 合并标签（按名称去重）
+    QHash<QString, QString> currentTagNameToId;
+    {
+        const auto currentTags = m_repository.tags(&error);
+        for (const auto& tag : currentTags) {
+            currentTagNameToId[tag.toMap().value(QStringLiteral("name")).toString()]
+                = tag.toMap().value(QStringLiteral("id")).toString();
+        }
+    }
+    {
+        QSqlQuery insertTag(m_databaseService.database());
+        for (const auto& value : backupTags) {
+            const auto map = value.toMap();
+            const auto oldId = map.value(QStringLiteral("id")).toString();
+            const auto name = map.value(QStringLiteral("name")).toString();
+            if (currentTagNameToId.contains(name)) {
+                m_mergeTagMap[oldId] = currentTagNameToId.value(name);
+                continue;
+            }
+            const auto newId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+            insertTag.prepare(QStringLiteral("INSERT INTO tags (id, name) VALUES (?, ?)"));
+            insertTag.addBindValue(newId);
+            insertTag.addBindValue(name);
+            if (insertTag.exec()) {
+                m_mergeTagMap[oldId] = newId;
+                currentTagNameToId[name] = newId;
+            }
+        }
+    }
+
+    // 2. 合并文件夹：同名按层级向下合并（不弹窗），不存在则新建
+    {
+        std::function<void(const QString&, const QString&)> mergeFolderLevel =
+            [&](const QString& backupParentId, const QString& targetParentId) {
+            for (const auto& value : backupFolders) {
+                const auto map = value.toMap();
+                if (map.value(QStringLiteral("parentId")).toString() != backupParentId) continue;
+                const auto name = map.value(QStringLiteral("name")).toString();
+                QString matchedId;
+                const auto children = m_repository.childFolders(targetParentId, &error);
+                for (const auto& child : children) {
+                    if (child.toMap().value(QStringLiteral("name")).toString() == name) {
+                        matchedId = child.toMap().value(QStringLiteral("id")).toString();
+                        break;
+                    }
+                }
+                const auto oldId = map.value(QStringLiteral("id")).toString();
+                QString newId = matchedId;
+                if (newId.isEmpty()) {
+                    newId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+                    QSqlQuery insertFolder(m_databaseService.database());
+                    insertFolder.prepare(QStringLiteral(
+                        "INSERT INTO folders (id, name, created_at, updated_at, parent_id, favorite) VALUES (?, ?, ?, ?, ?, ?)"));
+                    insertFolder.addBindValue(newId);
+                    insertFolder.addBindValue(name);
+                    insertFolder.addBindValue(map.value(QStringLiteral("createdAt")).toLongLong());
+                    insertFolder.addBindValue(map.value(QStringLiteral("updatedAt")).toLongLong());
+                    insertFolder.addBindValue(targetParentId.isEmpty() ? QVariant() : QVariant(targetParentId));
+                    insertFolder.addBindValue(map.value(QStringLiteral("favorite")).toBool() ? 1 : 0);
+                    if (!insertFolder.exec()) {
+                        emit errorOccurred(QStringLiteral("创建文件夹失败：%1").arg(name));
+                        continue;
+                    }
+                }
+                m_mergeFolderMap[oldId] = newId;
+                for (const auto& oldTagId : tagsByFolder.value(oldId)) {
+                    if (m_mergeTagMap.contains(oldTagId)) {
+                        m_repository.addItemTag(newId, m_mergeTagMap.value(oldTagId), &error);
+                    }
+                }
+                mergeFolderLevel(oldId, newId);
+            }
+        };
+        mergeFolderLevel(QString(), QString());
+    }
+
+    // 3. 构建当前库哈希索引（文件内容判重）
+    {
+        const auto currentScores = m_repository.list(QString(), &error);
+        for (const auto& score : currentScores) {
+            const auto hash = sha256OfFile(score.filePath);
+            if (hash.isEmpty() || m_mergeHashIndex.contains(hash)) continue;
+            m_mergeHashIndex[hash] = score.id;
+            m_mergeScoreTitles[score.id] = score.title;
+        }
+    }
+
+    // 4. 构建合并队列（备份乐谱 + 源文件路径 + 哈希）
+    for (const auto& value : backupScores) {
+        auto map = value.toMap();
+        const auto sourcePath = m_mergeBackupRoot + QStringLiteral("/library/scores/")
+            + map.value(QStringLiteral("fileName")).toString();
+        if (!QFileInfo::exists(sourcePath)) continue;
+        map[QStringLiteral("filePath")] = sourcePath;
+        map[QStringLiteral("hash")] = sha256OfFile(sourcePath);
+        QVariantList tagIds;
+        const auto backupTagIds = tagsByScore.value(map.value(QStringLiteral("id")).toString());
+        for (const auto& tagId : backupTagIds) tagIds.append(tagId);
+        map[QStringLiteral("tagIds")] = tagIds;
+        map[QStringLiteral("annotations")] = annotationsByScore.value(map.value(QStringLiteral("id")).toString());
+        m_mergeQueue.append(map);
+    }
+
+    // 5. 开始合并（逐项处理，冲突时暂停等待用户决策）
+    if (m_mergeQueue.isEmpty()) {
+        reloadFolders();
+        reload();
+        emit noticeOccurred(QStringLiteral("备份中无新增乐谱，标签与文件夹已合并"));
+        emit mergeFinished(0);
+        cleanupMergeState();
+        return {};
+    }
+    continueMerge();
+    return {};
+}
+
+void LibraryService::importBackupScore(const QVariantMap& item, const QString& targetFolderId)
+{
+    const auto newId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    const auto sourcePath = item.value(QStringLiteral("filePath")).toString();
+    QString error;
+    const auto storedPath = FileService::copyScoreIntoLibrary(sourcePath, newId, &error);
+    if (storedPath.isEmpty()) {
+        emit errorOccurred(error.isEmpty() ? QStringLiteral("导入乐谱失败。") : error);
+        return;
+    }
+    const auto fileType = item.value(QStringLiteral("fileType")).toString();
+    Score score;
+    score.id = newId;
+    score.title = item.value(QStringLiteral("title")).toString();
+    score.composer = item.value(QStringLiteral("composer")).toString();
+    score.fileName = QFileInfo(storedPath).fileName();
+    score.filePath = storedPath;
+    score.fileType = fileType;
+    score.pageCount = item.value(QStringLiteral("pageCount")).toInt();
+    score.favorite = item.value(QStringLiteral("favorite")).toBool();
+    score.lastPage = item.value(QStringLiteral("lastPage")).toInt();
+    score.createdAt = QDateTime::fromMSecsSinceEpoch(item.value(QStringLiteral("createdAt")).toLongLong());
+    score.updatedAt = QDateTime::fromMSecsSinceEpoch(item.value(QStringLiteral("updatedAt")).toLongLong());
+    const auto lastOpenedAt = item.value(QStringLiteral("lastOpenedAt")).toLongLong();
+    if (lastOpenedAt > 0) score.lastOpenedAt = QDateTime::fromMSecsSinceEpoch(lastOpenedAt);
+    if (!m_repository.insert(score, targetFolderId, &error)) {
+        FileService::removeFile(storedPath, &error);
+        emit errorOccurred(QStringLiteral("导入乐谱失败：%1").arg(score.title));
+        return;
+    }
+    if (FileService::isSupportedScoreFile(storedPath)) {
+        m_thumbnailGenerator.generate(newId, storedPath, fileType);
+    }
+    const auto tagIds = item.value(QStringLiteral("tagIds")).toList();
+    for (const auto& tagIdVariant : tagIds) {
+        const auto tagId = tagIdVariant.toString();
+        if (m_mergeTagMap.contains(tagId)) m_repository.addTag(newId, m_mergeTagMap.value(tagId), &error);
+    }
+    const auto annotations = item.value(QStringLiteral("annotations")).toList();
+    if (!annotations.isEmpty()) {
+        QSqlQuery insertAnnotation(m_databaseService.database());
+        for (const auto& value : annotations) {
+            const auto annotation = value.toMap();
+            insertAnnotation.prepare(QStringLiteral(
+                "INSERT INTO annotations (id, score_id, page, type, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"));
+            insertAnnotation.addBindValue(QUuid::createUuid().toString(QUuid::WithoutBraces));
+            insertAnnotation.addBindValue(newId);
+            insertAnnotation.addBindValue(annotation.value(QStringLiteral("page")).toInt());
+            insertAnnotation.addBindValue(annotation.value(QStringLiteral("type")).toString());
+            insertAnnotation.addBindValue(annotation.value(QStringLiteral("data")).toString());
+            insertAnnotation.addBindValue(annotation.value(QStringLiteral("createdAt")).toLongLong());
+            insertAnnotation.addBindValue(annotation.value(QStringLiteral("updatedAt")).toLongLong());
+            insertAnnotation.exec();
+        }
+    }
+}
+
+void LibraryService::continueMerge()
+{
+    QString error;
+    int processed = 0;
+    while (m_mergeIndex < m_mergeQueue.size()) {
+        const auto item = m_mergeQueue[m_mergeIndex].toMap();
+        const auto title = item.value(QStringLiteral("title")).toString();
+        const auto hash = item.value(QStringLiteral("hash")).toString();
+        const auto targetFolderId = m_mergeFolderMap.value(item.value(QStringLiteral("folderId")).toString());
+
+        QString existingScoreId;
+        if (!hash.isEmpty() && m_mergeHashIndex.contains(hash)) existingScoreId = m_mergeHashIndex.value(hash);
+
+        QString action = m_mergeApplyToAll ? m_mergeConflictAction : QString();
+        if (!existingScoreId.isEmpty() && action.isEmpty()) {
+            emit mergeConflict(title, m_mergeScoreTitles.value(existingScoreId), m_mergeIndex, m_mergeQueue.size());
+            return;
+        }
+
+        if (!existingScoreId.isEmpty()) {
+            if (action == QStringLiteral("skip")) {
+                ++m_mergeIndex;
+                continue;
+            }
+            if (action == QStringLiteral("overwrite")) {
+                const auto filePath = m_repository.filePathById(existingScoreId, &error);
+                const auto thumbnailPath = m_repository.thumbnailPathById(existingScoreId, &error);
+                FileService::removeFile(filePath, &error);
+                FileService::removeFile(thumbnailPath, &error);
+                m_repository.remove(existingScoreId, &error);
+                m_mergeHashIndex.remove(hash);
+            }
+        }
+
+        importBackupScore(item, targetFolderId);
+        ++processed;
+        ++m_mergeIndex;
+    }
+
+    reloadFolders();
+    reloadTags();
+    reload();
+    emit noticeOccurred(processed > 0
+        ? QStringLiteral("已合并导入 %1 份乐谱").arg(processed)
+        : QStringLiteral("备份已合并，无新增乐谱"));
+    emit mergeFinished(processed);
+    cleanupMergeState();
+}
+
+void LibraryService::resolveMergeConflict(const QString& action, bool applyToAll)
+{
+    m_mergeConflictAction = action;
+    m_mergeApplyToAll = applyToAll;
+    if (action == QStringLiteral("cancel")) {
+        cleanupMergeState();
+        emit noticeOccurred(QStringLiteral("合并已取消"));
+        emit mergeFinished(0);
+        return;
+    }
+    continueMerge();
 }

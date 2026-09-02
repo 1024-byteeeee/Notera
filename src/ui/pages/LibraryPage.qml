@@ -558,7 +558,12 @@ Rectangle {
                             id: favoriteMenuItem
                             symbol: scoreDelegate.favorite ? "star-filled" : "star"
                             text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
-                            onTriggered: libraryService.toggleItemFavorite(scoreDelegate.itemId, !scoreDelegate.favorite)
+                            onTriggered: {
+                                const ids = libraryService.selection.count > 0
+                                    ? libraryService.selection.itemIds
+                                    : [scoreDelegate.itemId]
+                                libraryService.favoriteItems(ids)
+                            }
                         }
                         AppMenuItem {
                             symbol: "edit"
@@ -655,10 +660,25 @@ Rectangle {
                                     checkable: true
                                     checked: libraryService.itemHasTag(scoreDelegate.itemId, itemId)
                                     onTriggered: {
+                                        const ids = libraryService.selection.count > 0
+                                            ? libraryService.selection.itemIds
+                                            : [scoreDelegate.itemId]
+                                        if (ids.length > 1) {
+                                            let allTagged = true
+                                            for (let i = 0; i < ids.length; ++i) {
+                                                if (!libraryService.itemHasTag(ids[i], itemId)) { allTagged = false; break }
+                                            }
+                                            if (allTagged) {
+                                                for (let i = 0; i < ids.length; ++i) libraryService.removeItemTag(ids[i], itemId)
+                                            } else {
+                                                libraryService.tagItems(ids, itemId)
+                                            }
+                                            return
+                                        }
                                         if (checked) {
-                                            libraryService.addItemTag(scoreDelegate.itemId, itemId)
-                                        } else {
                                             libraryService.removeItemTag(scoreDelegate.itemId, itemId)
+                                        } else {
+                                            libraryService.addItemTag(scoreDelegate.itemId, itemId)
                                         }
                                     }
                                 }
@@ -691,7 +711,12 @@ Rectangle {
                         AppMenuItem {
                             symbol: scoreDelegate.favorite ? "star-filled" : "star"
                             text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
-                            onTriggered: libraryService.toggleItemFavorite(scoreDelegate.itemId, !scoreDelegate.favorite)
+                            onTriggered: {
+                                const ids = libraryService.selection.count > 0
+                                    ? libraryService.selection.itemIds
+                                    : [scoreDelegate.itemId]
+                                libraryService.favoriteItems(ids)
+                            }
                         }
                         AppMenuItem {
                             symbol: "open"
@@ -716,27 +741,56 @@ Rectangle {
                                 saveFolderAsDialog.open()
                             }
                         }
+                        AppMenuItem {
+                            symbol: "copy"
+                            text: "复制"
+                            onTriggered: {
+                                const ids = libraryService.selection.count > 0
+                                    ? libraryService.selection.itemIds
+                                    : [scoreDelegate.itemId]
+                                libraryService.copyItems(ids)
+                            }
+                        }
+                        AppMenuItem {
+                            symbol: "cut"
+                            text: "剪切"
+                            onTriggered: {
+                                const ids = libraryService.selection.count > 0
+                                    ? libraryService.selection.itemIds
+                                    : [scoreDelegate.itemId]
+                                libraryService.cutItems(ids)
+                            }
+                        }
                         AppMenuSeparator { }
                         AppMenu {
                             id: folderMoveSubmenu
                             title: "移动到文件夹"
                             symbol: "folder"
-                            enabled: libraryService.folders.count > 0
+                            enabled: rootChildFolderModel.count > 0
                             AppMenuItem {
                                 symbol: "folder-up"
                                 text: "无（移出文件夹）"
-                                onTriggered: libraryService.setItemFolder(scoreDelegate.itemId, "")
+                                onTriggered: {
+                                    const ids = libraryService.selection.count > 0
+                                        ? libraryService.selection.itemIds
+                                        : [scoreDelegate.itemId]
+                                    libraryService.moveItems(ids, "")
+                                }
                             }
                             AppMenuSeparator { }
                             Instantiator {
-                                model: libraryService.folders
+                                model: rootChildFolderModel
                                 delegate: AppMenuItem {
                                     required property string itemId
                                     required property string name
                                     text: name
                                     symbol: "folder"
-                                    enabled: libraryService.canMoveItemToFolder(scoreDelegate.itemId, itemId)
-                                    onTriggered: libraryService.setItemFolder(scoreDelegate.itemId, itemId)
+                                    onTriggered: {
+                                        const ids = libraryService.selection.count > 0
+                                            ? libraryService.selection.itemIds
+                                            : [scoreDelegate.itemId]
+                                        libraryService.moveItems(ids, itemId)
+                                    }
                                 }
                                 onObjectAdded: function(index, object) { folderMoveSubmenu.insertItem(index + 2, object) }
                                 onObjectRemoved: function(index, object) { folderMoveSubmenu.removeItem(object) }
@@ -756,8 +810,28 @@ Rectangle {
                                     tagIcon: true
                                     checkable: true
                                     checked: libraryService.itemHasTag(scoreDelegate.itemId, itemId)
-                                    onTriggered: checked ? libraryService.addItemTag(scoreDelegate.itemId, itemId)
-                                        : libraryService.removeItemTag(scoreDelegate.itemId, itemId)
+                                    onTriggered: {
+                                        const ids = libraryService.selection.count > 0
+                                            ? libraryService.selection.itemIds
+                                            : [scoreDelegate.itemId]
+                                        if (ids.length > 1) {
+                                            let allTagged = true
+                                            for (let i = 0; i < ids.length; ++i) {
+                                                if (!libraryService.itemHasTag(ids[i], itemId)) { allTagged = false; break }
+                                            }
+                                            if (allTagged) {
+                                                for (let i = 0; i < ids.length; ++i) libraryService.removeItemTag(ids[i], itemId)
+                                            } else {
+                                                libraryService.tagItems(ids, itemId)
+                                            }
+                                            return
+                                        }
+                                        if (checked) {
+                                            libraryService.removeItemTag(scoreDelegate.itemId, itemId)
+                                        } else {
+                                            libraryService.addItemTag(scoreDelegate.itemId, itemId)
+                                        }
+                                    }
                                 }
                                 onObjectAdded: function(index, object) { folderTagSubmenu.insertItem(index, object) }
                                 onObjectRemoved: function(index, object) { folderTagSubmenu.removeItem(object) }
@@ -766,12 +840,17 @@ Rectangle {
                         AppMenuSeparator { }
                         AppMenuItem {
                             symbol: "trash"
-                            text: "删除文件夹"
+                            text: root.selectedCount > 0 ? "删除选中项" : "删除文件夹"
                             danger: true
                             onTriggered: {
-                                deleteFolderDialog.targetId = scoreDelegate.itemId
-                                deleteFolderDialog.folderName = scoreDelegate.title
-                                deleteFolderDialog.open()
+                                if (root.selectedCount > 0) {
+                                    batchDeleteDialog.selectedIds = libraryService.selection.selectedIds
+                                    batchDeleteDialog.open()
+                                } else {
+                                    deleteFolderDialog.targetId = scoreDelegate.itemId
+                                    deleteFolderDialog.folderName = scoreDelegate.title
+                                    deleteFolderDialog.open()
+                                }
                             }
                         }
                     }
@@ -1122,6 +1201,16 @@ Rectangle {
         property int conflictIndex: 0
         property int conflictTotal: 0
         property bool applyToAll: false
+        property string conflictSource: "paste"
+
+        function resolveConflict(action) {
+            if (conflictDialog.conflictSource === "merge") {
+                libraryService.resolveMergeConflict(action, conflictDialog.applyToAll)
+            } else {
+                libraryService.resolvePasteConflict(action, conflictDialog.applyToAll)
+            }
+            conflictDialog.close()
+        }
 
         parent: Overlay.overlay
         x: parent ? Math.round((parent.width - width) / 2) : 0
@@ -1195,6 +1284,13 @@ Rectangle {
                     leftPadding: 8
                 }
             }
+            Label {
+                Layout.fillWidth: true
+                text: "替换 = 覆盖目标 · 保留两者 = 自动重命名副本 · 跳过 = 保留当前继续 · 取消 = 中止"
+                color: Theme.mutedForeground
+                font.pixelSize: Theme.fontXs
+                wrapMode: Text.WordWrap
+            }
         }
 
         footer: Item {
@@ -1206,25 +1302,20 @@ Rectangle {
                 spacing: 10
                 AppButton {
                     text: "取消"
-                    onClicked: {
-                        libraryService.resolvePasteConflict("cancel", false)
-                        conflictDialog.close()
-                    }
+                    onClicked: conflictDialog.resolveConflict("cancel")
                 }
                 AppButton {
-                    text: "重命名"
-                    onClicked: {
-                        libraryService.resolvePasteConflict("rename", conflictDialog.applyToAll)
-                        conflictDialog.close()
-                    }
+                    text: "跳过"
+                    onClicked: conflictDialog.resolveConflict("skip")
                 }
                 AppButton {
-                    text: "覆盖"
+                    text: "保留两者"
+                    onClicked: conflictDialog.resolveConflict("rename")
+                }
+                AppButton {
+                    text: "替换"
                     primary: true
-                    onClicked: {
-                        libraryService.resolvePasteConflict("overwrite", conflictDialog.applyToAll)
-                        conflictDialog.close()
-                    }
+                    onClicked: conflictDialog.resolveConflict("overwrite")
                 }
             }
         }
@@ -1240,6 +1331,15 @@ Rectangle {
     Connections {
         target: libraryService
         function onPasteConflict(sourceName, targetName, index, total) {
+            conflictDialog.conflictSource = "paste"
+            conflictDialog.conflictName = sourceName
+            conflictDialog.conflictIndex = index
+            conflictDialog.conflictTotal = total
+            conflictDialog.applyToAll = false
+            conflictDialog.open()
+        }
+        function onMergeConflict(sourceName, targetName, index, total) {
+            conflictDialog.conflictSource = "merge"
             conflictDialog.conflictName = sourceName
             conflictDialog.conflictIndex = index
             conflictDialog.conflictTotal = total
@@ -1247,6 +1347,9 @@ Rectangle {
             conflictDialog.open()
         }
         function onCurrentFolderChanged() {
+            rootChildFolderModel.refresh()
+        }
+        function onFoldersChanged() {
             rootChildFolderModel.refresh()
         }
     }

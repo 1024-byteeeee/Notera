@@ -2,6 +2,9 @@
 
 #include <QObject>
 #include <QUrl>
+#include <QHash>
+#include <QScopedPointer>
+#include <QTemporaryDir>
 #include "features/library/LibraryEntryModel.h"
 #include "features/library/LibrarySelectionModel.h"
 #include "features/library/NamedListModel.h"
@@ -87,6 +90,9 @@ public:
     Q_INVOKABLE void enterFolder(const QString& folderId);
     Q_INVOKABLE void goUp();
     Q_INVOKABLE void goToLibraryRoot();
+    Q_INVOKABLE QVariantMap probeDatabaseBackup(const QUrl& backupFile);
+    Q_INVOKABLE QString importDatabaseBackupMerged(const QUrl& backupFile);
+    Q_INVOKABLE void resolveMergeConflict(const QString& action, bool applyToAll);
     void markScoreOpened(const QString& scoreId);
 
 signals:
@@ -101,6 +107,8 @@ signals:
     void clipboardChanged();
     void pasteConflict(QString sourceName, QString targetName, int index, int total);
     void pasteFinished(int processedCount);
+    void mergeConflict(QString sourceName, QString targetName, int index, int total);
+    void mergeFinished(int processedCount);
 
 private:
     void reload();
@@ -112,6 +120,10 @@ private:
     QString copyFolderRecursive(const QString& folderId, const QString& targetParentId, const QString& conflictAction);
     QString uniqueNameInFolder(const QString& baseName, const QString& folderId, bool isFolder);
     bool nameExistsInFolder(const QString& name, const QString& folderId, bool isFolder);
+    void continueMerge();
+    void cleanupMergeState();
+    void importBackupScore(const QVariantMap& item, const QString& targetFolderId);
+    static QString sha256OfFile(const QString& path);
 
     DatabaseService m_databaseService;
     ScoreRepository m_repository;
@@ -133,4 +145,14 @@ private:
     QString m_pasteTargetFolderId;
     QString m_pendingConflictAction;
     bool m_pasteApplyToAll {false};
+    QScopedPointer<QTemporaryDir> m_mergeTempDir;
+    QString m_mergeBackupRoot;
+    QVariantList m_mergeQueue;
+    int m_mergeIndex {0};
+    QString m_mergeConflictAction;
+    bool m_mergeApplyToAll {false};
+    QHash<QString, QString> m_mergeFolderMap;
+    QHash<QString, QString> m_mergeTagMap;
+    QHash<QString, QString> m_mergeHashIndex;
+    QHash<QString, QString> m_mergeScoreTitles;
 };

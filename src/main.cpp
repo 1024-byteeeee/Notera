@@ -3,12 +3,16 @@
 #include <memory>
 
 #include <QColor>
+#include <QDateTime>
 #include <QDebug>
 #include <QDir>
+#include <QDirIterator>
 #include <QEventLoop>
 #include <QGuiApplication>
 #include <QImage>
 #include <QIcon>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLocale>
 #include <QMouseEvent>
 #include <QPointingDevice>
@@ -26,6 +30,7 @@
 #include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QTimer>
+#include <QtCore/private/qzipwriter_p.h>
 
 #include "app/ApplicationController.h"
 #include "features/library/LibraryService.h"
@@ -302,6 +307,260 @@ int main(int argc, char* argv[])
     });
     QObject::connect(&controller, &ApplicationController::scoreOpened,
         &libraryService, &LibraryService::markScoreOpened);
+
+    if (arguments.contains(QStringLiteral("--merge-smoke-test"))) {
+        // 预清理历史残留，避免脏库导致误判
+        {
+            const auto connection = QStringLiteral("notera_merge_smoke_pretest");
+            {
+                auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+                database.setDatabaseName(AppDataPaths::databaseDirectory() + QStringLiteral("/notera.db"));
+                if (database.open()) {
+                    QVariantList paths;
+                    {
+                        QSqlQuery query(database);
+                        query.exec(QStringLiteral("SELECT id, file_path FROM scores WHERE title LIKE 'MERGE-SMOKE%'"));
+                        while (query.next()) paths.append(query.value(1).toString());
+                        query.exec(QStringLiteral("DELETE FROM scores WHERE title LIKE 'MERGE-SMOKE%'"));
+                        query.exec(QStringLiteral("DELETE FROM folders WHERE name LIKE 'MERGE-SMOKE%'"));
+                        query.exec(QStringLiteral("DELETE FROM tags WHERE name LIKE 'MERGE-SMOKE%'"));
+                    }
+                    database.close();
+                    for (const auto& path : paths) QFile::remove(path.toString());
+                }
+            }
+            QSqlDatabase::removeDatabase(connection);
+        }
+        // 构造一份符合备份格式的压缩包：manifest + 数据库(标签/文件夹/乐谱) + library/scores 源文件
+        QTemporaryDir backupRoot(QDir::tempPath() + QStringLiteral("/notera-merge-backup-XXXXXX"));
+        QTemporaryDir zipDir(QDir::tempPath() + QStringLiteral("/notera-merge-zip-XXXXXX"));
+        if (!backupRoot.isValid() || !zipDir.isValid()) return 1;
+        const auto backupPath = backupRoot.path();
+
+        {
+            QFile manifestFile(backupPath + QStringLiteral("/manifest.json"));
+            if (!manifestFile.open(QIODevice::WriteOnly)) return 1;
+            QJsonObject manifest{{QStringLiteral("format"), QStringLiteral("notera-backup")},
+                {QStringLiteral("formatVersion"), 1},
+                {QStringLiteral("applicationVersion"), QCoreApplication::applicationVersion()},
+                {QStringLiteral("createdAt"), QDateTime::currentDateTimeUtc().toString(Qt::ISODate)},
+                {QStringLiteral("sourceRoot"), backupPath}};
+            manifestFile.write(QJsonDocument(manifest).toJson(QJsonDocument::Indented));
+            manifestFile.close();
+        }
+        if (!QDir().mkpath(backupPath + QStringLiteral("/database"))
+            || !QDir().mkpath(backupPath + QStringLiteral("/library/scores"))
+            || !QDir().mkpath(backupPath + QStringLiteral("/thumbnails"))) return 1;
+
+        QImage scoreImage(160, 220, QImage::Format_RGB32);
+        scoreImage.fill(Qt::darkBlue);
+        if (!scoreImage.save(backupPath + QStringLiteral("/library/scores/score1.png"))) return 1;
+
+        {
+            auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), QStringLiteral("notera_merge_smoke_backup"));
+            database.setDatabaseName(backupPath + QStringLiteral("/database/notera.db"));
+            if (!database.open()) return 1;
+            QSqlQuery query(database);
+            query.exec(QStringLiteral("CREATE TABLE scores (id TEXT PRIMARY KEY, title TEXT NOT NULL, composer TEXT, file_name TEXT NOT NULL, file_path TEXT NOT NULL, file_type TEXT NOT NULL, page_count INTEGER NOT NULL DEFAULT 1, thumbnail_path TEXT, favorite INTEGER NOT NULL DEFAULT 0, last_page INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, last_opened_at INTEGER, folder_id TEXT)"));
+            query.exec(QStringLiteral("CREATE TABLE folders (id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, parent_id TEXT, last_opened_at INTEGER, favorite INTEGER NOT NULL DEFAULT 0)"));
+            query.exec(QStringLiteral("CREATE TABLE tags (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE)"));
+            query.exec(QStringLiteral("CREATE TABLE score_tags (score_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (score_id, tag_id))"));
+            query.exec(QStringLiteral("CREATE TABLE folder_tags (folder_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (folder_id, tag_id))"));
+            query.exec(QStringLiteral("CREATE TABLE annotations (id TEXT PRIMARY KEY, score_id TEXT NOT NULL, page INTEGER NOT NULL, type TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)"));
+            const auto now = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
+            query.exec(QStringLiteral("INSERT INTO tags (id, name) VALUES ('smoke-tag', 'MERGE-SMOKE-TAG')"));
+            query.exec(QStringLiteral("INSERT INTO folders (id, name, created_at, updated_at, parent_id, favorite) VALUES ('smoke-folder', 'MERGE-SMOKE-FOLDER', 1, 1, NULL, 0)"));
+            query.exec(QStringLiteral("INSERT INTO folder_tags (folder_id, tag_id) VALUES ('smoke-folder', 'smoke-tag')"));
+            QSqlQuery insert(query);
+            insert.prepare(QStringLiteral("INSERT INTO scores (id, title, composer, file_name, file_path, file_type, page_count, favorite, last_page, created_at, updated_at, folder_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"));
+            insert.addBindValue(QStringLiteral("smoke-score"));
+            insert.addBindValue(QStringLiteral("MERGE-SMOKE-SCORE"));
+            insert.addBindValue(QString());
+            insert.addBindValue(QStringLiteral("score1.png"));
+            insert.addBindValue(backupPath + QStringLiteral("/library/scores/score1.png"));
+            insert.addBindValue(QStringLiteral("png"));
+            insert.addBindValue(1);
+            insert.addBindValue(0);
+            insert.addBindValue(1);
+            insert.addBindValue(now);
+            insert.addBindValue(now);
+            insert.addBindValue(QStringLiteral("smoke-folder"));
+            if (!insert.exec()) return 1;
+            query.exec(QStringLiteral("INSERT INTO score_tags (score_id, tag_id) VALUES ('smoke-score', 'smoke-tag')"));
+            database.close();
+        }
+        QSqlDatabase::removeDatabase(QStringLiteral("notera_merge_smoke_backup"));
+
+        const auto zipPath = zipDir.filePath(QStringLiteral("backup.notera-backup.zip"));
+        {
+            QZipWriter writer(zipPath);
+            writer.setCompressionPolicy(QZipWriter::AutoCompress);
+            if (writer.status() != QZipWriter::NoError) return 1;
+            QDirIterator iterator(backupPath, QDir::NoDotAndDotDot | QDir::AllEntries | QDir::Hidden,
+                QDirIterator::Subdirectories);
+            while (iterator.hasNext()) {
+                const auto filePath = iterator.next();
+                const auto relativePath = QDir(backupPath).relativeFilePath(filePath);
+                const QFileInfo info(filePath);
+                if (info.isDir()) {
+                    writer.addDirectory(relativePath);
+                    continue;
+                }
+                QFile file(filePath);
+                if (!file.open(QIODevice::ReadOnly)) return 1;
+                writer.addFile(relativePath, file.readAll());
+                file.close();
+            }
+            writer.close();
+            if (writer.status() != QZipWriter::NoError) return 1;
+        }
+
+        // 探测备份信息
+        const auto probe = libraryService.probeDatabaseBackup(QUrl::fromLocalFile(zipPath));
+        if (!probe.value(QStringLiteral("valid")).toBool()
+            || probe.value(QStringLiteral("scoreCount")).toInt() != 1
+            || probe.value(QStringLiteral("folderCount")).toInt() != 1
+            || probe.value(QStringLiteral("tagCount")).toInt() != 1) {
+            qWarning() << "[merge-smoke] FAIL probe:" << QJsonDocument::fromVariant(probe).toJson(QJsonDocument::Compact);
+            return 1;
+        }
+
+        // 首次合并：标签/文件夹/乐谱并入当前库
+        const auto mergeError = libraryService.importDatabaseBackupMerged(QUrl::fromLocalFile(zipPath));
+        if (!mergeError.isEmpty()) {
+            qWarning() << "[merge-smoke] FAIL first merge:" << mergeError;
+            return 1;
+        }
+        {
+            // 乐谱在非根目录（挂在合并文件夹下），默认列表不显示，直接用 SQL 断言
+            const auto connection = QStringLiteral("notera_merge_smoke_check");
+            bool okScore = false;
+            bool okFolder = false;
+            bool okTag = false;
+            bool okTime = false;
+            {
+                auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+                database.setDatabaseName(AppDataPaths::databaseDirectory() + QStringLiteral("/notera.db"));
+                if (!database.open()) {
+                    qWarning() << "[merge-smoke] FAIL open db for assert";
+                    return 1;
+                }
+                {
+                    QSqlQuery query(database);
+                    if (query.exec(QStringLiteral("SELECT COUNT(*) FROM scores WHERE title = 'MERGE-SMOKE-SCORE'"))
+                        && query.next()) okScore = query.value(0).toInt() == 1;
+                    if (query.exec(QStringLiteral("SELECT COUNT(*) FROM scores s JOIN folders f ON s.folder_id = f.id "
+                            "WHERE s.title = 'MERGE-SMOKE-SCORE' AND f.name = 'MERGE-SMOKE-FOLDER'"))
+                        && query.next()) okFolder = query.value(0).toInt() == 1;
+                    if (query.exec(QStringLiteral("SELECT COUNT(*) FROM score_tags st JOIN scores s ON st.score_id = s.id "
+                            "JOIN tags t ON st.tag_id = t.id WHERE s.title = 'MERGE-SMOKE-SCORE' AND t.name = 'MERGE-SMOKE-TAG'"))
+                        && query.next()) okTag = query.value(0).toInt() == 1;
+                    // created_at 单位为毫秒（2020-01-01 之后），秒单位错误会落回 1970 附近
+                    if (query.exec(QStringLiteral("SELECT created_at FROM scores WHERE title = 'MERGE-SMOKE-SCORE'"))
+                        && query.next()) okTime = query.value(0).toLongLong() > 1577836800000LL;
+                }
+                database.close();
+            }
+            QSqlDatabase::removeDatabase(connection);
+            if (!okScore || !okFolder || !okTag || !okTime) {
+                qWarning() << "[merge-smoke] FAIL assert: score" << okScore << "folder" << okFolder << "tag" << okTag << "time" << okTime;
+                return 1;
+            }
+        }
+        {
+            bool foundFolder = false;
+            bool foundTag = false;
+            for (int i = 0; i < libraryService.folders()->rowCount(); ++i) {
+                if (libraryService.folders()->get(i).toMap().value(QStringLiteral("name")).toString()
+                    == QStringLiteral("MERGE-SMOKE-FOLDER")) foundFolder = true;
+            }
+            for (int i = 0; i < libraryService.tags()->rowCount(); ++i) {
+                if (libraryService.tags()->get(i).toMap().value(QStringLiteral("name")).toString()
+                    == QStringLiteral("MERGE-SMOKE-TAG")) foundTag = true;
+            }
+            if (!foundFolder || !foundTag) {
+                qWarning() << "[merge-smoke] FAIL folders/tags refresh: folder" << foundFolder << "tag" << foundTag;
+                return 1;
+            }
+        }
+
+        // 二次合并：同一备份再次导入 → 文件内容重复 → 哈希判重 → 冲突 → 跳过，不新增
+        bool conflicted = false;
+        QObject::connect(&libraryService, &LibraryService::mergeConflict, &libraryService,
+            [&conflicted, &libraryService](const QString&, const QString&, int, int) {
+                conflicted = true;
+                libraryService.resolveMergeConflict(QStringLiteral("skip"), true);
+            });
+        const auto countBeforeSecond = []() {
+            const auto connection = QStringLiteral("notera_merge_smoke_count");
+            int count = -1;
+            {
+                auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+                database.setDatabaseName(AppDataPaths::databaseDirectory() + QStringLiteral("/notera.db"));
+                if (database.open()) {
+                    {
+                        QSqlQuery query(database);
+                        if (query.exec(QStringLiteral("SELECT COUNT(*) FROM scores WHERE title LIKE 'MERGE-SMOKE%'"))
+                            && query.next()) count = query.value(0).toInt();
+                    }
+                    database.close();
+                }
+            }
+            QSqlDatabase::removeDatabase(connection);
+            return count;
+        }();
+        const auto mergeError2 = libraryService.importDatabaseBackupMerged(QUrl::fromLocalFile(zipPath));
+        const auto countAfterSecond = []() {
+            const auto connection = QStringLiteral("notera_merge_smoke_count2");
+            int count = -1;
+            {
+                auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+                database.setDatabaseName(AppDataPaths::databaseDirectory() + QStringLiteral("/notera.db"));
+                if (database.open()) {
+                    {
+                        QSqlQuery query(database);
+                        if (query.exec(QStringLiteral("SELECT COUNT(*) FROM scores WHERE title LIKE 'MERGE-SMOKE%'"))
+                            && query.next()) count = query.value(0).toInt();
+                    }
+                    database.close();
+                }
+            }
+            QSqlDatabase::removeDatabase(connection);
+            return count;
+        }();
+        qWarning() << "[merge-smoke] second merge: conflicted" << conflicted
+            << "before" << countBeforeSecond << "after" << countAfterSecond
+            << "err" << mergeError2;
+        if (!mergeError2.isEmpty()) return 1;
+        if (!conflicted || countBeforeSecond != countAfterSecond) return 1;
+        // 清理测试数据，避免污染开发库
+        {
+            const auto connection = QStringLiteral("notera_merge_smoke_cleanup");
+            {
+                auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+                database.setDatabaseName(AppDataPaths::databaseDirectory() + QStringLiteral("/notera.db"));
+                if (database.open()) {
+                    QVariantList paths;
+                    {
+                        QSqlQuery query(database);
+                        query.exec(QStringLiteral("SELECT id, file_path FROM scores WHERE title LIKE 'MERGE-SMOKE%'"));
+                        while (query.next()) {
+                            paths.append(query.value(1).toString());
+                            paths.append(AppDataPaths::thumbnailDirectory() + QLatin1Char('/')
+                                + query.value(0).toString() + QStringLiteral(".png"));
+                        }
+                        query.exec(QStringLiteral("DELETE FROM scores WHERE title LIKE 'MERGE-SMOKE%'"));
+                        query.exec(QStringLiteral("DELETE FROM folders WHERE name LIKE 'MERGE-SMOKE%'"));
+                        query.exec(QStringLiteral("DELETE FROM tags WHERE name LIKE 'MERGE-SMOKE%'"));
+                    }
+                    database.close();
+                    for (const auto& path : paths) QFile::remove(path.toString());
+                }
+            }
+            QSqlDatabase::removeDatabase(connection);
+        }
+        return 0;
+    }
 
     QTemporaryFile importSmokeFile;
     if (arguments.contains(QStringLiteral("--import-smoke-test"))) {

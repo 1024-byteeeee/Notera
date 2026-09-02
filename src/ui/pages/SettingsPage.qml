@@ -442,7 +442,7 @@ Rectangle {
                                         Layout.fillWidth: true
                                         spacing: 3
                                         Label { text: "导入数据库备份"; color: Theme.foreground; font.pixelSize: Theme.fontMd; font.weight: Font.Medium }
-                                        Label { text: "从备份包恢复数据，将替换当前所有数据并自动重启"; color: Theme.secondaryForeground; font.pixelSize: Theme.fontXs }
+                                        Label { text: "从备份包导入，可合并到当前库或替换当前所有数据"; color: Theme.secondaryForeground; font.pixelSize: Theme.fontXs }
                                     }
                                     Item { Layout.fillWidth: true }
                                     AppButton {
@@ -574,9 +574,105 @@ Rectangle {
         nameFilters: ["Notera 备份 (*.notera-backup *.zip)", "所有文件 (*)"]
         currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
         onAccepted: {
-            importConfirmDialog.backupFile = selectedFile
-            importConfirmDialog.message = "导入将替换当前所有乐谱、文件夹、标签和设置，此操作不可撤销。\n\n是否继续？"
-            importConfirmDialog.open()
+            importModeDialog.backupFile = selectedFile
+            importModeDialog.backupInfo = libraryService.probeDatabaseBackup(selectedFile)
+            importModeDialog.open()
+        }
+    }
+
+    Dialog {
+        id: importModeDialog
+        objectName: "importModeDialog"
+        property url backupFile: ""
+        property var backupInfo: ({})
+        parent: Overlay.overlay
+        x: parent ? Math.round((parent.width - width) / 2) : 0
+        y: parent ? Math.round((parent.height - height) / 2) : 0
+        width: parent ? Math.min(460, parent.width - 48) : 460
+        modal: true
+        focus: true
+        padding: 22
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        header: Label {
+            leftPadding: 22; rightPadding: 22; topPadding: 20; bottomPadding: 4
+            text: "导入数据库备份"
+            color: Theme.foreground
+            font.pixelSize: Theme.fontLg
+            font.weight: Font.DemiBold
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 12
+            Label {
+                Layout.fillWidth: true
+                text: {
+                    const info = importModeDialog.backupInfo
+                    if (info && info.valid) {
+                        let summary = "备份包含 "
+                            + (info.scoreCount !== undefined ? info.scoreCount : "?") + " 份乐谱、"
+                            + (info.folderCount !== undefined ? info.folderCount : "?") + " 个文件夹、"
+                            + (info.tagCount !== undefined ? info.tagCount : "?") + " 个标签"
+                        if (info.createdAt) summary += "\n创建于 " + info.createdAt
+                        return summary
+                    }
+                    return info && info.error ? "备份信息不可用：" + info.error : "备份信息不可用。"
+                }
+                color: Theme.secondaryForeground
+                font.pixelSize: Theme.fontMd
+                wrapMode: Text.WordWrap
+            }
+            Label {
+                Layout.fillWidth: true
+                text: "合并：把备份中的乐谱、文件夹、标签并入当前库，保留现有数据；重复乐谱按内容逐项处理。\n\n替换：删除当前所有数据，用备份整体恢复并自动重启。"
+                color: Theme.mutedForeground
+                font.pixelSize: Theme.fontSm
+                wrapMode: Text.WordWrap
+            }
+        }
+
+        footer: Item {
+            implicitHeight: 62
+            RowLayout {
+                anchors.right: parent.right
+                anchors.rightMargin: 22
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 10
+                AppButton {
+                    text: "取消"
+                    onClicked: importModeDialog.reject()
+                }
+                AppButton {
+                    text: "替换所有数据"
+                    danger: true
+                    onClicked: {
+                        importConfirmDialog.backupFile = importModeDialog.backupFile
+                        importConfirmDialog.message = "导入将替换当前所有乐谱、文件夹、标签和设置，此操作不可撤销。\n\n是否继续？"
+                        importModeDialog.close()
+                        importConfirmDialog.open()
+                    }
+                }
+                AppButton {
+                    text: "合并到当前库"
+                    primary: true
+                    onClicked: {
+                        const error = libraryService.importDatabaseBackupMerged(importModeDialog.backupFile)
+                        importModeDialog.close()
+                        if (error && error.length > 0) {
+                            backupResultDialog.title = "合并失败"
+                            backupResultDialog.message = error
+                            backupResultDialog.open()
+                        }
+                    }
+                }
+            }
+        }
+
+        background: Rectangle {
+            radius: Theme.radiusLg
+            color: Theme.surface
+            border.width: 1
+            border.color: Theme.strongBorder
         }
     }
 
