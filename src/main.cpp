@@ -544,7 +544,14 @@ int main(int argc, char* argv[])
             auto* const librarySurface = findVisualItem(root, QStringLiteral("librarySurface"));
             auto* const rubberSelectionGrid = findVisualItem(root, QStringLiteral("browserGrid"));
             auto* const selectionBox = findVisualItem(root, QStringLiteral("selectionBox"));
-            if (!libraryPage || !librarySurface || !rubberSelectionGrid || !selectionBox || !window) {
+            auto* const rubberBandHandler = root->findChild<QObject*>(QStringLiteral("gridRubberBand"));
+            const auto acceptedSelectionDevices = rubberBandHandler
+                ? rubberBandHandler->property("acceptedDevices").toInt() : 0;
+            const auto mouseAndTouchPad = static_cast<int>(QInputDevice::DeviceType::Mouse)
+                | static_cast<int>(QInputDevice::DeviceType::TouchPad);
+            if (!libraryPage || !librarySurface || !rubberSelectionGrid || !selectionBox || !window
+                || !rubberBandHandler
+                || (acceptedSelectionDevices & mouseAndTouchPad) != mouseAndTouchPad) {
                 fail("library-rubber-selection-objects");
                 return;
             }

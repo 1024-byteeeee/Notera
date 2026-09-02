@@ -270,10 +270,11 @@ Rectangle {
                 // GridView 区域内的框选（红框区域）
                 DragHandler {
                     id: gridRubberBand
+                    objectName: "gridRubberBand"
                     enabled: !root.dragInProgress
                     target: null
                     acceptedButtons: Qt.LeftButton
-                    acceptedDevices: PointerDevice.Mouse
+                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                     grabPermissions: PointerHandler.ApprovesTakeOverByAnything
 
                     onActiveChanged: {
