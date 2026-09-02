@@ -664,6 +664,37 @@ int main(int argc, char* argv[])
                     qWarning() << "[clipboard-smoke] FAIL: insert cut score" << insertCut.lastError().text();
                     return 1;
                 }
+                // 文件夹内部冲突测试：创建文件夹 + 内部同名乐谱
+                testImage.save(libDir + QStringLiteral("/clip-smoke-inner-score.png"));
+                QSqlQuery insertInnerFolder(database);
+                insertInnerFolder.prepare(QStringLiteral("INSERT INTO folders (id, name, parent_id, created_at, updated_at) VALUES (?,?,?,?,?)"));
+                insertInnerFolder.addBindValue(QStringLiteral("clip-smoke-inner-folder"));
+                insertInnerFolder.addBindValue(QStringLiteral("CLIP-SMOKE-INNER-FOLDER"));
+                insertInnerFolder.addBindValue(QString());
+                insertInnerFolder.addBindValue(now);
+                insertInnerFolder.addBindValue(now);
+                if (!insertInnerFolder.exec()) {
+                    qWarning() << "[clipboard-smoke] FAIL: insert inner folder" << insertInnerFolder.lastError().text();
+                    return 1;
+                }
+                QSqlQuery insertInnerScore(database);
+                insertInnerScore.prepare(QStringLiteral("INSERT INTO scores (id, title, composer, file_name, file_path, file_type, page_count, favorite, last_page, created_at, updated_at, folder_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"));
+                insertInnerScore.addBindValue(QStringLiteral("clip-smoke-inner-score"));
+                insertInnerScore.addBindValue(QStringLiteral("CLIP-SMOKE-INNER-SCORE"));
+                insertInnerScore.addBindValue(QString());
+                insertInnerScore.addBindValue(QStringLiteral("clip-smoke-inner-score.png"));
+                insertInnerScore.addBindValue(libDir + QStringLiteral("/clip-smoke-inner-score.png"));
+                insertInnerScore.addBindValue(QStringLiteral("png"));
+                insertInnerScore.addBindValue(1);
+                insertInnerScore.addBindValue(0);
+                insertInnerScore.addBindValue(1);
+                insertInnerScore.addBindValue(now);
+                insertInnerScore.addBindValue(now);
+                insertInnerScore.addBindValue(QStringLiteral("clip-smoke-inner-folder"));
+                if (!insertInnerScore.exec()) {
+                    qWarning() << "[clipboard-smoke] FAIL: insert inner score" << insertInnerScore.lastError().text();
+                    return 1;
+                }
                 database.close();
             }
             QSqlDatabase::removeDatabase(connection);
@@ -748,7 +779,38 @@ int main(int argc, char* argv[])
             }
         }
 
-        qWarning() << "[clipboard-smoke] PASS: multi-copy, conflict per-item, cut all work";
+        // 文件夹内部冲突测试：复制同名文件夹到根目录，文件夹自动合并，内部乐谱逐个冲突弹窗
+        {
+            QEventLoop innerLoop;
+            bool innerConflictFired = false;
+            QObject::connect(&libraryService, &LibraryService::pasteConflict, [&](const QString&, const QString&, int, int) {
+                innerConflictFired = true;
+                innerLoop.quit();
+            });
+            libraryService.copyItems({QStringLiteral("clip-smoke-inner-folder")});
+            libraryService.goToLibraryRoot();
+            libraryService.pasteItems();
+            QTimer::singleShot(800, &innerLoop, &QEventLoop::quit);
+            innerLoop.exec();
+            if (!innerConflictFired) {
+                qWarning() << "[clipboard-smoke] FAIL: inner folder score conflict did not fire (folder merge should not suppress inner conflict)";
+                return 1;
+            }
+            // 选"保留两者"(rename)，不应用到所有
+            libraryService.resolvePasteConflict(QStringLiteral("rename"), false);
+            QEventLoop innerDone;
+            QObject::connect(&libraryService, &LibraryService::pasteFinished, [&](int) { innerDone.quit(); });
+            QTimer::singleShot(800, &innerDone, &QEventLoop::quit);
+            innerDone.exec();
+            // 验证文件夹内有 2 个乐谱（原始 + 重命名副本）
+            const auto innerScores = libraryService.scoresInFolder(QStringLiteral("clip-smoke-inner-folder"));
+            if (innerScores.size() != 2) {
+                qWarning() << "[clipboard-smoke] FAIL: inner folder expected 2 scores after rename, got" << innerScores.size();
+                return 1;
+            }
+        }
+
+        qWarning() << "[clipboard-smoke] PASS: multi-copy, conflict per-item, cut, folder-inner-conflict all work";
         return 0;
     }
 

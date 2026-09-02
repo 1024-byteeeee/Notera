@@ -120,6 +120,8 @@ private:
     QString copyFolderRecursive(const QString& folderId, const QString& targetParentId, const QString& conflictAction);
     QString uniqueNameInFolder(const QString& baseName, const QString& folderId, bool isFolder);
     bool nameExistsInFolder(const QString& name, const QString& folderId, bool isFolder);
+    QString getOrCreateFolder(const QString& name, const QString& parentId);
+    void expandFolderToQueue(const QString& sourceFolderId, const QString& targetFolderId);
     void continueMerge();
     void cleanupMergeState();
     void importBackupScore(const QVariantMap& item, const QString& targetFolderId);
@@ -145,6 +147,7 @@ private:
     QString m_pasteTargetFolderId;
     QString m_pendingConflictAction;
     bool m_pasteApplyToAll {false};
+    QStringList m_cutSourceFolderIds;
     QScopedPointer<QTemporaryDir> m_mergeTempDir;
     QString m_mergeBackupRoot;
     QVariantList m_mergeQueue;

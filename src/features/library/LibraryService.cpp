@@ -1148,10 +1148,65 @@ QString LibraryService::copyFolderRecursive(const QString& folderId, const QStri
     return {};
 }
 
+QString LibraryService::getOrCreateFolder(const QString& name, const QString& parentId)
+{
+    QString error;
+    const auto children = m_repository.childFolders(parentId, &error);
+    for (const auto& f : children) {
+        if (f.toMap().value(QStringLiteral("name")).toString() == name) {
+            return f.toMap().value(QStringLiteral("id")).toString();
+        }
+    }
+    const auto newId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    if (!m_repository.createFolder(name, parentId, &error)) {
+        emit errorOccurred(QStringLiteral("创建文件夹失败：%1").arg(name));
+    }
+    return newId;
+}
+
+void LibraryService::expandFolderToQueue(const QString& sourceFolderId, const QString& targetFolderId)
+{
+    QString error;
+    int insertOffset = 0;
+
+    // 展开内部乐谱：插入到当前位置之后，逐个进入冲突处理流程
+    const auto scores = m_repository.listAtFolder(sourceFolderId, QString(), &error);
+    for (const auto& s : scores) {
+        m_pasteQueue.insert(m_pasteIndex + 1 + insertOffset, QVariantMap{
+            {QStringLiteral("itemId"), s.id},
+            {QStringLiteral("targetFolderId"), targetFolderId}
+        });
+        ++insertOffset;
+    }
+
+    // 展开子文件夹：targetFolderId 为父目标，continuePaste 会自动合并同名子文件夹并递归展开
+    const auto subFolders = m_repository.childFolders(sourceFolderId, &error);
+    for (const auto& f : subFolders) {
+        m_pasteQueue.insert(m_pasteIndex + 1 + insertOffset, QVariantMap{
+            {QStringLiteral("itemId"), f.toMap().value(QStringLiteral("itemId")).toString()},
+            {QStringLiteral("targetFolderId"), targetFolderId}
+        });
+        ++insertOffset;
+    }
+}
+
 void LibraryService::pasteItems()
 {
     if (m_clipboardItems.isEmpty() || m_clipboardMode == QStringLiteral("none")) return;
-    m_pasteQueue = m_clipboardItems;
+    m_pasteQueue.clear();
+    m_cutSourceFolderIds.clear();
+    const auto isCut = m_clipboardMode == QStringLiteral("cut");
+    QString error;
+    for (const auto& item : m_clipboardItems) {
+        const auto itemId = item.toString();
+        m_pasteQueue.append(QVariantMap{
+            {QStringLiteral("itemId"), itemId},
+            {QStringLiteral("targetFolderId"), m_currentFolderId}
+        });
+        if (isCut && m_repository.itemTypeById(itemId, &error) == QStringLiteral("folder")) {
+            m_cutSourceFolderIds.append(itemId);
+        }
+    }
     m_pasteIndex = 0;
     m_pasteTargetFolderId = m_currentFolderId;
     m_pendingConflictAction.clear();
@@ -1178,32 +1233,47 @@ void LibraryService::continuePaste()
 {
     QString error;
     int processed = 0;
+    const auto isCut = m_clipboardMode == QStringLiteral("cut");
+
     while (m_pasteIndex < m_pasteQueue.size()) {
-        const auto itemId = m_pasteQueue[m_pasteIndex].toString();
+        const auto item = m_pasteQueue[m_pasteIndex].toMap();
+        const auto itemId = item.value(QStringLiteral("itemId")).toString();
+        const auto targetFolderId = item.value(QStringLiteral("targetFolderId")).toString();
         const auto type = m_repository.itemTypeById(itemId, &error);
         if (type.isEmpty()) { ++m_pasteIndex; continue; }
 
-        const auto currentParent = type == QStringLiteral("folder")
+        const bool isFolder = type == QStringLiteral("folder");
+
+        // 剪切到同一目录：跳过
+        const auto currentParent = isFolder
             ? m_repository.folderParent(itemId, &error)
             : m_repository.scoreFolderId(itemId, &error);
-        if (currentParent == m_pasteTargetFolderId && m_clipboardMode == QStringLiteral("cut")) {
+        if (currentParent == targetFolderId && isCut) {
             ++m_pasteIndex;
             continue;
         }
 
-        QString itemName;
-        bool isFolder = type == QStringLiteral("folder");
+        // 文件夹：同名自动合并（不弹窗），递归展开内部内容到队列逐个处理
         if (isFolder) {
-            itemName = m_repository.folderName(itemId, &error);
-        } else {
+            const auto sourceName = m_repository.folderName(itemId, &error);
+            if (sourceName.isEmpty()) { ++m_pasteIndex; continue; }
+            const auto mergedFolderId = getOrCreateFolder(sourceName, targetFolderId);
+            expandFolderToQueue(itemId, mergedFolderId);
+            ++m_pasteIndex;
+            continue;
+        }
+
+        // 乐谱：逐个冲突判断
+        QString itemName;
+        {
             const auto all = m_repository.list(QString(), &error);
             for (const auto& s : all) {
                 if (s.id == itemId) { itemName = s.title; break; }
             }
         }
+        if (itemName.isEmpty()) { ++m_pasteIndex; continue; }
 
-        const bool hasConflict = nameExistsInFolder(itemName, m_pasteTargetFolderId, isFolder);
-        // 当前项总是应用用户刚做出的决策；applyToAll 只决定后续项是否复用该决策
+        const bool hasConflict = nameExistsInFolder(itemName, targetFolderId, false);
         QString action = m_pendingConflictAction;
         if (hasConflict && action.isEmpty()) {
             emit pasteConflict(itemName, itemName, m_pasteIndex, m_pasteQueue.size());
@@ -1211,70 +1281,53 @@ void LibraryService::continuePaste()
         }
         if (hasConflict && action.isEmpty()) action = QStringLiteral("rename");
 
-        if (m_clipboardMode == QStringLiteral("cut")) {
+        if (isCut) {
             if (hasConflict) {
                 if (action == QStringLiteral("skip")) { ++m_pasteIndex; continue; }
                 if (action == QStringLiteral("overwrite")) {
-                    if (isFolder) {
-                        const auto children = m_repository.childFolders(m_pasteTargetFolderId, &error);
-                        for (const auto& f : children) {
-                            if (f.toMap().value(QStringLiteral("name")).toString() == itemName) {
-                                if (!m_repository.deleteFolder(f.toMap().value(QStringLiteral("itemId")).toString(), &error)) {
-                                    emit errorOccurred(QStringLiteral("移除旧文件夹失败。"));
-                                }
-                                break;
+                    const auto scores = m_repository.listAtFolder(targetFolderId, QString(), &error);
+                    for (const auto& s : scores) {
+                        if (s.title == itemName) {
+                            if (m_repository.remove(s.id, &error)) {
+                                (void)FileService::removeFile(m_repository.filePathById(s.id, &error), &error);
+                            } else {
+                                emit errorOccurred(QStringLiteral("移除旧乐谱失败。"));
                             }
-                        }
-                    } else {
-                        const auto scores = m_repository.listAtFolder(m_pasteTargetFolderId, QString(), &error);
-                        for (const auto& s : scores) {
-                            if (s.title == itemName) {
-                                if (m_repository.remove(s.id, &error)) {
-                                    (void)FileService::removeFile(m_repository.filePathById(s.id, &error), &error);
-                                } else {
-                                    emit errorOccurred(QStringLiteral("移除旧乐谱失败。"));
-                                }
-                                break;
-                            }
-                        }
-                    }
-                } else if (action == QStringLiteral("rename")) {
-                    if (isFolder) {
-                        if (!m_repository.renameFolder(itemId, uniqueNameInFolder(itemName, m_pasteTargetFolderId, true), &error)) {
-                            emit errorOccurred(QStringLiteral("重命名文件夹失败。"));
+                            break;
                         }
                     }
                 }
+                // rename：移动后给乐谱改名
             }
-            if (isFolder) {
-                if (!m_repository.moveFolder(itemId, m_pasteTargetFolderId, &error)) {
-                    emit errorOccurred(QStringLiteral("移动文件夹失败。"));
-                }
-            } else {
-                if (!m_repository.setFolder(itemId, m_pasteTargetFolderId, &error)) {
-                    emit errorOccurred(QStringLiteral("移动乐谱失败。"));
+            if (!m_repository.setFolder(itemId, targetFolderId, &error)) {
+                emit errorOccurred(QStringLiteral("移动乐谱失败。"));
+            } else if (hasConflict && action == QStringLiteral("rename")) {
+                if (!m_repository.rename(itemId, uniqueNameInFolder(itemName, targetFolderId, false), &error)) {
+                    emit errorOccurred(QStringLiteral("重命名乐谱失败。"));
                 }
             }
         } else {
-            if (isFolder) {
-                copyFolderRecursive(itemId, m_pasteTargetFolderId, action);
-            } else {
-                copyScoreToFolder(itemId, m_pasteTargetFolderId, action);
-            }
+            (void)copyScoreToFolder(itemId, targetFolderId, action);
         }
         ++processed;
         ++m_pasteIndex;
-        // 非"应用到所有"时，当前项决策用完即清空，下一项冲突时重新弹窗
         if (!m_pasteApplyToAll) m_pendingConflictAction.clear();
     }
 
-    if (m_clipboardMode == QStringLiteral("cut")) {
+    // 剪切模式：内部内容移动完成后，删除源空文件夹（级联删除剩余空结构）
+    if (isCut) {
+        for (const auto& folderId : m_cutSourceFolderIds) {
+            if (!m_repository.deleteFolder(folderId, &error)) {
+                emit errorOccurred(QStringLiteral("删除源文件夹失败。"));
+            }
+        }
+        m_cutSourceFolderIds.clear();
         clearClipboard();
     }
     reloadFolders();
     reload();
     if (processed > 0) {
-        emit noticeOccurred(m_clipboardMode == QStringLiteral("cut")
+        emit noticeOccurred(isCut
             ? QStringLiteral("已移动 %1 个项目").arg(processed)
             : QStringLiteral("已复制 %1 个项目").arg(processed));
     }
