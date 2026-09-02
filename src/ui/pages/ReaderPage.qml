@@ -793,9 +793,27 @@ Rectangle {
                     font.pixelSize: Theme.fontSm
                 }
 
+                property var noteValues: [1, 2, 4, 8, 16, 32]
+
+                function nextNoteValue(current) {
+                    const idx = noteValues.indexOf(current)
+                    return idx >= 0 && idx < noteValues.length - 1 ? noteValues[idx + 1] : current
+                }
+                function prevNoteValue(current) {
+                    const idx = noteValues.indexOf(current)
+                    return idx > 0 ? noteValues[idx - 1] : current
+                }
+
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Theme.spacingXs
+
+                    Label {
+                        Layout.preferredWidth: 36
+                        text: "节拍"
+                        color: Theme.mutedForeground
+                        font.pixelSize: Theme.fontXs
+                    }
 
                     AppButton {
                         text: "−"
@@ -805,7 +823,7 @@ Rectangle {
 
                     Label {
                         Layout.fillWidth: true
-                        text: metronome.beatsPerMeasure + " / " + metronome.beatUnit
+                        text: metronome.beatsPerMeasure
                         color: Theme.foreground
                         font.pixelSize: Theme.fontXl
                         font.weight: Font.DemiBold
@@ -819,49 +837,43 @@ Rectangle {
                     }
                 }
 
-                RowLayout {
+                Rectangle {
                     Layout.fillWidth: true
-                    spacing: Theme.spacingXs
-
-                    Label {
-                        Layout.fillWidth: true
-                        text: "分子"
-                        color: Theme.mutedForeground
-                        font.pixelSize: Theme.fontXs
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-                    Label {
-                        Layout.fillWidth: true
-                        text: "分母"
-                        color: Theme.mutedForeground
-                        font.pixelSize: Theme.fontXs
-                        horizontalAlignment: Text.AlignHCenter
-                    }
+                    Layout.preferredHeight: 1
+                    Layout.leftMargin: 36
+                    color: Theme.border
                 }
 
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Theme.spacingXs
 
+                    Label {
+                        Layout.preferredWidth: 36
+                        text: "音符"
+                        color: Theme.mutedForeground
+                        font.pixelSize: Theme.fontXs
+                    }
+
                     AppButton {
                         text: "−"
                         Layout.preferredWidth: 36
-                        onClicked: metronome.beatUnit = Math.max(1, metronome.beatUnit - 1)
+                        onClicked: metronome.beatUnit = metronomePanel.prevNoteValue(metronome.beatUnit)
                     }
 
                     Label {
                         Layout.fillWidth: true
                         text: metronome.beatUnit
                         color: Theme.foreground
-                        font.pixelSize: Theme.fontLg
-                        font.weight: Font.Medium
+                        font.pixelSize: Theme.fontXl
+                        font.weight: Font.DemiBold
                         horizontalAlignment: Text.AlignHCenter
                     }
 
                     AppButton {
                         text: "+"
                         Layout.preferredWidth: 36
-                        onClicked: metronome.beatUnit = Math.min(32, metronome.beatUnit + 1)
+                        onClicked: metronome.beatUnit = metronomePanel.nextNoteValue(metronome.beatUnit)
                     }
                 }
             }

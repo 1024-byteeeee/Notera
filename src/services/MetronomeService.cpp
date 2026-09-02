@@ -1,69 +1,7 @@
 #include "MetronomeService.h"
 #include "MetronomeAudio.h"
 
-#include <QDir>
 #include <QSettings>
-#include <cmath>
-
-namespace {
-
-constexpr int kSampleRate = 44100;
-constexpr int kBitDepth = 16;
-constexpr double kClickDurationSeconds = 0.05;
-
-QByteArray generateClickWave(double frequency, double amplitude)
-{
-    const int totalSamples = static_cast<int>(kSampleRate * kClickDurationSeconds);
-    QByteArray samples;
-    samples.resize(totalSamples * 2);
-    auto* data = reinterpret_cast<qint16*>(samples.data());
-    for (int i = 0; i < totalSamples; ++i) {
-        const double t = static_cast<double>(i) / kSampleRate;
-        const double envelope = std::exp(-t * 60.0);
-        const double value = std::sin(2.0 * M_PI * frequency * t) * envelope * amplitude;
-        data[i] = static_cast<qint16>(qBound(-1.0, value, 1.0) * 32767.0);
-    }
-
-    const quint32 dataSize = static_cast<quint32>(samples.size());
-    const quint32 fileSize = 36 + dataSize;
-    const quint32 byteRate = kSampleRate * 1 * (kBitDepth / 8);
-    const quint16 blockAlign = static_cast<quint16>(1 * (kBitDepth / 8));
-
-    QByteArray wav;
-    wav.reserve(44 + dataSize);
-    wav.append("RIFF", 4);
-    wav.append(reinterpret_cast<const char*>(&fileSize), 4);
-    wav.append("WAVE", 4);
-    wav.append("fmt ", 4);
-    const quint32 fmtSize = 16;
-    wav.append(reinterpret_cast<const char*>(&fmtSize), 4);
-    const quint16 audioFormat = 1;
-    wav.append(reinterpret_cast<const char*>(&audioFormat), 2);
-    const quint16 channels = 1;
-    wav.append(reinterpret_cast<const char*>(&channels), 2);
-    const quint32 sampleRate = kSampleRate;
-    wav.append(reinterpret_cast<const char*>(&sampleRate), 4);
-    wav.append(reinterpret_cast<const char*>(&byteRate), 4);
-    wav.append(reinterpret_cast<const char*>(&blockAlign), 2);
-    const quint16 bitsPerSample = kBitDepth;
-    wav.append(reinterpret_cast<const char*>(&bitsPerSample), 2);
-    wav.append("data", 4);
-    wav.append(reinterpret_cast<const char*>(&dataSize), 4);
-    wav.append(samples);
-    return wav;
-}
-
-bool writeTempWav(QTemporaryFile& file, const QByteArray& data)
-{
-    file.setFileTemplate(QDir::tempPath() + QStringLiteral("/notera-metronome-XXXXXX.wav"));
-    if (!file.open()) return false;
-    file.write(data);
-    file.flush();
-    file.close();
-    return true;
-}
-
-}
 
 MetronomeService::MetronomeService(QObject* parent)
     : QObject(parent)
@@ -72,11 +10,23 @@ MetronomeService::MetronomeService(QObject* parent)
     m_bpm = qBound(1, settings.value(QStringLiteral("metronome/bpm"), 120).toInt(), 500);
     m_beatsPerMeasure = qBound(1, settings.value(QStringLiteral("metronome/beatsPerMeasure"), 4).toInt(), 16);
     m_beatUnit = qBound(1, settings.value(QStringLiteral("metronome/beatUnit"), 4).toInt(), 32);
+    static const int kValidNoteValues[] = {1, 2, 4, 8, 16, 32};
+    bool isValid = false;
+    for (int v : kValidNoteValues) {
+        if (m_beatUnit == v) { isValid = true; break; }
+    }
+    if (!isValid) {
+        int closest = 4;
+        int minDiff = (m_beatUnit > 4) ? m_beatUnit - 4 : 4 - m_beatUnit;
+        for (int v : kValidNoteValues) {
+            const int diff = (m_beatUnit > v) ? m_beatUnit - v : v - m_beatUnit;
+            if (diff < minDiff) { minDiff = diff; closest = v; }
+        }
+        m_beatUnit = closest;
+    }
     m_volume = qBound(0.0, settings.value(QStringLiteral("metronome/volume"), 0.8).toDouble(), 1.0);
 
-    generateClickSamples();
     m_audio = createMetronomeAudio();
-    m_audio->setSources(m_accentFile.fileName(), m_normalFile.fileName());
     m_audio->setVolume(m_volume);
 
     m_timer.setTimerType(Qt::PreciseTimer);
@@ -176,12 +126,4 @@ void MetronomeService::updateTimerInterval()
 {
     const int interval = qMax(1, static_cast<int>(60000.0 / m_bpm));
     m_timer.setInterval(interval);
-}
-
-void MetronomeService::generateClickSamples()
-{
-    const auto accent = generateClickWave(880.0, 0.9);
-    const auto normal = generateClickWave(660.0, 0.6);
-    writeTempWav(m_accentFile, accent);
-    writeTempWav(m_normalFile, normal);
 }

@@ -28,6 +28,7 @@ qt_add_executable(Notera
     src/services/MetronomeService.h
     src/services/MetronomeService.cpp
     src/services/MetronomeAudio.h
+    src/services/MetronomeAudio.cpp
     src/features/library/Score.h
     src/features/library/ScoreListModel.h
     src/features/library/ScoreListModel.cpp
@@ -45,12 +46,6 @@ qt_add_executable(Notera
     src/features/library/LibraryService.cpp
     src/assets/Notera.icns
 )
-
-if(APPLE)
-    target_sources(Notera PRIVATE src/services/MetronomeAudio_mac.mm)
-elseif(WIN32)
-    target_sources(Notera PRIVATE src/services/MetronomeAudio_win.cpp)
-endif()
 
 set_source_files_properties(src/assets/Notera.icns PROPERTIES
     MACOSX_PACKAGE_LOCATION "Resources"
@@ -103,7 +98,9 @@ target_link_libraries(Notera
 )
 
 if(APPLE)
-    target_link_options(Notera PRIVATE "-Wl,-weak_framework,AGL" "-Wl,-framework,AppKit")
+    target_link_options(Notera PRIVATE "-Wl,-weak_framework,AGL"
+        "-Wl,-framework,CoreAudio" "-Wl,-framework,CoreFoundation"
+        "-Wl,-framework,AudioToolbox")
 endif()
 
 set_target_properties(Notera PROPERTIES

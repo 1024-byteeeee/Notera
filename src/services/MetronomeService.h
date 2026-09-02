@@ -1,7 +1,6 @@
 #pragma once
 
 #include <QObject>
-#include <QTemporaryFile>
 #include <QTimer>
 #include <memory>
 
@@ -47,12 +46,9 @@ private slots:
 
 private:
     void updateTimerInterval();
-    void generateClickSamples();
 
     QTimer m_timer;
     std::unique_ptr<MetronomeAudio> m_audio;
-    QTemporaryFile m_accentFile;
-    QTemporaryFile m_normalFile;
 
     bool m_running {false};
     int m_bpm {120};
