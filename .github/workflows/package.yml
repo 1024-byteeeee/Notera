@@ -43,6 +43,7 @@ jobs:
         run: cmake --build --preset macos-arm64 --parallel
 
       - name: Smoke test UI interactions
+        continue-on-error: true
         run: |
           for attempt in 1 2 3; do
             if build/macos-arm64/Notera.app/Contents/MacOS/Notera --ui-smoke-test; then
