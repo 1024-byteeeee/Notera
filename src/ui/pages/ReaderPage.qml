@@ -172,7 +172,6 @@ Rectangle {
         }
     }
 
-    // 工具按钮组件
     component ToolButton: Rectangle {
         required property string btnText
         property string iconName: ""
@@ -227,7 +226,6 @@ Rectangle {
         anchors.fill: parent
         spacing: 0
 
-        // ── 顶部工具栏 ───────────────────────────────────
         Rectangle {
             Layout.fillWidth: true
             implicitHeight: 60
@@ -240,7 +238,6 @@ Rectangle {
                 anchors.margins: 14
                 spacing: 10
 
-                // 返回按钮
                 ToolButton {
                     btnText: "乐谱库"
                     iconName: "back"
@@ -248,7 +245,6 @@ Rectangle {
                     onBtnClicked: { root.autoScrolling = false; appController.currentPage = "library" }
                 }
 
-                // 上一张
                 ToolButton {
                     objectName: "prevScoreButton"
                     btnText: "上一张"
@@ -258,7 +254,6 @@ Rectangle {
                     onBtnClicked: root.goToPrevScore()
                 }
 
-                // 下一张
                 ToolButton {
                     objectName: "nextScoreButton"
                     btnText: "下一张"
@@ -268,7 +263,6 @@ Rectangle {
                     onBtnClicked: root.goToNextScore()
                 }
 
-                // 标题
                 Label {
                     Layout.fillWidth: true
                     text: appController.currentScoreTitle.length > 0 ? appController.currentScoreTitle : "阅读器"
@@ -279,7 +273,6 @@ Rectangle {
                     elide: Text.ElideRight
                 }
 
-                // 自动滚动按钮
                 ToolButton {
                     btnText: root.autoScrolling ? "暂停滚动" : "自动滚动"
                     iconName: root.autoScrolling ? "pause" : "play"
@@ -289,7 +282,6 @@ Rectangle {
                     onBtnClicked: root.autoScrolling = !root.autoScrolling
                 }
 
-                // 速度控制
                 Rectangle {
                     Layout.preferredWidth: 180
                     height: Theme.controlHeight
@@ -356,7 +348,6 @@ Rectangle {
                     }
                 }
 
-                // 缩放控制
                 ToolButton {
                     objectName: "rotateLeftButton"
                     btnText: ""
@@ -390,7 +381,6 @@ Rectangle {
                         anchors.rightMargin: 8
                         spacing: 2
 
-                        // 缩小
                         Rectangle {
                             Layout.preferredWidth: 30
                             height: 28
@@ -405,7 +395,6 @@ Rectangle {
                             }
                         }
 
-                        // 百分比（点击重置）
                         Rectangle {
                             Layout.fillWidth: true
                             height: 28
@@ -426,7 +415,6 @@ Rectangle {
                             }
                         }
 
-                        // 放大
                         Rectangle {
                             Layout.preferredWidth: 30
                             height: 28
@@ -454,7 +442,6 @@ Rectangle {
             }
         }
 
-        // ── 阅读区域 ─────────────────────────────────────
         Flickable {
             id: readerFlick
             objectName: "readerFlick"
@@ -480,7 +467,6 @@ Rectangle {
                 }
             }
 
-            // 双指捏合缩放（触控板，不阻塞滚动）
             PinchHandler {
                 id: pinchZoom
                 target: null
@@ -604,7 +590,6 @@ Rectangle {
             }
         }
 
-        // ── 底部状态栏 ───────────────────────────────────
         Rectangle {
             Layout.fillWidth: true
             implicitHeight: 36

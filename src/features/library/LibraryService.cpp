@@ -27,7 +27,7 @@ int pageCountForFile(const QString& filePath, const QString& fileType)
     return document.status() == QPdfDocument::Status::Ready ? std::max(1, document.pageCount()) : 1;
 }
 
-} // namespace
+}
 
 LibraryService::LibraryService(QObject* parent)
     : QObject(parent)
@@ -326,7 +326,6 @@ void LibraryService::importLocalFile(const QUrl& url)
     if (url.isLocalFile()) {
         localPath = url.toLocalFile();
     } else if (url.scheme().isEmpty()) {
-        // QML FileDialog / DropArea 在部分平台下可能传入纯路径而非 file:// URL
         localPath = url.path();
         if (localPath.isEmpty()) {
             localPath = url.toString();
@@ -350,7 +349,6 @@ void LibraryService::importAndStitchImages(const QStringList& filePaths)
         return;
     }
 
-    // 和 importLocalFile 完全一致的路径解析逻辑
     auto resolveLocalPath = [](const QString& pathOrUrl) -> QString {
         QUrl url(pathOrUrl);
         if (url.isValid() && url.isLocalFile()) {
@@ -366,7 +364,6 @@ void LibraryService::importAndStitchImages(const QStringList& filePaths)
         return {};
     };
 
-    // 用 QImageReader 加载（支持更多格式 + 详细错误）
     QList<QImage> images;
     for (const auto& pathOrUrl : filePaths) {
         const QString localPath = resolveLocalPath(pathOrUrl);
@@ -385,7 +382,6 @@ void LibraryService::importAndStitchImages(const QStringList& filePaths)
         images.append(img);
     }
 
-    // 计算拼接尺寸：宽度取最大值，高度累加
     int maxWidth = 0;
     qint64 totalHeight = 0;
     for (const auto& img : images) {
@@ -398,7 +394,6 @@ void LibraryService::importAndStitchImages(const QStringList& filePaths)
         return;
     }
 
-    // 安全上限
     constexpr qint64 maximumCanvasPixels = 64LL * 1024 * 1024;
     if (totalHeight > 65536 || maxWidth > 16384
         || static_cast<qint64>(maxWidth) * totalHeight > maximumCanvasPixels) {
@@ -406,7 +401,6 @@ void LibraryService::importAndStitchImages(const QStringList& filePaths)
         return;
     }
 
-    // 创建拼接画布（白色背景）
     QImage stitched(maxWidth, static_cast<int>(totalHeight), QImage::Format_ARGB32);
     if (stitched.isNull()) {
         emit errorOccurred(QStringLiteral("内存不足，无法创建拼接图片。"));
@@ -424,7 +418,6 @@ void LibraryService::importAndStitchImages(const QStringList& filePaths)
     }
     painter.end();
 
-    // 保存到临时文件（用固定路径，避免 QTemporaryFile 自动删除）
     const QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
     const QString tempPath = QStringLiteral("%1/notera_stitch_%2.png")
         .arg(tempDir, QUuid::createUuid().toString(QUuid::WithoutBraces));
@@ -433,10 +426,8 @@ void LibraryService::importAndStitchImages(const QStringList& filePaths)
         return;
     }
 
-    // 导入拼接后的图片
     importFile(tempPath, QStringLiteral("拼接乐谱 %1张").arg(images.size()));
 
-    // 清理临时文件
     QFile::remove(tempPath);
 }
 

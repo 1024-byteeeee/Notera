@@ -13,4 +13,4 @@ void setCustomRoot(const QString& path);
 [[nodiscard]] QString annotationsDirectory();
 [[nodiscard]] QString cacheDirectory();
 
-} // namespace AppDataPaths
+}

@@ -15,7 +15,7 @@ QString childDirectory(const QString& name)
     return directory.filePath(name);
 }
 
-} // namespace
+}
 
 namespace AppDataPaths {
 
@@ -66,4 +66,4 @@ QString cacheDirectory()
     return childDirectory(QStringLiteral("cache"));
 }
 
-} // namespace AppDataPaths
+}

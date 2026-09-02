@@ -153,7 +153,7 @@ bool closePopup(QObject* root, const QString& objectName)
     return popup && QMetaObject::invokeMethod(popup, "close");
 }
 
-} // namespace
+}
 
 int main(int argc, char* argv[])
 {
@@ -587,7 +587,6 @@ int main(int argc, char* argv[])
             }
             sendMouseEvent(window, QEvent::MouseButtonRelease, rubberEnd, Qt::LeftButton, Qt::NoButton);
 
-            // 红框内部的卡片间隙属于内容面板，允许从这里启动框选。
             auto* const firstEntryDelegate = findVisualItem(root, QStringLiteral("folderDelegate"));
             if (!firstEntryDelegate) {
                 fail("library-rubber-selection-delegate-gap-object");
@@ -605,7 +604,6 @@ int main(int argc, char* argv[])
             sendMouseEvent(window, QEvent::MouseButtonRelease, occupiedCellGap + QPointF(80.0, 60.0),
                 Qt::LeftButton, Qt::NoButton);
 
-            // 红框外的标题与按钮间隙不能启动框选。
             const auto outsideSurface = librarySurface->mapToScene(
                 QPointF(librarySurface->width() / 2.0, -12.0));
             sendMouseEvent(window, QEvent::MouseButtonPress, outsideSurface,

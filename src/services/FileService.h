@@ -10,4 +10,4 @@ namespace FileService {
 [[nodiscard]] QString copyScoreIntoLibrary(const QString& sourcePath, const QString& scoreId, QString* error);
 [[nodiscard]] bool removeFile(const QString& path, QString* error);
 
-} // namespace FileService
+}

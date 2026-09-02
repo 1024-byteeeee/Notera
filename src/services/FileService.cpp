@@ -10,7 +10,7 @@ namespace {
 
 constexpr auto PreviewableImageSuffixes = {"jpg", "jpeg", "png", "bmp", "gif", "webp", "tif", "tiff"};
 
-} // namespace
+}
 
 namespace FileService {
 
@@ -65,4 +65,4 @@ bool removeFile(const QString& path, QString* error)
     return false;
 }
 
-} // namespace FileService
+}

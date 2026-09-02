@@ -15,7 +15,6 @@ Rectangle {
     property var dragItemIds: []
     property string dragThumbnailPath: ""
 
-    // 内部拖放源与跟随鼠标的预览。
     Rectangle {
         id: dragPreview
         objectName: "dragPreview"
@@ -47,7 +46,6 @@ Rectangle {
             asynchronous: true
         }
 
-        // 多项拖拽时右上角显示数量徽章
         Rectangle {
             visible: root.dragItemIds.length > 1
             anchors.right: parent.right
@@ -489,7 +487,6 @@ Rectangle {
                     }
 
 
-                    // 左上角勾选框始终可用，并位于卡片点击层之上。
                     Rectangle {
                         id: checkBox
                         objectName: "entryCheckBox"
@@ -518,7 +515,6 @@ Rectangle {
                         }
                     }
 
-                    // 收藏按钮 - 悬浮放大五角星，无框
                     Item {
                         id: favoriteBtn
                         objectName: scoreDelegate.itemType === "score" ? "favoriteButton" : "folderFavoriteButton"
@@ -572,7 +568,6 @@ Rectangle {
                         }
                         AppMenuSeparator { }
 
-                        // 移动到文件夹子菜单
                         AppMenu {
                             id: folderSubmenu
                             title: "移动到文件夹"
@@ -603,7 +598,6 @@ Rectangle {
                             }
                         }
 
-                        // 标签子菜单（可多选切换）
                         AppMenu {
                             id: tagSubmenu
                             title: "标签"
@@ -733,7 +727,6 @@ Rectangle {
                 }
             }
 
-            // 鼠标在网格空白处框选；矩形缩小时同步取消离开选区的项目。
             Rectangle {
                 id: selectionBox
                 objectName: "selectionBox"
@@ -866,7 +859,6 @@ Rectangle {
             }
         }
 
-        // 底部批量操作栏
         Rectangle {
             visible: root.selectedCount > 0
             Layout.fillWidth: true
@@ -924,7 +916,6 @@ Rectangle {
         }
     }
 
-    // 空白区域右键菜单
     AppMenu {
         id: blankContextMenu
         objectName: "blankContextMenu"

@@ -44,8 +44,6 @@ let background = NSGradient(colors: [
     NSColor(calibratedRed: 0.84, green: 0.42, blue: 0.00, alpha: 1.0)
 ])!
 background.draw(in: canvas, angle: 90)
-// Slight overscan removes the transparent legacy-icon inset. macOS applies its
-// own rounded-square mask, so the artwork must reach the full icon canvas.
 source.draw(in: canvas.insetBy(dx: -64, dy: -64), from: .zero,
             operation: .sourceOver, fraction: 1.0)
 context.flushGraphics()

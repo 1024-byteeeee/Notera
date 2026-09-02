@@ -30,7 +30,7 @@ QStringList tagNamesForFolder(const QSqlDatabase& database, const QString& folde
     return result;
 }
 
-} // namespace
+}
 
 ScoreRepository::ScoreRepository(QSqlDatabase database)
     : m_database(std::move(database))

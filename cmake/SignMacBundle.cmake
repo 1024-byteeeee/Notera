@@ -7,9 +7,6 @@ if(NOT EXISTS "${bundle_path}")
     message(FATAL_ERROR "Notera bundle was not staged for signing: ${bundle_path}")
 endif()
 
-# CI defaults to ad-hoc signing so development releases are internally
-# consistent. Set NOTERA_CODESIGN_IDENTITY to a Developer ID Application
-# identity for a distributable signed release.
 set(signing_identity "$ENV{NOTERA_CODESIGN_IDENTITY}")
 if(signing_identity STREQUAL "")
     set(signing_identity "-")

@@ -47,7 +47,6 @@ bool DatabaseService::applyMigrations(QString* error)
 
     const auto version = query.value(0).toInt();
 
-    // v1: initial schema
     if (version < 1) {
         if (!m_database.transaction()) {
             *error = m_database.lastError().text();
@@ -87,7 +86,6 @@ bool DatabaseService::applyMigrations(QString* error)
         }
     }
 
-    // v2: folders
     if (version < 2) {
         if (!m_database.transaction()) {
             *error = m_database.lastError().text();
@@ -116,7 +114,6 @@ bool DatabaseService::applyMigrations(QString* error)
         }
     }
 
-    // v3: hierarchical folders. Existing folders remain at the library root.
     if (version < 3) {
         if (!m_database.transaction()) {
             *error = m_database.lastError().text();
@@ -140,7 +137,6 @@ bool DatabaseService::applyMigrations(QString* error)
         }
     }
 
-    // v4: persist folder access time so folders can participate in Recent.
     if (version < 4) {
         if (!m_database.transaction()) {
             *error = m_database.lastError().text();
@@ -161,7 +157,6 @@ bool DatabaseService::applyMigrations(QString* error)
         }
     }
 
-    // v5: folders participate in favorites and the shared tag system.
     if (version < 5) {
         if (!m_database.transaction()) {
             *error = m_database.lastError().text();

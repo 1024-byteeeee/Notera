@@ -89,7 +89,6 @@ Item {
         }
     }
 
-    // Toast 通知
     Rectangle {
         id: toast
         property alias text: toastLabel.text

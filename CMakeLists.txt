@@ -107,8 +107,6 @@ set_target_properties(Notera PROPERTIES
 
 qt_finalize_executable(Notera)
 
-# Qt generates an install-time deployment script. It bundles the required Qt
-# frameworks on macOS and the required DLLs on Windows before CPack packages them.
 qt_generate_deploy_qml_app_script(
     TARGET Notera
     OUTPUT_SCRIPT deploy_script
@@ -143,11 +141,8 @@ if(APPLE)
     if(NOT dmg_background_result EQUAL 0)
         message(FATAL_ERROR "Failed to render DMG background: ${dmg_background_error}")
     endif()
-    # CPack runs this after Qt deployment has copied all nested frameworks and
-    # plug-ins, but before the DMG is assembled.
     set(CPACK_PRE_BUILD_SCRIPTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignMacBundle.cmake")
 elseif(WIN32)
-    # Requires WiX Toolset on the Windows packaging machine.
     set(CPACK_GENERATOR "WIX")
     set(CPACK_WIX_UPGRADE_GUID "C2A4B1D0-76FB-4D37-94B3-32D3A9FD44F1")
     set(CPACK_WIX_PRODUCT_ICON "${CMAKE_CURRENT_SOURCE_DIR}/src/assets/Notera.ico")
