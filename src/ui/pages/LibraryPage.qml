@@ -267,46 +267,6 @@ Rectangle {
 
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-                // GridView 区域内的框选（红框区域）
-                DragHandler {
-                    id: gridRubberBand
-                    objectName: "gridRubberBand"
-                    property bool validStart: false
-                    enabled: !root.dragInProgress
-                    target: null
-                    acceptedButtons: Qt.LeftButton
-                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                    grabPermissions: PointerHandler.ApprovesTakeOverByAnything
-
-                    onActiveChanged: {
-                        if (!active) {
-                            validStart = false
-                            return
-                        }
-                        const localPress = centroid.pressPosition
-                        validStart = grid.indexAt(localPress.x + grid.contentX,
-                            localPress.y + grid.contentY) < 0
-                        if (!validStart) return
-                        const p = grid.mapToItem(librarySurface, localPress.x, localPress.y)
-                        selectionBox.x = p.x
-                        selectionBox.y = p.y
-                        selectionBox.width = 0
-                        selectionBox.height = 0
-                    }
-                    onActiveTranslationChanged: {
-                        if (!active || !validStart) return
-                        const start = grid.mapToItem(librarySurface,
-                            centroid.pressPosition.x, centroid.pressPosition.y)
-                        const cur = grid.mapToItem(librarySurface,
-                            centroid.position.x, centroid.position.y)
-                        selectionBox.x = Math.min(start.x, cur.x)
-                        selectionBox.y = Math.min(start.y, cur.y)
-                        selectionBox.width = Math.abs(cur.x - start.x)
-                        selectionBox.height = Math.abs(cur.y - start.y)
-                        root.updateRubberSelection()
-                    }
-                }
-
                 delegate: Item {
                     id: scoreDelegate
                     objectName: itemType === "score" ? "scoreDelegate" : "folderDelegate"
@@ -458,6 +418,7 @@ Rectangle {
                             anchors.fill: parent
                             objectName: scoreDelegate.itemType === "score" ? "scoreCardMouse" : "folderCardMouse"
                             acceptedButtons: Qt.LeftButton
+                            preventStealing: true
                             drag.target: dragPreview
                             drag.threshold: Qt.styleHints.startDragDistance
                             property bool preparedDrag: false
@@ -786,29 +747,35 @@ Rectangle {
             }
 
             DragHandler {
-                id: rubberBand
-                enabled: false
+                id: gridRubberBand
+                objectName: "gridRubberBand"
+                property bool validStart: false
+                enabled: !root.dragInProgress && grid.count > 0
                 target: null
                 acceptedButtons: Qt.LeftButton
-                acceptedDevices: PointerDevice.Mouse
-                grabPermissions: PointerHandler.ApprovesTakeOverByAnything
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                grabPermissions: PointerHandler.CanTakeOverFromItems
+                    | PointerHandler.ApprovesTakeOverByAnything
 
                 onActiveChanged: {
                     if (!active) {
-                        libraryService.selection.clear()
+                        validStart = false
                         return
                     }
                     const p = centroid.pressPosition
+                    validStart = p.x >= 0 && p.y >= 0
+                        && p.x <= librarySurface.width && p.y <= librarySurface.height
+                    if (!validStart) return
                     selectionBox.x = p.x
                     selectionBox.y = p.y
                     selectionBox.width = 0
                     selectionBox.height = 0
                 }
                 onActiveTranslationChanged: {
-                    if (!active) return
+                    if (!active || !validStart) return
                     const start = centroid.pressPosition
-                    const curX = start.x + activeTranslation.x
-                    const curY = start.y + activeTranslation.y
+                    const curX = centroid.position.x
+                    const curY = centroid.position.y
                     selectionBox.x = Math.min(start.x, curX)
                     selectionBox.y = Math.min(start.y, curY)
                     selectionBox.width = Math.abs(curX - start.x)

@@ -551,6 +551,7 @@ int main(int argc, char* argv[])
                 | static_cast<int>(QInputDevice::DeviceType::TouchPad);
             if (!libraryPage || !librarySurface || !rubberSelectionGrid || !selectionBox || !window
                 || !rubberBandHandler
+                || rubberBandHandler->parent() != librarySurface
                 || (acceptedSelectionDevices & mouseAndTouchPad) != mouseAndTouchPad) {
                 fail("library-rubber-selection-objects");
                 return;
@@ -586,7 +587,7 @@ int main(int argc, char* argv[])
             }
             sendMouseEvent(window, QEvent::MouseButtonRelease, rubberEnd, Qt::LeftButton, Qt::NoButton);
 
-            // 卡片之间的黑色间隙仍属于项目单元格，不能从这里启动框选。
+            // 红框内部的卡片间隙属于内容面板，允许从这里启动框选。
             auto* const firstEntryDelegate = findVisualItem(root, QStringLiteral("folderDelegate"));
             if (!firstEntryDelegate) {
                 fail("library-rubber-selection-delegate-gap-object");
@@ -597,11 +598,25 @@ int main(int argc, char* argv[])
                 Qt::LeftButton, Qt::LeftButton);
             sendMouseEvent(window, QEvent::MouseMove, occupiedCellGap + QPointF(80.0, 60.0),
                 Qt::NoButton, Qt::LeftButton);
-            if (selectionBox->isVisible()) {
-                fail("library-rubber-selection-rejects-occupied-cell-gap");
+            if (!selectionBox->isVisible()) {
+                fail("library-rubber-selection-allows-surface-gap");
                 return;
             }
             sendMouseEvent(window, QEvent::MouseButtonRelease, occupiedCellGap + QPointF(80.0, 60.0),
+                Qt::LeftButton, Qt::NoButton);
+
+            // 红框外的标题与按钮间隙不能启动框选。
+            const auto outsideSurface = librarySurface->mapToScene(
+                QPointF(librarySurface->width() / 2.0, -12.0));
+            sendMouseEvent(window, QEvent::MouseButtonPress, outsideSurface,
+                Qt::LeftButton, Qt::LeftButton);
+            sendMouseEvent(window, QEvent::MouseMove, outsideSurface + QPointF(80.0, 40.0),
+                Qt::NoButton, Qt::LeftButton);
+            if (selectionBox->isVisible()) {
+                fail("library-rubber-selection-rejects-outside-surface");
+                return;
+            }
+            sendMouseEvent(window, QEvent::MouseButtonRelease, outsideSurface + QPointF(80.0, 40.0),
                 Qt::LeftButton, Qt::NoButton);
 
             const auto selectStart = rubberSelectionGrid->mapToScene(QPointF(
