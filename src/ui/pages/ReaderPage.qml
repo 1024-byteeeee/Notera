@@ -274,6 +274,23 @@ Rectangle {
                 }
 
                 ToolButton {
+                    objectName: "metronomeButton"
+                    btnText: "节拍器"
+                    iconName: "metronome"
+                    btnActive: metronome.running
+                    Layout.preferredWidth: 96
+                    onBtnClicked: metronome.toggle()
+                }
+
+                ToolButton {
+                    objectName: "metronomeSettingsButton"
+                    btnText: ""
+                    iconName: "settings"
+                    Layout.preferredWidth: 42
+                    onBtnClicked: metronomePanel.open()
+                }
+
+                ToolButton {
                     btnText: root.autoScrolling ? "暂停滚动" : "自动滚动"
                     iconName: root.autoScrolling ? "pause" : "play"
                     btnEnabled: root.isPdf || root.isImage
@@ -629,7 +646,286 @@ Rectangle {
         function onCurrentPageChanged() {
             if (appController.currentPage === "reader") {
                 root.finishInitialViewIfReady()
+            } else {
+                metronome.stop()
             }
         }
+    }
+
+    Popup {
+        id: metronomePanel
+        objectName: "metronomePanel"
+        width: 300
+        modal: false
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        property int flashBeat: -1
+
+        onAboutToShow: {
+            const btn = metronomeSettingsButton
+            if (btn) {
+                const pos = btn.mapToItem(root, 0, btn.height + 8)
+                x = Math.min(pos.x, root.width - width - 8)
+                y = pos.y
+            }
+        }
+
+        background: Rectangle {
+            color: Theme.surface
+            border.color: Theme.border
+            border.width: 1
+            radius: Theme.radiusLg
+        }
+
+        contentItem: Item {
+            implicitWidth: columnLayout.implicitWidth
+            implicitHeight: columnLayout.implicitHeight
+
+            ColumnLayout {
+                id: columnLayout
+                anchors.fill: parent
+                anchors.margins: Theme.spacingMd
+                spacing: Theme.spacingMd
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingSm
+
+                Rectangle {
+                    id: beatIndicator
+                    Layout.preferredWidth: 12
+                    Layout.preferredHeight: 12
+                    radius: 6
+                    color: metronomePanel.flashBeat === 0 ? Theme.accent
+                         : metronomePanel.flashBeat >= 0 ? Theme.strongBorder
+                         : Theme.sunkenSurface
+                    Behavior on color { ColorAnimation { duration: 60 } }
+                }
+
+                AppButton {
+                    Layout.fillWidth: true
+                    primary: true
+                    text: metronome.running ? "暂停节拍器" : "启动节拍器"
+                    onClicked: metronome.toggle()
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingXs
+
+                Label {
+                    text: "BPM"
+                    color: Theme.mutedForeground
+                    font.pixelSize: Theme.fontSm
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingXs
+
+                    AppButton {
+                        text: "−"
+                        Layout.preferredWidth: 36
+                        onClicked: metronome.bpm = Math.max(1, metronome.bpm - 1)
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: metronome.bpm
+                        color: Theme.foreground
+                        font.pixelSize: Theme.font2xl
+                        font.weight: Font.Bold
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    AppButton {
+                        text: "+"
+                        Layout.preferredWidth: 36
+                        onClicked: metronome.bpm = Math.min(500, metronome.bpm + 1)
+                    }
+                }
+
+                Slider {
+                    id: bpmSlider
+                    Layout.fillWidth: true
+                    from: 1
+                    to: 500
+                    stepSize: 1
+                    value: metronome.bpm
+                    onMoved: metronome.bpm = value
+
+                    background: Rectangle {
+                        x: bpmSlider.leftPadding
+                        y: bpmSlider.topPadding + bpmSlider.availableHeight / 2 - height / 2
+                        width: bpmSlider.availableWidth
+                        height: 4
+                        radius: 2
+                        color: Theme.sunkenSurface
+                        Rectangle {
+                            width: bpmSlider.visualPosition * parent.width
+                            height: parent.height
+                            radius: 2
+                            color: Theme.accent
+                        }
+                    }
+                    handle: Rectangle {
+                        x: bpmSlider.leftPadding + bpmSlider.visualPosition * (bpmSlider.availableWidth - width)
+                        y: bpmSlider.topPadding + bpmSlider.availableHeight / 2 - height / 2
+                        implicitWidth: 16
+                        implicitHeight: 16
+                        radius: 8
+                        color: Theme.surface
+                        border.width: 2
+                        border.color: Theme.accent
+                    }
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingXs
+
+                Label {
+                    text: "拍号"
+                    color: Theme.mutedForeground
+                    font.pixelSize: Theme.fontSm
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingXs
+
+                    AppButton {
+                        text: "−"
+                        Layout.preferredWidth: 36
+                        onClicked: metronome.beatsPerMeasure = Math.max(1, metronome.beatsPerMeasure - 1)
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: metronome.beatsPerMeasure + " / " + metronome.beatUnit
+                        color: Theme.foreground
+                        font.pixelSize: Theme.fontXl
+                        font.weight: Font.DemiBold
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    AppButton {
+                        text: "+"
+                        Layout.preferredWidth: 36
+                        onClicked: metronome.beatsPerMeasure = Math.min(16, metronome.beatsPerMeasure + 1)
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingXs
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: "分子"
+                        color: Theme.mutedForeground
+                        font.pixelSize: Theme.fontXs
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        text: "分母"
+                        color: Theme.mutedForeground
+                        font.pixelSize: Theme.fontXs
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingXs
+
+                    AppButton {
+                        text: "−"
+                        Layout.preferredWidth: 36
+                        onClicked: metronome.beatUnit = Math.max(1, metronome.beatUnit - 1)
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: metronome.beatUnit
+                        color: Theme.foreground
+                        font.pixelSize: Theme.fontLg
+                        font.weight: Font.Medium
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    AppButton {
+                        text: "+"
+                        Layout.preferredWidth: 36
+                        onClicked: metronome.beatUnit = Math.min(32, metronome.beatUnit + 1)
+                    }
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingXs
+
+                Label {
+                    text: "音量"
+                    color: Theme.mutedForeground
+                    font.pixelSize: Theme.fontSm
+                }
+
+                Slider {
+                    id: volumeSlider
+                    Layout.fillWidth: true
+                    from: 0
+                    to: 1
+                    stepSize: 0.01
+                    value: metronome.volume
+                    onMoved: metronome.volume = value
+
+                    background: Rectangle {
+                        x: volumeSlider.leftPadding
+                        y: volumeSlider.topPadding + volumeSlider.availableHeight / 2 - height / 2
+                        width: volumeSlider.availableWidth
+                        height: 4
+                        radius: 2
+                        color: Theme.sunkenSurface
+                        Rectangle {
+                            width: volumeSlider.visualPosition * parent.width
+                            height: parent.height
+                            radius: 2
+                            color: Theme.accent
+                        }
+                    }
+                    handle: Rectangle {
+                        x: volumeSlider.leftPadding + volumeSlider.visualPosition * (volumeSlider.availableWidth - width)
+                        y: volumeSlider.topPadding + volumeSlider.availableHeight / 2 - height / 2
+                        implicitWidth: 16
+                        implicitHeight: 16
+                        radius: 8
+                        color: Theme.surface
+                        border.width: 2
+                        border.color: Theme.accent
+                    }
+                }
+            }
+            }
+        }
+    }
+
+    Connections {
+        target: metronome
+        function onBeat(beatIndex) {
+            metronomePanel.flashBeat = beatIndex
+            beatFlashTimer.restart()
+        }
+    }
+
+    Timer {
+        id: beatFlashTimer
+        interval: 90
+        onTriggered: metronomePanel.flashBeat = -1
     }
 }

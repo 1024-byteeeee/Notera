@@ -26,7 +26,8 @@ Canvas {
             "♪": "music", "♫": "music", "◷": "recent", "⚙": "settings",
             "▾": "chevron-down", "▸": "chevron-right", "⌕": "search",
             "←": "back", "‹": "previous", "›": "next", "▶": "play",
-            "⏸": "pause", "↶": "rotate-left", "↷": "rotate-right"
+            "⏸": "pause", "↶": "rotate-left", "↷": "rotate-right",
+            "⌚": "metronome"
         }
         return aliases[value] || value
     }
@@ -120,6 +121,11 @@ Canvas {
             ctx.beginPath(); ctx.arc(12, 12, 7, name === "rotate-right" ? -2.5 : -0.6, name === "rotate-right" ? 0.6 : 2.5, name !== "rotate-right"); ctx.stroke()
             if (name === "rotate-right") line([[18, 5], [19, 10], [14, 9]])
             else line([[6, 5], [5, 10], [10, 9]])
+        } else if (name === "metronome") {
+            line([[6, 20], [18, 20], [15, 5], [9, 5]], true)
+            line([[12, 7], [12, 18]])
+            circle(12, 11, 1.8, true)
+            line([[4, 20], [20, 20]])
         }
     }
 }

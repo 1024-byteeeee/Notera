@@ -30,6 +30,7 @@
 #include "app/ApplicationController.h"
 #include "features/library/LibraryService.h"
 #include "platform/AppDataPaths.h"
+#include "services/MetronomeService.h"
 
 namespace {
 
@@ -294,6 +295,7 @@ int main(int argc, char* argv[])
 
     ApplicationController controller;
     LibraryService libraryService;
+    MetronomeService metronome;
     QObject::connect(&controller, &ApplicationController::restartRequested, &app, [&restartGuard] {
         restartGuard.requested = true;
         QCoreApplication::quit();
@@ -352,6 +354,7 @@ int main(int argc, char* argv[])
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("appController"), &controller);
     engine.rootContext()->setContextProperty(QStringLiteral("libraryService"), &libraryService);
+    engine.rootContext()->setContextProperty(QStringLiteral("metronome"), &metronome);
     engine.loadFromModule("Notera", "Main");
 
     if (engine.rootObjects().isEmpty()) {
