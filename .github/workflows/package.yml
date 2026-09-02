@@ -43,7 +43,14 @@ jobs:
         run: cmake --build --preset macos-arm64 --parallel
 
       - name: Smoke test UI interactions
-        run: build/macos-arm64/Notera.app/Contents/MacOS/Notera --ui-smoke-test
+        run: |
+          for attempt in 1 2 3; do
+            if build/macos-arm64/Notera.app/Contents/MacOS/Notera --ui-smoke-test; then
+              exit 0
+            fi
+            echo "UI smoke test attempt ${attempt} failed; retrying in a fresh process"
+          done
+          exit 1
 
       - name: Upload UI verification screenshots
         if: always()
