@@ -384,15 +384,30 @@ int main(int argc, char* argv[])
 
     if (arguments.contains(QStringLiteral("--theme-smoke-test"))) {
         auto* const root = engine.rootObjects().constFirst();
+        auto* const selectionBox = findVisualItem(root, QStringLiteral("selectionBox"));
+        if (!selectionBox) return 1;
         const auto originalMode = controller.themeMode();
         controller.setThemeMode(0);
         QCoreApplication::processEvents();
         const auto lightBackground = root->property("themeBackground").value<QColor>();
+        const auto lightMarqueeFill = selectionBox->property("color").value<QColor>();
+        const auto lightMarqueeBorderColor = selectionBox->property("appliedBorderColor").value<QColor>();
         controller.setThemeMode(1);
         QCoreApplication::processEvents();
         const auto darkBackground = root->property("themeBackground").value<QColor>();
+        const auto darkMarqueeFill = selectionBox->property("color").value<QColor>();
+        const auto darkMarqueeBorderColor = selectionBox->property("appliedBorderColor").value<QColor>();
         controller.setThemeMode(originalMode);
-        return lightBackground.isValid() && darkBackground.isValid() && lightBackground != darkBackground ? 0 : 1;
+        const auto marqueeColorsAreThemeIndependent = lightMarqueeFill.isValid()
+            && lightMarqueeBorderColor.isValid()
+            && lightMarqueeFill == darkMarqueeFill
+            && lightMarqueeBorderColor == darkMarqueeBorderColor;
+        const auto marqueeIsMoreTransparent = lightMarqueeFill.alphaF() > 0.0
+            && lightMarqueeFill.alphaF() < (0x22 / 255.0);
+        return lightBackground.isValid() && darkBackground.isValid()
+                && lightBackground != darkBackground
+                && marqueeColorsAreThemeIndependent && marqueeIsMoreTransparent
+            ? 0 : 1;
     }
 
     QTemporaryFile readerSmokeFile;

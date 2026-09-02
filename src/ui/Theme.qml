@@ -29,6 +29,10 @@ QtObject {
     readonly property color accentSoft: dark ? "#2a2315" : "#faf3e0"
     readonly property color accentForeground: dark ? "#1a1408" : "#ffffff"
 
+    // 框选区域使用跨主题固定色，避免浅色与深色模式切换时改变视觉语义。
+    readonly property color marqueeFill: Qt.rgba(224 / 255, 180 / 255, 92 / 255, 0.09)
+    readonly property color marqueeBorder: "#e0b45c"
+
     // ── 按钮状态色 ───────────────────────────────────────
     readonly property color buttonBackground: dark ? "#232326" : "#f5f4f1"
     readonly property color buttonHover: dark ? "#2e2e32" : "#ebeae6"

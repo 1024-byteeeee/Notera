@@ -768,11 +768,12 @@ Rectangle {
             Rectangle {
                 id: selectionBox
                 objectName: "selectionBox"
+                readonly property color appliedBorderColor: Theme.marqueeBorder
                 visible: gridRubberBand.active
                 z: 10
-                color: Theme.accent + "22"
+                color: Theme.marqueeFill
                 border.width: 1
-                border.color: Theme.accent
+                border.color: appliedBorderColor
                 radius: 4
             }
 
