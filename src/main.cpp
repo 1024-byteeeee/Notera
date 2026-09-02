@@ -585,6 +585,25 @@ int main(int argc, char* argv[])
                 return;
             }
             sendMouseEvent(window, QEvent::MouseButtonRelease, rubberEnd, Qt::LeftButton, Qt::NoButton);
+
+            // 卡片之间的黑色间隙仍属于项目单元格，不能从这里启动框选。
+            auto* const firstEntryDelegate = findVisualItem(root, QStringLiteral("folderDelegate"));
+            if (!firstEntryDelegate) {
+                fail("library-rubber-selection-delegate-gap-object");
+                return;
+            }
+            const auto occupiedCellGap = firstEntryDelegate->mapToScene(QPointF(2.0, 2.0));
+            sendMouseEvent(window, QEvent::MouseButtonPress, occupiedCellGap,
+                Qt::LeftButton, Qt::LeftButton);
+            sendMouseEvent(window, QEvent::MouseMove, occupiedCellGap + QPointF(80.0, 60.0),
+                Qt::NoButton, Qt::LeftButton);
+            if (selectionBox->isVisible()) {
+                fail("library-rubber-selection-rejects-occupied-cell-gap");
+                return;
+            }
+            sendMouseEvent(window, QEvent::MouseButtonRelease, occupiedCellGap + QPointF(80.0, 60.0),
+                Qt::LeftButton, Qt::NoButton);
+
             const auto selectStart = rubberSelectionGrid->mapToScene(QPointF(
                 rubberSelectionGrid->width() * 0.9, rubberSelectionGrid->height() * 0.75));
             const auto selectEnd = rubberSelectionGrid->mapToScene(QPointF(
