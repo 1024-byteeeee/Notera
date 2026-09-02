@@ -90,6 +90,7 @@ target_link_libraries(Notera
         Qt6::Concurrent
         Qt6::Pdf
         Qt6::Sql
+        Qt6::CorePrivate
 )
 
 if(APPLE)

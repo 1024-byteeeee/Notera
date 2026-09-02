@@ -548,28 +548,33 @@ Rectangle {
         }
     }
 
-    FolderDialog {
+    FileDialog {
         id: exportBackupDialog
         objectName: "exportBackupDialog"
-        title: "选择备份保存位置"
+        title: "导出数据库备份"
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "zip"
+        nameFilters: ["Notera 备份 (*.notera-backup *.zip)", "所有文件 (*)"]
         currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
         onAccepted: {
-            const error = appController.exportDatabaseBackup(selectedFolder)
+            const error = appController.exportDatabaseBackup(selectedFile)
             backupResultDialog.title = error.length > 0 ? "导出失败" : "导出成功"
             backupResultDialog.message = error.length > 0
                 ? error
-                : "备份已导出到所选目录。"
+                : "备份已导出到所选位置。"
             backupResultDialog.open()
         }
     }
 
-    FolderDialog {
+    FileDialog {
         id: importBackupDialog
         objectName: "importBackupDialog"
-        title: "选择备份目录（.notera-backup）"
+        title: "选择备份文件（.notera-backup / .zip）"
+        fileMode: FileDialog.OpenFile
+        nameFilters: ["Notera 备份 (*.notera-backup *.zip)", "所有文件 (*)"]
         currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
         onAccepted: {
-            importConfirmDialog.backupDirectory = selectedFolder
+            importConfirmDialog.backupFile = selectedFile
             importConfirmDialog.message = "导入将替换当前所有乐谱、文件夹、标签和设置，此操作不可撤销。\n\n是否继续？"
             importConfirmDialog.open()
         }
@@ -578,11 +583,11 @@ Rectangle {
     ConfirmDialog {
         id: importConfirmDialog
         objectName: "importConfirmDialog"
-        property url backupDirectory: ""
+        property url backupFile: ""
         title: "导入数据库备份？"
         confirmText: "开始导入"
         onAccepted: {
-            const error = appController.importDatabaseBackup(backupDirectory)
+            const error = appController.importDatabaseBackup(backupFile)
             if (error.length > 0) {
                 backupResultDialog.title = "导入失败"
                 backupResultDialog.message = error

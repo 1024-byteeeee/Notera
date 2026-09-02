@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <QCoreApplication>
 #include <QDir>
+#include <QDirIterator>
 #include <QDesktopServices>
 #include <QDateTime>
 #include <QFile>
@@ -15,7 +16,10 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QStandardPaths>
+#include <QTemporaryDir>
 #include <QUuid>
+#include <QtCore/private/qzipreader_p.h>
+#include <QtCore/private/qzipwriter_p.h>
 
 ApplicationController::ApplicationController(QObject* parent)
     : QObject(parent)
@@ -215,6 +219,74 @@ static bool removeDirectoryRecursively(const QString& path)
     return dir.removeRecursively();
 }
 
+static bool zipDirectory(const QString& srcDir, const QString& zipPath, QString* error)
+{
+    QZipWriter writer(zipPath);
+    writer.setCompressionPolicy(QZipWriter::AutoCompress);
+    if (writer.status() != QZipWriter::NoError) {
+        if (error) *error = QStringLiteral("无法创建备份压缩包。");
+        return false;
+    }
+
+    QDirIterator it(srcDir, QDir::NoDotAndDotDot | QDir::AllEntries | QDir::Hidden,
+        QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        const auto filePath = it.next();
+        const auto relativePath = QDir(srcDir).relativeFilePath(filePath);
+        const QFileInfo info(filePath);
+        if (info.isDir()) {
+            writer.addDirectory(relativePath);
+        } else {
+            QFile file(filePath);
+            if (!file.open(QIODevice::ReadOnly)) {
+                if (error) *error = QStringLiteral("无法读取文件：%1").arg(filePath);
+                return false;
+            }
+            writer.addFile(relativePath, file.readAll());
+            file.close();
+        }
+    }
+    writer.close();
+    if (writer.status() != QZipWriter::NoError) {
+        if (error) *error = QStringLiteral("写入备份压缩包失败。");
+        return false;
+    }
+    return true;
+}
+
+static bool unzipToDirectory(const QString& zipPath, const QString& dstDir, QString* error)
+{
+    QZipReader reader(zipPath);
+    if (!reader.exists()) {
+        if (error) *error = QStringLiteral("无法打开备份压缩包。");
+        return false;
+    }
+    const auto entries = reader.fileInfoList();
+    for (const auto& entry : entries) {
+        const auto targetPath = QDir(dstDir).filePath(entry.filePath);
+        if (entry.isDir) {
+            if (!QDir().mkpath(targetPath)) {
+                if (error) *error = QStringLiteral("无法创建目录：%1").arg(targetPath);
+                return false;
+            }
+        } else {
+            if (!QDir().mkpath(QFileInfo(targetPath).absolutePath())) {
+                if (error) *error = QStringLiteral("无法创建目录：%1").arg(QFileInfo(targetPath).absolutePath());
+                return false;
+            }
+            QFile file(targetPath);
+            if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+                if (error) *error = QStringLiteral("无法写入文件：%1").arg(targetPath);
+                return false;
+            }
+            file.write(reader.fileData(entry.filePath));
+            file.close();
+        }
+    }
+    reader.close();
+    return true;
+}
+
 static QString escapedSqlString(QString value)
 {
     return value.replace(QLatin1Char('\''), QStringLiteral("''"));
@@ -331,16 +403,22 @@ QString ApplicationController::openDataDirectory() const
         ? QString {} : QStringLiteral("无法打开数据存储目录。");
 }
 
-QString ApplicationController::exportDatabaseBackup(const QUrl& destinationDirectory) const
+QString ApplicationController::exportDatabaseBackup(const QUrl& destinationFile) const
 {
-    if (!destinationDirectory.isValid() || !destinationDirectory.isLocalFile()) {
-        return QStringLiteral("请选择本机文件夹。");
+    if (!destinationFile.isValid() || !destinationFile.isLocalFile()) {
+        return QStringLiteral("请选择本机保存位置。");
     }
-    const auto parentPath = QDir::cleanPath(destinationDirectory.toLocalFile());
+    auto zipPath = QDir::cleanPath(destinationFile.toLocalFile());
+    if (!zipPath.endsWith(QStringLiteral(".zip"), Qt::CaseInsensitive)
+        && !zipPath.endsWith(QStringLiteral(".notera-backup"), Qt::CaseInsensitive)) {
+        zipPath += QStringLiteral(".notera-backup.zip");
+    }
+    const auto parentPath = QFileInfo(zipPath).absolutePath();
     if (!QDir(parentPath).exists()) return QStringLiteral("目标文件夹不存在。");
-    const auto backupName = QStringLiteral("Notera-backup-%1.notera-backup")
-        .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss")));
-    const auto backupRoot = QDir(parentPath).filePath(backupName);
+
+    QTemporaryDir tempDir;
+    if (!tempDir.isValid()) return QStringLiteral("无法创建临时目录。");
+    const auto backupRoot = tempDir.path();
     if (!QDir().mkpath(backupRoot + QStringLiteral("/database"))) {
         return QStringLiteral("无法创建备份目录。");
     }
@@ -351,7 +429,6 @@ QString ApplicationController::exportDatabaseBackup(const QUrl& destinationDirec
     QSqlQuery query(database);
     const auto snapshotSql = QStringLiteral("VACUUM INTO '%1'").arg(escapedSqlString(snapshotPath));
     if (!database.isOpen() || !query.exec(snapshotSql)) {
-        removeDirectoryRecursively(backupRoot);
         return QStringLiteral("创建数据库一致性快照失败：%1").arg(query.lastError().text());
     }
 
@@ -361,25 +438,41 @@ QString ApplicationController::exportDatabaseBackup(const QUrl& destinationDirec
     for (const auto& directory : directories) {
         if (!copyDirectoryRecursively(sourceRoot + QLatin1Char('/') + directory,
                 backupRoot + QLatin1Char('/') + directory, &error)) {
-            removeDirectoryRecursively(backupRoot);
             return error;
         }
     }
     if (!writeBackupManifest(backupRoot, sourceRoot, &error)) {
-        removeDirectoryRecursively(backupRoot);
+        return error;
+    }
+
+    if (QFileInfo::exists(zipPath) && !QFile::remove(zipPath)) {
+        return QStringLiteral("无法覆盖已存在的备份文件。");
+    }
+    if (!zipDirectory(backupRoot, zipPath, &error)) {
+        QFile::remove(zipPath);
         return error;
     }
     return {};
 }
 
-QString ApplicationController::importDatabaseBackup(const QUrl& backupDirectory)
+QString ApplicationController::importDatabaseBackup(const QUrl& backupFile)
 {
-    if (!backupDirectory.isValid() || !backupDirectory.isLocalFile()) {
-        return QStringLiteral("请选择本机备份文件夹。");
+    if (!backupFile.isValid() || !backupFile.isLocalFile()) {
+        return QStringLiteral("请选择本机备份文件。");
     }
-    const auto backupRoot = QDir::cleanPath(backupDirectory.toLocalFile());
-    QJsonObject manifest;
+    const auto zipPath = QDir::cleanPath(backupFile.toLocalFile());
+    if (!QFileInfo::exists(zipPath)) return QStringLiteral("备份文件不存在。");
+
+    QTemporaryDir tempDir;
+    if (!tempDir.isValid()) return QStringLiteral("无法创建临时目录。");
+    const auto backupRoot = tempDir.path();
+
     QString error;
+    if (!unzipToDirectory(zipPath, backupRoot, &error)) {
+        return error;
+    }
+
+    QJsonObject manifest;
     if (!readBackupManifest(backupRoot, &manifest, &error)
         || !validateBackupDatabase(backupRoot + QStringLiteral("/database/notera.db"), &error)) {
         return error;
