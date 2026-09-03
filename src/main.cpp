@@ -857,44 +857,52 @@ int main(int argc, char* argv[])
             }
         }
 
-        // 文件夹内部冲突测试：复制同名文件夹到根目录，文件夹自动合并，内部乐谱逐个冲突弹窗
+        // 文件夹内部冲突测试：复制同名文件夹到根目录，文件夹级别冲突弹窗，内部乐谱逐个冲突弹窗
         {
             QObject ctx; // 块结束时自动断开所有以此为 context 的连接
-            QEventLoop innerLoop;
-            bool innerConflictFired = false;
-            QObject::connect(&libraryService, &LibraryService::pasteConflict, &ctx, [&](const QString&, const QString&, int, int) {
-                innerConflictFired = true;
-                innerLoop.quit();
+            QEventLoop folderConflictLoop;
+            bool folderConflictFired = false;
+            QObject::connect(&libraryService, &LibraryService::pasteFolderConflict, &ctx, [&](const QString&, const QString&, int, int) {
+                folderConflictFired = true;
+                folderConflictLoop.quit();
             });
             libraryService.copyItems({QStringLiteral("clip-smoke-inner-folder")});
             libraryService.goToLibraryRoot();
             libraryService.pasteItems();
-            QTimer::singleShot(800, &innerLoop, &QEventLoop::quit);
-            innerLoop.exec();
-            if (!innerConflictFired) {
-                qWarning() << "[clipboard-smoke] FAIL: inner folder score conflict did not fire (folder merge should not suppress inner conflict)";
+            QTimer::singleShot(800, &folderConflictLoop, &QEventLoop::quit);
+            folderConflictLoop.exec();
+            if (!folderConflictFired) {
+                qWarning() << "[clipboard-smoke] FAIL: folder-level conflict did not fire for same-named folder";
                 return 1;
             }
-            // 选"保留两者"(rename)，不应用到所有
-            libraryService.resolvePasteConflict(QStringLiteral("rename"), false);
+            // 文件夹冲突选"保留两者"(rename)，会创建 "clip-smoke-inner-folder (2)"
+            libraryService.resolvePasteFolderConflict(QStringLiteral("rename"), false);
+
             QEventLoop innerDone;
             QObject::connect(&libraryService, &LibraryService::pasteFinished, &ctx, [&](int) { innerDone.quit(); });
             QTimer::singleShot(800, &innerDone, &QEventLoop::quit);
             innerDone.exec();
-            // 验证文件夹内有 2 个乐谱（原始 + 重命名副本）
-            const auto innerScores = libraryService.scoresInFolder(QStringLiteral("clip-smoke-inner-folder"));
-            if (innerScores.size() != 2) {
-                qWarning() << "[clipboard-smoke] FAIL: inner folder expected 2 scores after rename, got" << innerScores.size();
+            // 验证：根目录下有原始文件夹和重命名后的文件夹
+            const auto rootFolders = libraryService.childFolders(QString());
+            bool foundOriginal = false;
+            bool foundRenamed = false;
+            for (const auto& f : rootFolders) {
+                const auto name = f.toMap().value(QStringLiteral("name")).toString();
+                if (name == QStringLiteral("clip-smoke-inner-folder")) foundOriginal = true;
+                if (name == QStringLiteral("clip-smoke-inner-folder (2)")) foundRenamed = true;
+            }
+            if (!foundOriginal || !foundRenamed) {
+                qWarning() << "[clipboard-smoke] FAIL: expected both original and renamed folder after folder rename";
                 return 1;
             }
         }
 
-        // 嵌套文件夹冲突测试：A 内含 B，B 内含乐谱；复制 A 到根目录，深层乐谱应冲突弹窗
+        // 嵌套文件夹冲突测试：A 内含 B，B 内含乐谱；复制 A 到根目录，文件夹级别冲突弹窗
         {
             QObject ctx; // 块结束时自动断开所有以此为 context 的连接
             QEventLoop nestedLoop;
             bool nestedConflictFired = false;
-            QObject::connect(&libraryService, &LibraryService::pasteConflict, &ctx, [&](const QString&, const QString&, int, int) {
+            QObject::connect(&libraryService, &LibraryService::pasteFolderConflict, &ctx, [&](const QString&, const QString&, int, int) {
                 nestedConflictFired = true;
                 nestedLoop.quit();
             });
@@ -904,33 +912,40 @@ int main(int argc, char* argv[])
             QTimer::singleShot(800, &nestedLoop, &QEventLoop::quit);
             nestedLoop.exec();
             if (!nestedConflictFired) {
-                qWarning() << "[clipboard-smoke] FAIL: nested folder inner score conflict did not fire (subfolder expansion broken)";
+                qWarning() << "[clipboard-smoke] FAIL: nested folder conflict did not fire";
                 return 1;
             }
-            // 选"保留两者"(rename)，不应用到所有
-            libraryService.resolvePasteConflict(QStringLiteral("rename"), false);
+            // 选"保留两者"(rename)，会创建 "nested-a (2)"
+            libraryService.resolvePasteFolderConflict(QStringLiteral("rename"), false);
             QEventLoop nestedDone;
             QObject::connect(&libraryService, &LibraryService::pasteFinished, &ctx, [&](int) { nestedDone.quit(); });
             QTimer::singleShot(800, &nestedDone, &QEventLoop::quit);
             nestedDone.exec();
-            // 验证 NESTED-B 内有 2 个乐谱（原始 + 重命名副本）
-            const auto nestedScores = libraryService.scoresInFolder(QStringLiteral("nested-b"));
-            if (nestedScores.size() != 2) {
-                qWarning() << "[clipboard-smoke] FAIL: nested folder B expected 2 scores after rename, got" << nestedScores.size();
+            // 验证：根目录下有原始文件夹和重命名后的文件夹
+            const auto rootFolders = libraryService.childFolders(QString());
+            bool foundOriginal = false;
+            bool foundRenamed = false;
+            for (const auto& f : rootFolders) {
+                const auto name = f.toMap().value(QStringLiteral("name")).toString();
+                if (name == QStringLiteral("nested-a")) foundOriginal = true;
+                if (name == QStringLiteral("nested-a (2)")) foundRenamed = true;
+            }
+            if (!foundOriginal || !foundRenamed) {
+                qWarning() << "[clipboard-smoke] FAIL: expected both original and renamed nested folder";
                 return 1;
             }
         }
 
-        // 逐个冲突测试：文件夹内含 2 个冲突乐谱，不勾选应用到所有，第一个选替换后第二个应重新弹窗
+        // 文件夹级别冲突测试：复制同名文件夹到根目录，文件夹级别弹窗逐个询问，不勾选应用到所有
         {
             QObject ctx;
-            int conflictCount = 0;
+            int folderConflictCount = 0;
             QEventLoop multiLoop;
-            QObject::connect(&libraryService, &LibraryService::pasteConflict, &ctx, [&](const QString&, const QString&, int, int) {
-                ++conflictCount;
-                if (conflictCount == 1) {
-                    // 第一个冲突：选替换，不应用到所有
-                    libraryService.resolvePasteConflict(QStringLiteral("overwrite"), false);
+            QObject::connect(&libraryService, &LibraryService::pasteFolderConflict, &ctx, [&](const QString&, const QString&, int, int) {
+                ++folderConflictCount;
+                if (folderConflictCount == 1) {
+                    // 第一个冲突：选保留两者(rename)，不应用到所有
+                    libraryService.resolvePasteFolderConflict(QStringLiteral("rename"), false);
                 } else {
                     // 第二个及以后冲突：说明逐个弹窗正常工作，选跳过结束
                     multiLoop.quit();
@@ -942,13 +957,13 @@ int main(int argc, char* argv[])
             libraryService.goToLibraryRoot();
             libraryService.pasteItems();
             multiLoop.exec();
-            if (conflictCount < 2) {
-                qWarning() << "[clipboard-smoke] FAIL: expected at least 2 conflict dialogs without apply-to-all, got" << conflictCount;
+            if (folderConflictCount < 1) {
+                qWarning() << "[clipboard-smoke] FAIL: expected at least 1 folder conflict dialog, got" << folderConflictCount;
                 return 1;
             }
             // 清理：如果还在进行中，取消
             if (libraryService.clipboardMode() != QStringLiteral("none")) {
-                libraryService.resolvePasteConflict(QStringLiteral("cancel"), false);
+                libraryService.resolvePasteFolderConflict(QStringLiteral("cancel"), false);
             }
         }
 
