@@ -1122,7 +1122,7 @@ QString LibraryService::copyFolderRecursive(const QString& folderId, const QStri
             const auto children = m_repository.childFolders(targetParentId, &error);
             for (const auto& f : children) {
                 if (f.toMap().value(QStringLiteral("name")).toString() == sourceName) {
-                    if (!m_repository.deleteFolder(f.toMap().value(QStringLiteral("itemId")).toString(), &error)) {
+                    if (!m_repository.deleteFolder(f.toMap().value(QStringLiteral("id")).toString(), &error)) {
                         return error.isEmpty() ? QStringLiteral("移除旧文件夹失败。") : error;
                     }
                     break;
@@ -1152,7 +1152,7 @@ QString LibraryService::copyFolderRecursive(const QString& folderId, const QStri
 
     const auto childFolders = m_repository.childFolders(folderId, &error);
     for (const auto& f : childFolders) {
-        copyFolderRecursive(f.toMap().value(QStringLiteral("itemId")).toString(), newFolderId, conflictAction);
+        copyFolderRecursive(f.toMap().value(QStringLiteral("id")).toString(), newFolderId, conflictAction);
     }
     return {};
 }
@@ -1325,14 +1325,18 @@ void LibraryService::continuePaste()
                         const auto children = m_repository.childFolders(targetFolderId, &error);
                         for (const auto& f : children) {
                             if (f.toMap().value(QStringLiteral("name")).toString() == sourceName) {
-                                m_repository.deleteFolder(f.toMap().value(QStringLiteral("itemId")).toString(), &error);
+                                if (!m_repository.deleteFolder(f.toMap().value(QStringLiteral("id")).toString(), &error)) {
+                                    emit errorOccurred(QStringLiteral("移除旧文件夹失败。"));
+                                }
                                 break;
                             }
                         }
                     }
                     if (action == QStringLiteral("rename")) {
                         const auto newName = uniqueNameInFolder(sourceName, targetFolderId, true);
-                        m_repository.renameFolder(itemId, newName, &error);
+                        if (!m_repository.renameFolder(itemId, newName, &error)) {
+                            emit errorOccurred(QStringLiteral("重命名文件夹失败。"));
+                        }
                     }
                 }
                 // 移动文件夹
@@ -1362,7 +1366,9 @@ void LibraryService::continuePaste()
                     const auto children = m_repository.childFolders(targetFolderId, &error);
                     for (const auto& f : children) {
                         if (f.toMap().value(QStringLiteral("name")).toString() == sourceName) {
-                            m_repository.deleteFolder(f.toMap().value(QStringLiteral("itemId")).toString(), &error);
+                            if (!m_repository.deleteFolder(f.toMap().value(QStringLiteral("id")).toString(), &error)) {
+                                emit errorOccurred(QStringLiteral("移除旧文件夹失败。"));
+                            }
                             break;
                         }
                     }
