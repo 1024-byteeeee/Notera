@@ -1131,10 +1131,19 @@ QString LibraryService::copyFolderRecursive(const QString& folderId, const QStri
         }
     }
 
-    const auto newFolderId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     if (!m_repository.createFolder(targetName, targetParentId, &error)) {
         return QStringLiteral("创建文件夹失败。");
     }
+    // createFolder 内部自己生成 UUID，创建后必须重新查询获取真实 id
+    const auto updated = m_repository.childFolders(targetParentId, &error);
+    QString newFolderId;
+    for (const auto& f : updated) {
+        if (f.toMap().value(QStringLiteral("name")).toString() == targetName) {
+            newFolderId = f.toMap().value(QStringLiteral("id")).toString();
+            break;
+        }
+    }
+    if (newFolderId.isEmpty()) return QStringLiteral("获取新文件夹 ID 失败。");
 
     const auto childScores = m_repository.listAtFolder(folderId, QString(), &error);
     for (const auto& s : childScores) {

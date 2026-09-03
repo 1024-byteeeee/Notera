@@ -888,8 +888,8 @@ int main(int argc, char* argv[])
             bool foundRenamed = false;
             for (const auto& f : rootFolders) {
                 const auto name = f.toMap().value(QStringLiteral("name")).toString();
-                if (name == QStringLiteral("clip-smoke-inner-folder")) foundOriginal = true;
-                if (name == QStringLiteral("clip-smoke-inner-folder (2)")) foundRenamed = true;
+                if (name == QStringLiteral("CLIP-SMOKE-INNER-FOLDER")) foundOriginal = true;
+                if (name == QStringLiteral("CLIP-SMOKE-INNER-FOLDER (2)")) foundRenamed = true;
             }
             if (!foundOriginal || !foundRenamed) {
                 qWarning() << "[clipboard-smoke] FAIL: expected both original and renamed folder after folder rename";
@@ -927,8 +927,8 @@ int main(int argc, char* argv[])
             bool foundRenamed = false;
             for (const auto& f : rootFolders) {
                 const auto name = f.toMap().value(QStringLiteral("name")).toString();
-                if (name == QStringLiteral("nested-a")) foundOriginal = true;
-                if (name == QStringLiteral("nested-a (2)")) foundRenamed = true;
+                if (name == QStringLiteral("NESTED-A")) foundOriginal = true;
+                if (name == QStringLiteral("NESTED-A (2)")) foundRenamed = true;
             }
             if (!foundOriginal || !foundRenamed) {
                 qWarning() << "[clipboard-smoke] FAIL: expected both original and renamed nested folder";
