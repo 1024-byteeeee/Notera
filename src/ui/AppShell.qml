@@ -40,6 +40,7 @@ Item {
         target: appController
         function onCurrentPageChanged() { root.switchPage(appController.currentPage) }
         function onLibraryFilterChanged() {
+            libraryService.setFilterMode(appController.libraryFilter)
             if (appController.currentPage === "library") root.animateContent()
         }
     }

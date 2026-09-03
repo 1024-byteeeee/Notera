@@ -50,6 +50,7 @@ public:
     [[nodiscard]] QString clipboardMode() const;
 
     Q_INVOKABLE void importLocalFile(const QUrl& url);
+    Q_INVOKABLE void importFiles(const QVariantList& paths);
     Q_INVOKABLE void importAndStitchImages(const QStringList& filePaths);
     Q_INVOKABLE void toggleFavorite(const QString& scoreId, bool favorite);
     Q_INVOKABLE void toggleItemFavorite(const QString& itemId, bool favorite);
@@ -77,11 +78,13 @@ public:
     Q_INVOKABLE void pasteItems();
     Q_INVOKABLE void resolvePasteConflict(const QString& action, bool applyToAll);
     Q_INVOKABLE void resolvePasteFolderConflict(const QString& action, bool applyToAll);
+    Q_INVOKABLE void resolveImportConflict(const QString& action, bool applyToAll);
     Q_INVOKABLE QString favoriteItems(const QVariantList& itemIds);
     Q_INVOKABLE QString tagItems(const QVariantList& itemIds, const QString& tagId);
     Q_INVOKABLE QString saveScoreAs(const QString& scoreId, const QUrl& destination);
     Q_INVOKABLE QString saveFolderAs(const QString& folderId, const QUrl& destinationDirectory);
     Q_INVOKABLE void createFolder(const QString& name);
+    Q_INVOKABLE void resolveCreateFolderConflict(const QString& action);
     Q_INVOKABLE void renameFolder(const QString& folderId, const QString& name);
     Q_INVOKABLE void deleteFolder(const QString& folderId);
     Q_INVOKABLE void createTag(const QString& name);
@@ -109,6 +112,9 @@ signals:
     void pasteConflict(QString sourceName, QString targetName, int index, int total);
     void pasteFolderConflict(QString sourceName, QString targetName, int index, int total);
     void pasteFinished(int processedCount);
+    void createFolderConflict(QString name);
+    void importConflict(QString sourceName, QString targetName, int index, int total);
+    void importFinished(int processedCount);
     void mergeConflict(QString sourceName, QString targetName, int index, int total);
     void mergeFinished(int processedCount);
 
@@ -117,7 +123,11 @@ private:
     void reloadFolders();
     void reloadTags();
     void importFile(const QString& sourcePath, const QString& titleOverride = {});
+    void continueImport();
+    void consumeImportTemp(const QString& path);
+    static QString resolveImportPath(const QVariant& value);
     void continuePaste();
+    void beginPasteToFolder(const QString& folderId);
     QString copyScoreToFolder(const QString& scoreId, const QString& targetFolderId, const QString& conflictAction);
     QString copyFolderRecursive(const QString& folderId, const QString& targetParentId, const QString& conflictAction);
     QString uniqueNameInFolder(const QString& baseName, const QString& folderId, bool isFolder);
@@ -153,6 +163,14 @@ private:
     QStringList m_cutSourceFolderIds;
     QString m_pendingFolderConflictAction;
     bool m_folderConflictApplyToAll {false};
+    QString m_pendingCreateFolderName;
+    QString m_pendingCreateFolderParentId;
+    QStringList m_importQueue;
+    QStringList m_importQueueTitles;
+    QStringList m_importTempFiles;
+    int m_importIndex {0};
+    QString m_importConflictAction;
+    bool m_importApplyToAll {false};
     QScopedPointer<QTemporaryDir> m_mergeTempDir;
     QString m_mergeBackupRoot;
     QVariantList m_mergeQueue;

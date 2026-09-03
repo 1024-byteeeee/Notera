@@ -184,7 +184,8 @@ int main(int argc, char* argv[])
         || arguments.contains(QStringLiteral("--folder-rename-smoke-test"))
         || arguments.contains(QStringLiteral("--storage-migration-smoke-test"))
         || arguments.contains(QStringLiteral("--clear-data-smoke-test"))
-        || arguments.contains(QStringLiteral("--clipboard-smoke-test"));
+        || arguments.contains(QStringLiteral("--clipboard-smoke-test"))
+        || arguments.contains(QStringLiteral("--tag-smoke-test"));
     if (isSmokeTest) {
         QStandardPaths::setTestModeEnabled(true);
         app.setApplicationName(QStringLiteral("NoteraTest"));
@@ -826,6 +827,89 @@ int main(int argc, char* argv[])
             }
         }
 
+        // 4b. 同目录复制乐谱（对齐 Windows）：复制到同一文件夹应弹冲突窗，而不是静默生成“ - 副本”
+        {
+            QObject ctx;
+            QEventLoop copyLoop;
+            bool conflictFired = false;
+            QObject::connect(&libraryService, &LibraryService::pasteConflict, &ctx, [&](const QString&, const QString&, int, int) {
+                conflictFired = true;
+                copyLoop.quit();
+            });
+            QObject::connect(&libraryService, &LibraryService::pasteFinished, &ctx, [&](int) { copyLoop.quit(); });
+            QTimer::singleShot(800, &copyLoop, &QEventLoop::quit);
+            libraryService.copyItems({QStringLiteral("clip-smoke-1")});
+            libraryService.goToLibraryRoot();
+            libraryService.pasteItems(); // 同目录复制：应弹冲突窗
+            copyLoop.exec();
+            if (!conflictFired) {
+                qWarning() << "[clipboard-smoke] FAIL: same-folder score copy should fire conflict";
+                return 1;
+            }
+            // 冲突未解决前不应产生重复项
+            {
+                const auto inRoot = libraryService.scoresInFolder(QString());
+                int count = 0;
+                for (const auto& s : inRoot) {
+                    if (s.toMap().value(QStringLiteral("title")).toString() == QStringLiteral("CLIPBOARD-SMOKE-1")) ++count;
+                }
+                if (count != 1) {
+                    qWarning() << "[clipboard-smoke] FAIL: same-folder copy should not duplicate before resolving conflict";
+                    return 1;
+                }
+            }
+            // 选“保留两者”：新增“(2)”副本，源不被删除
+            libraryService.resolvePasteConflict(QStringLiteral("rename"), false);
+            {
+                const auto inRoot = libraryService.scoresInFolder(QString());
+                bool foundOriginal = false;
+                bool foundCopy = false;
+                for (const auto& s : inRoot) {
+                    const auto t = s.toMap().value(QStringLiteral("title")).toString();
+                    if (t == QStringLiteral("CLIPBOARD-SMOKE-1")) foundOriginal = true;
+                    if (t == QStringLiteral("CLIPBOARD-SMOKE-1 (2)")) foundCopy = true;
+                }
+                if (!foundOriginal || !foundCopy) {
+                    qWarning() << "[clipboard-smoke] FAIL: expected original + ' (2)' copy for same-folder score copy";
+                    return 1;
+                }
+            }
+            // 再次同目录复制，选“替换”：替换自身无意义，不应删除源文件也不应新增重复项
+            {
+                QObject ctx2;
+                QEventLoop loop2;
+                bool conflictFired2 = false;
+                QObject::connect(&libraryService, &LibraryService::pasteConflict, &ctx2, [&](const QString&, const QString&, int, int) {
+                    conflictFired2 = true;
+                    loop2.quit();
+                });
+                QObject::connect(&libraryService, &LibraryService::pasteFinished, &ctx2, [&](int) { loop2.quit(); });
+                QTimer::singleShot(800, &loop2, &QEventLoop::quit);
+                libraryService.copyItems({QStringLiteral("clip-smoke-1")});
+                libraryService.goToLibraryRoot();
+                libraryService.pasteItems();
+                loop2.exec();
+                if (!conflictFired2) {
+                    qWarning() << "[clipboard-smoke] FAIL: same-folder score copy should fire conflict again";
+                    return 1;
+                }
+                libraryService.resolvePasteConflict(QStringLiteral("overwrite"), false);
+                const auto inRoot = libraryService.scoresInFolder(QString());
+                bool foundOriginal = false;
+                bool foundCopy = false;
+                for (const auto& s : inRoot) {
+                    const auto t = s.toMap().value(QStringLiteral("title")).toString();
+                    if (t == QStringLiteral("CLIPBOARD-SMOKE-1")) foundOriginal = true;
+                    if (t == QStringLiteral("CLIPBOARD-SMOKE-1 (2)")) foundCopy = true;
+                }
+                // 源必须保留，且不应出现“(3)”或删除“(2)”
+                if (!foundOriginal || !foundCopy) {
+                    qWarning() << "[clipboard-smoke] FAIL: same-folder overwrite should be a no-op preserving all items";
+                    return 1;
+                }
+            }
+        }
+
         // 5. 测试剪切：把根目录的 CLIPBOARD-SMOKE-CUT 剪切到目标文件夹，验证源消失、目标出现
         libraryService.goToLibraryRoot();
         libraryService.cutItems({QStringLiteral("clip-smoke-cut")});
@@ -857,114 +941,200 @@ int main(int argc, char* argv[])
             }
         }
 
-        // 文件夹内部冲突测试：复制同名文件夹到根目录，文件夹级别冲突弹窗，内部乐谱逐个冲突弹窗
+        // 5b. 移动（拖拽 / 菜单“移动到文件夹”）遇同名冲突（对齐 Windows）：弹冲突窗而非静默重复
+        {
+            QObject ctx;
+            QEventLoop moveLoop;
+            bool conflictFired = false;
+            QObject::connect(&libraryService, &LibraryService::pasteConflict, &ctx, [&](const QString&, const QString&, int, int) {
+                conflictFired = true;
+                moveLoop.quit();
+            });
+            QObject::connect(&libraryService, &LibraryService::pasteFinished, &ctx, [&](int) { moveLoop.quit(); });
+            QTimer::singleShot(800, &moveLoop, &QEventLoop::quit);
+            libraryService.moveItems({QStringLiteral("clip-smoke-2")}, QStringLiteral("clip-smoke-target"));
+            moveLoop.exec();
+            if (!conflictFired) {
+                qWarning() << "[clipboard-smoke] FAIL: move with same-name target should fire conflict";
+                return 1;
+            }
+            libraryService.resolvePasteConflict(QStringLiteral("rename"), false);
+            // 验证：根目录不再有 CLIPBOARD-SMOKE-2；目标内有原 CLIPBOARD-SMOKE-2 与“(2)”副本
+            const auto inRoot = libraryService.scoresInFolder(QString());
+            const auto inTarget = libraryService.scoresInFolder(QStringLiteral("clip-smoke-target"));
+            bool rootHasOriginal = false;
+            for (const auto& s : inRoot) {
+                if (s.toMap().value(QStringLiteral("title")).toString() == QStringLiteral("CLIPBOARD-SMOKE-2")) rootHasOriginal = true;
+            }
+            bool targetHasOriginal = false;
+            bool targetHasRenamed = false;
+            for (const auto& s : inTarget) {
+                const auto t = s.toMap().value(QStringLiteral("title")).toString();
+                if (t == QStringLiteral("CLIPBOARD-SMOKE-2")) targetHasOriginal = true;
+                if (t == QStringLiteral("CLIPBOARD-SMOKE-2 (2)")) targetHasRenamed = true;
+            }
+            if (rootHasOriginal || !targetHasOriginal || !targetHasRenamed) {
+                qWarning() << "[clipboard-smoke] FAIL: move-with-conflict rename did not move correctly (rootHasOriginal=" << rootHasOriginal << " targetHasOriginal=" << targetHasOriginal << " targetHasRenamed=" << targetHasRenamed << ")";
+                return 1;
+            }
+        }
+
+        // 同目录复制文件夹（对齐 Windows）：复制到同一父文件夹应弹冲突窗，选"保留两者"生成" (2)"副本，内部乐谱一并复制
         {
             QObject ctx; // 块结束时自动断开所有以此为 context 的连接
-            QEventLoop folderConflictLoop;
+            QEventLoop copyLoop;
             bool folderConflictFired = false;
             QObject::connect(&libraryService, &LibraryService::pasteFolderConflict, &ctx, [&](const QString&, const QString&, int, int) {
                 folderConflictFired = true;
-                folderConflictLoop.quit();
+                copyLoop.quit();
             });
+            QObject::connect(&libraryService, &LibraryService::pasteFinished, &ctx, [&](int) { copyLoop.quit(); });
+            QTimer::singleShot(800, &copyLoop, &QEventLoop::quit);
             libraryService.copyItems({QStringLiteral("clip-smoke-inner-folder")});
             libraryService.goToLibraryRoot();
-            libraryService.pasteItems();
-            QTimer::singleShot(800, &folderConflictLoop, &QEventLoop::quit);
-            folderConflictLoop.exec();
+            libraryService.pasteItems(); // 同目录复制：应弹冲突窗
+            copyLoop.exec();
             if (!folderConflictFired) {
-                qWarning() << "[clipboard-smoke] FAIL: folder-level conflict did not fire for same-named folder";
+                qWarning() << "[clipboard-smoke] FAIL: same-folder folder copy should fire folder conflict";
                 return 1;
             }
-            // 文件夹冲突选"保留两者"(rename)，会创建 "clip-smoke-inner-folder (2)"
+            // 冲突未解决前不应产生重复文件夹
+            {
+                const auto rootFolders = libraryService.childFolders(QString());
+                int count = 0;
+                for (const auto& f : rootFolders) {
+                    if (f.toMap().value(QStringLiteral("name")).toString() == QStringLiteral("CLIP-SMOKE-INNER-FOLDER")) ++count;
+                }
+                if (count != 1) {
+                    qWarning() << "[clipboard-smoke] FAIL: same-folder folder copy should not duplicate before resolving conflict";
+                    return 1;
+                }
+            }
             libraryService.resolvePasteFolderConflict(QStringLiteral("rename"), false);
-
-            QEventLoop innerDone;
-            QObject::connect(&libraryService, &LibraryService::pasteFinished, &ctx, [&](int) { innerDone.quit(); });
-            QTimer::singleShot(800, &innerDone, &QEventLoop::quit);
-            innerDone.exec();
-            // 验证：根目录下有原始文件夹和重命名后的文件夹
+            // 验证：根目录下有原始文件夹和“(2)”副本文件夹，副本内含内部乐谱
             const auto rootFolders = libraryService.childFolders(QString());
             bool foundOriginal = false;
-            bool foundRenamed = false;
+            bool foundCopy = false;
+            QString copyFolderId;
             for (const auto& f : rootFolders) {
                 const auto name = f.toMap().value(QStringLiteral("name")).toString();
                 if (name == QStringLiteral("CLIP-SMOKE-INNER-FOLDER")) foundOriginal = true;
-                if (name == QStringLiteral("CLIP-SMOKE-INNER-FOLDER (2)")) foundRenamed = true;
+                if (name == QStringLiteral("CLIP-SMOKE-INNER-FOLDER (2)")) {
+                    foundCopy = true;
+                    copyFolderId = f.toMap().value(QStringLiteral("id")).toString();
+                }
             }
-            if (!foundOriginal || !foundRenamed) {
-                qWarning() << "[clipboard-smoke] FAIL: expected both original and renamed folder after folder rename";
+            if (!foundOriginal || !foundCopy) {
+                qWarning() << "[clipboard-smoke] FAIL: expected original and ' (2)' copy after same-folder copy";
+                return 1;
+            }
+            const auto copyScores = libraryService.scoresInFolder(copyFolderId);
+            if (copyScores.size() != 1) {
+                qWarning() << "[clipboard-smoke] FAIL: copied folder should contain inner score, got" << copyScores.size();
                 return 1;
             }
         }
 
-        // 嵌套文件夹冲突测试：A 内含 B，B 内含乐谱；复制 A 到根目录，文件夹级别冲突弹窗
+        // 嵌套文件夹同目录复制（对齐 Windows）：A 内含 B，B 内含乐谱；选"保留两者"生成"A (2)"副本，结构完整
         {
             QObject ctx; // 块结束时自动断开所有以此为 context 的连接
-            QEventLoop nestedLoop;
-            bool nestedConflictFired = false;
+            QEventLoop copyLoop;
+            bool folderConflictFired = false;
             QObject::connect(&libraryService, &LibraryService::pasteFolderConflict, &ctx, [&](const QString&, const QString&, int, int) {
-                nestedConflictFired = true;
-                nestedLoop.quit();
+                folderConflictFired = true;
+                copyLoop.quit();
             });
+            QObject::connect(&libraryService, &LibraryService::pasteFinished, &ctx, [&](int) { copyLoop.quit(); });
+            QTimer::singleShot(800, &copyLoop, &QEventLoop::quit);
             libraryService.copyItems({QStringLiteral("nested-a")});
             libraryService.goToLibraryRoot();
-            libraryService.pasteItems();
-            QTimer::singleShot(800, &nestedLoop, &QEventLoop::quit);
-            nestedLoop.exec();
-            if (!nestedConflictFired) {
-                qWarning() << "[clipboard-smoke] FAIL: nested folder conflict did not fire";
+            libraryService.pasteItems(); // 同目录复制：应弹冲突窗
+            copyLoop.exec();
+            if (!folderConflictFired) {
+                qWarning() << "[clipboard-smoke] FAIL: same-folder nested copy should fire folder conflict";
                 return 1;
             }
-            // 选"保留两者"(rename)，会创建 "nested-a (2)"
             libraryService.resolvePasteFolderConflict(QStringLiteral("rename"), false);
-            QEventLoop nestedDone;
-            QObject::connect(&libraryService, &LibraryService::pasteFinished, &ctx, [&](int) { nestedDone.quit(); });
-            QTimer::singleShot(800, &nestedDone, &QEventLoop::quit);
-            nestedDone.exec();
-            // 验证：根目录下有原始文件夹和重命名后的文件夹
+            // 验证：根目录下存在“NESTED-A (2)”，其内 NESTED-B 及乐谱结构完整
             const auto rootFolders = libraryService.childFolders(QString());
-            bool foundOriginal = false;
-            bool foundRenamed = false;
+            QString copyId;
             for (const auto& f : rootFolders) {
-                const auto name = f.toMap().value(QStringLiteral("name")).toString();
-                if (name == QStringLiteral("NESTED-A")) foundOriginal = true;
-                if (name == QStringLiteral("NESTED-A (2)")) foundRenamed = true;
+                if (f.toMap().value(QStringLiteral("name")).toString() == QStringLiteral("NESTED-A (2)")) {
+                    copyId = f.toMap().value(QStringLiteral("id")).toString();
+                    break;
+                }
             }
-            if (!foundOriginal || !foundRenamed) {
-                qWarning() << "[clipboard-smoke] FAIL: expected both original and renamed nested folder";
+            if (copyId.isEmpty()) {
+                qWarning() << "[clipboard-smoke] FAIL: expected 'NESTED-A (2)' copy";
+                return 1;
+            }
+            bool foundNestedB = false;
+            const auto subFolders = libraryService.childFolders(copyId);
+            for (const auto& f : subFolders) {
+                if (f.toMap().value(QStringLiteral("name")).toString() != QStringLiteral("NESTED-B")) continue;
+                foundNestedB = true;
+                const auto bScores = libraryService.scoresInFolder(f.toMap().value(QStringLiteral("id")).toString());
+                if (bScores.size() != 1) {
+                    qWarning() << "[clipboard-smoke] FAIL: copied NESTED-B should contain its score";
+                    return 1;
+                }
+            }
+            if (!foundNestedB) {
+                qWarning() << "[clipboard-smoke] FAIL: copied folder missing NESTED-B";
                 return 1;
             }
         }
 
-        // 文件夹级别冲突测试：复制同名文件夹到根目录，文件夹级别弹窗逐个询问，不勾选应用到所有
+        // 跨文件夹复制同名文件夹（对齐 Windows）：文件夹级冲突弹窗，选"保留两者"生成" (2)"副本
         {
             QObject ctx;
+            libraryService.createFolder(QStringLiteral("MULTI-CONFLICT-DEST"));
+            QString destId;
+            for (int i = 0; i < libraryService.folders()->rowCount(); ++i) {
+                const auto f = libraryService.folders()->get(i).toMap();
+                if (f.value(QStringLiteral("name")).toString() == QStringLiteral("MULTI-CONFLICT-DEST")) {
+                    destId = f.value(QStringLiteral("itemId")).toString();
+                    break;
+                }
+            }
+            if (destId.isEmpty()) {
+                qWarning() << "[clipboard-smoke] FAIL: cannot find MULTI-CONFLICT-DEST";
+                return 1;
+            }
+            // 在 DEST 内建同名子文件夹，制造跨文件夹同名冲突
+            libraryService.enterFolder(destId);
+            libraryService.createFolder(QStringLiteral("MULTI-CONFLICT-FOLDER"));
+
             int folderConflictCount = 0;
             QEventLoop multiLoop;
             QObject::connect(&libraryService, &LibraryService::pasteFolderConflict, &ctx, [&](const QString&, const QString&, int, int) {
                 ++folderConflictCount;
-                if (folderConflictCount == 1) {
-                    // 第一个冲突：选保留两者(rename)，不应用到所有
-                    libraryService.resolvePasteFolderConflict(QStringLiteral("rename"), false);
-                } else {
-                    // 第二个及以后冲突：说明逐个弹窗正常工作，选跳过结束
-                    multiLoop.quit();
-                }
+                // 第一个冲突：选保留两者(rename)，不应用到所有
+                libraryService.resolvePasteFolderConflict(QStringLiteral("rename"), false);
             });
             QObject::connect(&libraryService, &LibraryService::pasteFinished, &ctx, [&](int) { multiLoop.quit(); });
             QTimer::singleShot(1500, &multiLoop, &QEventLoop::quit);
             libraryService.copyItems({QStringLiteral("multi-conflict-folder")});
-            libraryService.goToLibraryRoot();
-            libraryService.pasteItems();
+            libraryService.pasteItems(); // 粘贴到当前文件夹 DEST：DEST 内已有同名文件夹 → 冲突弹窗
             multiLoop.exec();
             if (folderConflictCount < 1) {
-                qWarning() << "[clipboard-smoke] FAIL: expected at least 1 folder conflict dialog, got" << folderConflictCount;
+                qWarning() << "[clipboard-smoke] FAIL: expected at least 1 folder conflict dialog for cross-folder copy, got" << folderConflictCount;
                 return 1;
             }
-            // 清理：如果还在进行中，取消
-            if (libraryService.clipboardMode() != QStringLiteral("none")) {
-                libraryService.resolvePasteFolderConflict(QStringLiteral("cancel"), false);
+            // 验证：DEST 内同时有原同名文件夹与“(2)”副本
+            const auto destSubs = libraryService.childFolders(destId);
+            bool foundOriginal = false;
+            bool foundRenamed = false;
+            for (const auto& f : destSubs) {
+                const auto name = f.toMap().value(QStringLiteral("name")).toString();
+                if (name == QStringLiteral("MULTI-CONFLICT-FOLDER")) foundOriginal = true;
+                if (name == QStringLiteral("MULTI-CONFLICT-FOLDER (2)")) foundRenamed = true;
             }
+            if (!foundOriginal || !foundRenamed) {
+                qWarning() << "[clipboard-smoke] FAIL: expected both original and renamed folder inside DEST";
+                return 1;
+            }
+            libraryService.goToLibraryRoot();
         }
 
         // 剪切文件夹（无冲突）：验证整个文件夹被移动到目标，文件不丢失，源文件夹被清理
@@ -1033,7 +1203,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        qWarning() << "[clipboard-smoke] PASS: multi-copy, conflict per-item, cut, folder-inner-conflict, nested-folder-conflict, per-item-without-applyall, cut-folder-no-loss all work";
+        qWarning() << "[clipboard-smoke] PASS: multi-copy, conflict per-item, cut, same-folder-copy-conflict-dialog, nested-same-folder-copy-conflict, cross-folder-folder-conflict, cut-folder-no-loss all work";
         return 0;
     }
 
@@ -1053,7 +1223,220 @@ int main(int argc, char* argv[])
         }
         const auto previousCount = libraryService.scores()->rowCount();
         libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
-        return libraryService.scores()->rowCount() == previousCount + 1 ? 0 : 1;
+        if (libraryService.scores()->rowCount() != previousCount + 1) return 1;
+        // 再次导入同名文件：对齐 Windows，应触发导入冲突弹窗，而不是静默产生重复项
+        {
+            QObject ctx;
+            bool conflictFired = false;
+            QObject::connect(&libraryService, &LibraryService::importConflict, &ctx,
+                [&](const QString&, const QString&, int, int) { conflictFired = true; });
+            libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
+            if (!conflictFired) return 1;
+            // 冲突未解决前不应产生重复项
+            if (libraryService.scores()->rowCount() != previousCount + 1) return 1;
+            // 选“替换”：总数不变（替换而非新增）
+            libraryService.resolveImportConflict(QStringLiteral("overwrite"), false);
+            if (libraryService.scores()->rowCount() != previousCount + 1) return 1;
+            // 选“保留两者”：新增一个“(2)”副本
+            conflictFired = false;
+            libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
+            if (!conflictFired) return 1;
+            libraryService.resolveImportConflict(QStringLiteral("rename"), false);
+            if (libraryService.scores()->rowCount() != previousCount + 2) return 1;
+        }
+        return 0;
+    }
+
+    if (arguments.contains(QStringLiteral("--tag-smoke-test"))) {
+        // 验证标签全生命周期：创建/重名拒绝/大小写不敏感/乐谱与文件夹打标/标签筛选/删除级联
+        const auto libDir = AppDataPaths::libraryDirectory();
+        const auto dbPath = AppDataPaths::databaseDirectory() + QStringLiteral("/notera.db");
+        // 1. 清理旧测试数据
+        {
+            const auto connection = QStringLiteral("tag_smoke_preclean");
+            {
+                auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+                database.setDatabaseName(dbPath);
+                if (database.open()) {
+                    QSqlQuery query(database);
+                    query.exec(QStringLiteral("DELETE FROM scores WHERE title LIKE 'TAG-SMOKE%'"));
+                    query.exec(QStringLiteral("DELETE FROM folders WHERE name LIKE 'TAG-SMOKE%'"));
+                    query.exec(QStringLiteral("DELETE FROM tags WHERE name LIKE 'TAG-SMOKE%'"));
+                    database.close();
+                }
+            }
+            QSqlDatabase::removeDatabase(connection);
+        }
+        // 2. 通过公共服务 API 创建测试乐谱 + 文件夹（自动刷新模型）
+        QImage testImage(100, 100, QImage::Format_RGB32);
+        testImage.fill(Qt::green);
+        const auto file1 = libDir + QStringLiteral("/TAG-SMOKE-SCORE.png");
+        if (!testImage.save(file1)) {
+            qWarning() << "[tag-smoke] FAIL: cannot save test image";
+            return 1;
+        }
+        libraryService.createFolder(QStringLiteral("TAG-SMOKE-FOLDER"));
+        libraryService.importLocalFile(QUrl::fromLocalFile(file1));
+        const auto scoreId = [&dbPath]() {
+            const auto connection = QStringLiteral("tag_smoke_lookup_score");
+            QString id;
+            {
+                auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+                database.setDatabaseName(dbPath);
+                if (database.open()) {
+                    QSqlQuery query(database);
+                    if (query.exec(QStringLiteral("SELECT id FROM scores WHERE title = 'TAG-SMOKE-SCORE'"))
+                        && query.next()) id = query.value(0).toString();
+                    database.close();
+                }
+            }
+            QSqlDatabase::removeDatabase(connection);
+            return id;
+        }();
+        const auto folderId = [&dbPath]() {
+            const auto connection = QStringLiteral("tag_smoke_lookup_folder");
+            QString id;
+            {
+                auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+                database.setDatabaseName(dbPath);
+                if (database.open()) {
+                    QSqlQuery query(database);
+                    if (query.exec(QStringLiteral("SELECT id FROM folders WHERE name = 'TAG-SMOKE-FOLDER'"))
+                        && query.next()) id = query.value(0).toString();
+                    database.close();
+                }
+            }
+            QSqlDatabase::removeDatabase(connection);
+            return id;
+        }();
+        if (scoreId.isEmpty() || folderId.isEmpty()) {
+            qWarning() << "[tag-smoke] FAIL: cannot create test score/folder (scoreId=" << scoreId << " folderId=" << folderId << ")";
+            return 1;
+        }
+
+        // 3. 创建标签
+        libraryService.createTag(QStringLiteral("TAG-SMOKE-A"));
+        if (libraryService.tags()->count() != 1) {
+            qWarning() << "[tag-smoke] FAIL: createTag did not create exactly 1 tag, got" << libraryService.tags()->count();
+            return 1;
+        }
+        const auto tagA = libraryService.tags()->get(0).toMap().value(QStringLiteral("itemId")).toString();
+        if (tagA.isEmpty()) return 1;
+
+        // 4. 精确同名重复创建：应被拒绝并提示，而不是静默报"已创建"
+        {
+            QObject ctx;
+            QString errorMessage;
+            QObject::connect(&libraryService, &LibraryService::errorOccurred, &ctx, [&](const QString& m) { errorMessage = m; });
+            libraryService.createTag(QStringLiteral("TAG-SMOKE-A"));
+            if (libraryService.tags()->count() != 1) {
+                qWarning() << "[tag-smoke] FAIL: exact duplicate createTag created extra tag";
+                return 1;
+            }
+            if (errorMessage.isEmpty()) {
+                qWarning() << "[tag-smoke] FAIL: exact duplicate createTag should reject with error";
+                return 1;
+            }
+        }
+
+        // 5. 大小写不同的同名标签：应视为重复拒绝（对齐 Windows 大小写不敏感）
+        {
+            QObject ctx;
+            QString errorMessage;
+            QObject::connect(&libraryService, &LibraryService::errorOccurred, &ctx, [&](const QString& m) { errorMessage = m; });
+            libraryService.createTag(QStringLiteral("tag-smoke-a"));
+            if (libraryService.tags()->count() != 1) {
+                qWarning() << "[tag-smoke] FAIL: case-insensitive duplicate createTag should be rejected, got" << libraryService.tags()->count();
+                return 1;
+            }
+        }
+
+        // 6. 重命名为已存在的标签名（含大小写变体）：应拒绝且名称不变
+        libraryService.createTag(QStringLiteral("TAG-SMOKE-B"));
+        if (libraryService.tags()->count() != 2) return 1;
+        const auto tagB = libraryService.tags()->get(1).toMap().value(QStringLiteral("itemId")).toString();
+        {
+            QObject ctx;
+            QString errorMessage;
+            QObject::connect(&libraryService, &LibraryService::errorOccurred, &ctx, [&](const QString& m) { errorMessage = m; });
+            libraryService.renameTag(tagB, QStringLiteral("TAG-SMOKE-A"));
+            if (errorMessage.isEmpty()) {
+                qWarning() << "[tag-smoke] FAIL: renameTag to existing name should reject";
+                return 1;
+            }
+        }
+        // 重命名为 A 的大小写变体：也应拒绝
+        {
+            QObject ctx;
+            QString errorMessage;
+            QObject::connect(&libraryService, &LibraryService::errorOccurred, &ctx, [&](const QString& m) { errorMessage = m; });
+            libraryService.renameTag(tagB, QStringLiteral("tag-smoke-a"));
+            if (errorMessage.isEmpty()) {
+                qWarning() << "[tag-smoke] FAIL: renameTag to case-variant of existing tag should reject";
+                return 1;
+            }
+        }
+        // 名称应保持未变
+        {
+            QString error;
+            const auto tags = libraryService.tags()->get(0).toMap().value(QStringLiteral("itemId")).toString();
+            (void)tags;
+            bool foundB = false;
+            for (int i = 0; i < libraryService.tags()->count(); ++i) {
+                const auto t = libraryService.tags()->get(i).toMap();
+                if (t.value(QStringLiteral("itemId")).toString() == tagB && t.value(QStringLiteral("name")).toString() == QStringLiteral("TAG-SMOKE-B")) foundB = true;
+            }
+            if (!foundB) {
+                qWarning() << "[tag-smoke] FAIL: renameTag to duplicate changed the tag name";
+                return 1;
+            }
+        }
+
+        // 7. 给乐谱和文件夹打标签
+        libraryService.addItemTag(scoreId, tagA);
+        if (!libraryService.itemHasTag(scoreId, tagA)) {
+            qWarning() << "[tag-smoke] FAIL: addItemTag score";
+            return 1;
+        }
+        libraryService.addItemTag(folderId, tagA);
+        if (!libraryService.itemHasTag(folderId, tagA)) {
+            qWarning() << "[tag-smoke] FAIL: addItemTag folder";
+            return 1;
+        }
+        // 移除乐谱标签
+        libraryService.removeItemTag(scoreId, tagA);
+        if (libraryService.itemHasTag(scoreId, tagA)) {
+            qWarning() << "[tag-smoke] FAIL: removeItemTag score";
+            return 1;
+        }
+
+        // 8. 标签筛选：tag: 模式下应同时显示带该标签的文件夹与乐谱
+        libraryService.addItemTag(scoreId, tagA);
+        libraryService.setFilterMode(QStringLiteral("tag:") + tagA);
+        {
+            const auto ids = libraryService.entries()->itemIds();
+            if (!ids.contains(scoreId) || !ids.contains(folderId)) {
+                qWarning() << "[tag-smoke] FAIL: tag filter should show tagged score and folder";
+                return 1;
+            }
+        }
+        libraryService.setFilterMode(QStringLiteral("all"));
+
+        // 9. 删除标签：关联应级联清除，不再能筛选到
+        libraryService.deleteTag(tagA);
+        if (libraryService.itemHasTag(scoreId, tagA)
+            || libraryService.itemHasTag(folderId, tagA)) {
+            qWarning() << "[tag-smoke] FAIL: deleteTag should cascade-remove associations";
+            return 1;
+        }
+        if (libraryService.tags()->count() != 1) {
+            qWarning() << "[tag-smoke] FAIL: deleteTag should leave only TAG-SMOKE-B, got" << libraryService.tags()->count();
+            return 1;
+        }
+        // 删除后清理剩余测试标签
+        libraryService.deleteTag(tagB);
+        qWarning() << "[tag-smoke] PASS: create/reject-duplicate/case-insensitive/add/remove/filter/delete all work";
+        return 0;
     }
 
     if (arguments.contains(QStringLiteral("--stitch-smoke-test"))) {
@@ -1073,7 +1456,26 @@ int main(int argc, char* argv[])
         const auto previousCount = libraryService.scores()->rowCount();
         libraryService.importAndStitchImages({QUrl::fromLocalFile(firstPath).toString(),
             QUrl::fromLocalFile(secondPath).toString()});
-        return libraryService.scores()->rowCount() == previousCount + 1 ? 0 : 1;
+        if (libraryService.scores()->rowCount() != previousCount + 1) return 1;
+        // 再次拼接同名图片：对齐 Windows，目标已存在同名“拼接乐谱”时应触发导入冲突弹窗，
+        // 而不是静默产生重复项；选“保留两者”后生成“(2)”副本
+        {
+            QObject ctx;
+            bool conflictFired = false;
+            QObject::connect(&libraryService, &LibraryService::importConflict, &ctx,
+                [&](const QString&, const QString&, int, int) { conflictFired = true; });
+            libraryService.importAndStitchImages({QUrl::fromLocalFile(firstPath).toString(),
+                QUrl::fromLocalFile(secondPath).toString()});
+            if (!conflictFired) {
+                qWarning() << "[stitch-smoke] FAIL: duplicate stitch import should fire import conflict";
+                return 1;
+            }
+            // 冲突未解决前不应产生重复项
+            if (libraryService.scores()->rowCount() != previousCount + 1) return 1;
+            libraryService.resolveImportConflict(QStringLiteral("rename"), false);
+            if (libraryService.scores()->rowCount() != previousCount + 2) return 1;
+        }
+        return 0;
     }
 
     QString renameSmokeFolderId;
@@ -1782,7 +2184,42 @@ int main(int argc, char* argv[])
                 return;
             }
             libraryService.goToLibraryRoot();
-            // 触发冲突弹窗验证布局：复制已有文件夹到同位置触发同名冲突
+            // 对齐 Windows：同目录复制也弹冲突窗（不再静默生成“ - 副本”），选“跳过”不产生副本、源保留
+            {
+                QObject ctx;
+                bool sameFolderConflictFired = false;
+                QObject::connect(&libraryService, &LibraryService::pasteFolderConflict, &ctx, [&](const QString&, const QString&, int, int) {
+                    sameFolderConflictFired = true;
+                });
+                libraryService.copyItems({folderId});
+                libraryService.pasteItems();
+                {
+                    QEventLoop conflictWait;
+                    QTimer::singleShot(300, &conflictWait, &QEventLoop::quit);
+                    conflictWait.exec();
+                }
+                if (!sameFolderConflictFired) {
+                    fail("same-folder-copy-should-conflict");
+                    return;
+                }
+                libraryService.resolvePasteFolderConflict(QStringLiteral("skip"), false);
+                QCoreApplication::processEvents();
+                {
+                    const auto rootFolders = libraryService.childFolders(QString());
+                    int count = 0;
+                    for (const auto& f : rootFolders) {
+                        if (f.toMap().value(QStringLiteral("name")).toString() == QStringLiteral("A界面测试文件夹")) ++count;
+                    }
+                    if (count != 1) {
+                        fail("same-folder-copy-skip-no-duplicate");
+                        return;
+                    }
+                }
+            }
+            // 制造跨文件夹同名冲突验证冲突弹窗布局：
+            // 在 Z 界面测试文件夹内建同名子文件夹，再把根目录的 A 界面测试文件夹复制进去
+            libraryService.enterFolder(recentFirstFolderId);
+            libraryService.createFolder(QStringLiteral("A界面测试文件夹"));
             libraryService.copyItems({folderId});
             libraryService.pasteItems();
             {
@@ -1794,7 +2231,7 @@ int main(int argc, char* argv[])
                 fail("conflict-dialog-screenshot");
                 return;
             }
-            libraryService.resolvePasteConflict(QStringLiteral("cancel"), false);
+            libraryService.resolvePasteFolderConflict(QStringLiteral("cancel"), false);
             QCoreApplication::processEvents();
 
             const auto folderScores = libraryService.scoresInFolder(folderId);

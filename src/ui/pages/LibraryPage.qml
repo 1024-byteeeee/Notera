@@ -109,6 +109,33 @@ Rectangle {
         return false
     }
 
+    // 系统快捷键仅在不处于文本输入、且没有弹窗拦截时生效，避免与搜索框/对话框的编辑快捷键冲突
+    function textInputActive() {
+        const focusItem = root.Window.activeFocusItem
+        return focusItem && (focusItem instanceof TextInput || focusItem instanceof TextEdit)
+    }
+    function dialogOpen() {
+        return conflictDialog.opened || createFolderConflictDialog.opened
+    }
+    function performCopy() {
+        if (root.selectedCount <= 0) return
+        libraryService.copyItems(libraryService.selection.selectedIds)
+    }
+    function performCut() {
+        if (root.selectedCount <= 0) return
+        libraryService.cutItems(libraryService.selection.selectedIds)
+    }
+    function performPaste() {
+        if (libraryService.clipboardItems.length <= 0) return
+        libraryService.pasteItems()
+    }
+    function performDelete() {
+        if (root.selectedCount <= 0) return
+        batchDeleteDialog.selectedIds = libraryService.selection.selectedIds
+        batchDeleteDialog.open()
+    }
+    function performSelectAll() { root.selectAll() }
+
     function updateRubberSelection() {
         const ids = []
         const selectionRect = Qt.rect(selectionBox.x, selectionBox.y, selectionBox.width, selectionBox.height)
@@ -161,6 +188,35 @@ Rectangle {
         function onImportRequested() { fileDialog.open() }
     }
     Component.onCompleted: libraryService.filterMode = appController.libraryFilter
+
+    // 系统快捷键：使用 StandardKey 自动映射 macOS(Cmd) / Windows(Ctrl)，
+    // 文本输入或弹窗打开时禁用，避免抢占搜索框与对话框的编辑快捷键。
+    // 注意必须用 sequences(数组) 形式，否则 StandardKey 的多键绑定只会命中其中一个。
+    Shortcut {
+        sequences: [StandardKey.Copy]
+        enabled: root.visible && !root.textInputActive() && !root.dialogOpen()
+        onActivated: root.performCopy()
+    }
+    Shortcut {
+        sequences: [StandardKey.Cut]
+        enabled: root.visible && !root.textInputActive() && !root.dialogOpen()
+        onActivated: root.performCut()
+    }
+    Shortcut {
+        sequences: [StandardKey.Paste]
+        enabled: root.visible && !root.textInputActive() && !root.dialogOpen()
+        onActivated: root.performPaste()
+    }
+    Shortcut {
+        sequences: [StandardKey.Delete]
+        enabled: root.visible && !root.textInputActive() && !root.dialogOpen()
+        onActivated: root.performDelete()
+    }
+    Shortcut {
+        sequences: [StandardKey.SelectAll]
+        enabled: root.visible && !root.textInputActive() && !root.dialogOpen()
+        onActivated: root.performSelectAll()
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -466,6 +522,7 @@ Rectangle {
                                 }
                                 if (scoreDelegate.itemType === "folder") {
                                     libraryService.enterFolder(scoreDelegate.itemId)
+                                    appController.libraryFilter = "folder:" + scoreDelegate.itemId
                                 } else {
                                     appController.openScore(scoreDelegate.scoreId, scoreDelegate.title, scoreDelegate.filePath,
                                         scoreDelegate.fileType, scoreDelegate.pageCount,
@@ -731,7 +788,10 @@ Rectangle {
                         AppMenuItem {
                             symbol: "open"
                             text: "打开"
-                            onTriggered: libraryService.enterFolder(scoreDelegate.itemId)
+                            onTriggered: {
+                                libraryService.enterFolder(scoreDelegate.itemId)
+                                appController.libraryFilter = "folder:" + scoreDelegate.itemId
+                            }
                         }
                         AppMenuItem {
                             symbol: "edit"
@@ -990,8 +1050,7 @@ Rectangle {
                         drop.acceptProposedAction()
                         return
                     }
-                    for (let index = 0; index < drop.urls.length; ++index)
-                        libraryService.importLocalFile(drop.urls[index])
+                    libraryService.importFiles(drop.urls)
                 }
             }
 
@@ -1095,14 +1154,16 @@ Rectangle {
     AppMenu {
         id: blankContextMenu
         objectName: "blankContextMenu"
-        AppMenuItem { text: "新建文件夹"; symbol: "folder"; visible: !appController.libraryFilter.startsWith("tag:"); onTriggered: newFolderDialog.open() }
+        readonly property bool isTagView: appController.libraryFilter.startsWith("tag:")
+        AppMenuItem { text: "新建文件夹"; symbol: "folder"; visible: !blankContextMenu.isTagView; onTriggered: newFolderDialog.open() }
         AppMenuItem { text: "新建标签"; tagIcon: true; onTriggered: newTagDialog.open() }
-        AppMenuSeparator { visible: !appController.libraryFilter.startsWith("tag:") }
-        AppMenuItem { text: "导入乐谱"; symbol: "import"; visible: !appController.libraryFilter.startsWith("tag:"); onTriggered: fileDialog.open() }
-        AppMenuSeparator { }
+        AppMenuSeparator { visible: !blankContextMenu.isTagView }
+        AppMenuItem { text: "导入乐谱"; symbol: "import"; visible: !blankContextMenu.isTagView; onTriggered: fileDialog.open() }
+        AppMenuSeparator { visible: !blankContextMenu.isTagView }
         AppMenuItem {
             text: libraryService.clipboardMode === "cut" ? "粘贴（移动）" : "粘贴"
             symbol: "paste"
+            visible: !blankContextMenu.isTagView
             enabled: libraryService.clipboardItems.length > 0
             onTriggered: libraryService.pasteItems()
         }
@@ -1113,6 +1174,92 @@ Rectangle {
         title: "新建文件夹"
         placeholderText: "输入文件夹名称"
         onSubmitted: function(text) { libraryService.createFolder(text) }
+    }
+
+    Dialog {
+        id: createFolderConflictDialog
+        property string conflictName: ""
+        parent: Overlay.overlay
+        x: parent ? Math.round((parent.width - width) / 2) : 0
+        y: parent ? Math.round((parent.height - height) / 2) : 0
+        width: parent ? Math.min(420, parent.width - 48) : 420
+        popupType: Popup.Item
+        modal: true
+        focus: true
+        padding: 22
+        closePolicy: Popup.NoAutoClose
+        transformOrigin: Item.Center
+
+        enter: Transition {
+            ParallelAnimation {
+                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
+                NumberAnimation { property: "scale"; from: 0.97; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
+            }
+        }
+        exit: Transition {
+            ParallelAnimation {
+                NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Motion.fast; easing.type: Easing.InCubic }
+                NumberAnimation { property: "scale"; from: 1; to: 0.985; duration: Motion.fast; easing.type: Easing.InCubic }
+            }
+        }
+
+        header: Label {
+            leftPadding: 22; rightPadding: 22; topPadding: 20; bottomPadding: 4
+            text: "新建文件夹"
+            color: Theme.foreground
+            font.pixelSize: Theme.fontLg
+            font.weight: Font.DemiBold
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 10
+            Label {
+                Layout.fillWidth: true
+                text: "当前文件夹已存在同名文件夹：\n" + createFolderConflictDialog.conflictName
+                color: Theme.secondaryForeground
+                font.pixelSize: Theme.fontMd
+                wrapMode: Text.WordWrap
+            }
+            Label {
+                Layout.fillWidth: true
+                text: "选择“保留两者”将自动重命名为“" + createFolderConflictDialog.conflictName + " (2)”。"
+                color: Theme.mutedForeground
+                font.pixelSize: Theme.fontXs
+                wrapMode: Text.WordWrap
+            }
+        }
+
+        footer: Item {
+            implicitHeight: 62
+            RowLayout {
+                anchors.right: parent.right
+                anchors.rightMargin: 22
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 10
+                AppButton {
+                    text: "取消"
+                    onClicked: {
+                        libraryService.resolveCreateFolderConflict("cancel")
+                        createFolderConflictDialog.close()
+                    }
+                }
+                AppButton {
+                    text: "保留两者"
+                    primary: true
+                    onClicked: {
+                        libraryService.resolveCreateFolderConflict("rename")
+                        createFolderConflictDialog.close()
+                    }
+                }
+            }
+        }
+
+        background: Rectangle {
+            radius: Theme.radiusLg
+            color: Theme.surface
+            border.width: 1
+            border.color: Theme.strongBorder
+        }
     }
 
     AppDialog {
@@ -1145,8 +1292,7 @@ Rectangle {
         fileMode: FileDialog.OpenFiles
         nameFilters: ["支持的乐谱 (*.pdf *.jpg *.jpeg *.png *.bmp *.gif *.webp *.tif *.tiff)", "所有文件 (*)"]
         onAccepted: {
-            for (let index = 0; index < selectedFiles.length; ++index)
-                libraryService.importLocalFile(selectedFiles[index])
+            libraryService.importFiles(selectedFiles)
         }
     }
 
@@ -1236,14 +1382,19 @@ Rectangle {
         property string conflictSource: "paste"
 
         function resolveConflict(action) {
+            // 注意：这里不能在调用 resolve* 之后再 close()。服务层会在同一同步调用里
+            // 处理后续项，遇到下一个冲突会再次发出冲突信号并重新打开本弹窗；
+            // 若随后 close()，会把刚打开的下一个冲突弹窗又关掉，导致"弹窗不循环弹出"。
+            // 关闭动作统一交给 onPasteFinished / onMergeFinished 在整批操作结束时执行。
             if (conflictDialog.conflictSource === "merge") {
                 libraryService.resolveMergeConflict(action, conflictDialog.applyToAll)
             } else if (conflictDialog.conflictSource === "pasteFolder") {
                 libraryService.resolvePasteFolderConflict(action, conflictDialog.applyToAll)
+            } else if (conflictDialog.conflictSource === "import") {
+                libraryService.resolveImportConflict(action, conflictDialog.applyToAll)
             } else {
                 libraryService.resolvePasteConflict(action, conflictDialog.applyToAll)
             }
-            conflictDialog.close()
         }
 
         parent: Overlay.overlay
@@ -1395,6 +1546,28 @@ Rectangle {
             conflictDialog.applyToAll = false
             applyAllRow.checked = false
             conflictDialog.open()
+        }
+        function onImportConflict(sourceName, targetName, index, total) {
+            conflictDialog.conflictSource = "import"
+            conflictDialog.conflictName = sourceName
+            conflictDialog.conflictIndex = index
+            conflictDialog.conflictTotal = total
+            conflictDialog.applyToAll = false
+            applyAllRow.checked = false
+            conflictDialog.open()
+        }
+        function onPasteFinished(processedCount) {
+            if (conflictDialog.opened) conflictDialog.close()
+        }
+        function onMergeFinished(processedCount) {
+            if (conflictDialog.opened) conflictDialog.close()
+        }
+        function onImportFinished(processedCount) {
+            if (conflictDialog.opened) conflictDialog.close()
+        }
+        function onCreateFolderConflict(name) {
+            createFolderConflictDialog.conflictName = name
+            createFolderConflictDialog.open()
         }
         function onCurrentFolderChanged() {
             rootChildFolderModel.refresh()
