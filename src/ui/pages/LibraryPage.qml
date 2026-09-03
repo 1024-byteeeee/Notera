@@ -535,8 +535,7 @@ Rectangle {
                             acceptedButtons: Qt.RightButton
                             gesturePolicy: TapHandler.ReleaseWithinBounds
                             onTapped: {
-                                // 标签视图下右键任何地方都不弹菜单（含卡片）
-                                if (appController.libraryFilter.startsWith("tag:")) return
+                                // 标签视图下文件夹/文件的卡片右键菜单保留
                                 if (scoreDelegate.itemType === "folder") folderCardMenu.popup()
                                 else scoreMenu.popup()
                             }
@@ -1066,7 +1065,7 @@ Rectangle {
             TapHandler {
                 acceptedButtons: Qt.RightButton
                 onTapped: {
-                    // 标签视图下右键任何地方都不弹菜单（含空白区）
+                    // 标签视图下空白区不弹右键菜单（卡片右键菜单保留）
                     if (appController.libraryFilter.startsWith("tag:")) return
                     blankContextMenu.popup()
                 }
