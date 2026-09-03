@@ -952,7 +952,73 @@ int main(int argc, char* argv[])
             }
         }
 
-        qWarning() << "[clipboard-smoke] PASS: multi-copy, conflict per-item, cut, folder-inner-conflict, nested-folder-conflict, per-item-without-applyall all work";
+        // 剪切文件夹（无冲突）：验证整个文件夹被移动到目标，文件不丢失，源文件夹被清理
+        {
+            QObject ctx;
+            libraryService.createFolder(QStringLiteral("CUT-DEST"));
+            QString destId;
+            for (int i = 0; i < libraryService.folders()->rowCount(); ++i) {
+                const auto f = libraryService.folders()->get(i).toMap();
+                if (f.value(QStringLiteral("name")).toString() == QStringLiteral("CUT-DEST")) {
+                    destId = f.value(QStringLiteral("itemId")).toString();
+                    break;
+                }
+            }
+            if (destId.isEmpty()) {
+                qWarning() << "[clipboard-smoke] FAIL: cannot find CUT-DEST";
+                return 1;
+            }
+            libraryService.cutItems({QStringLiteral("multi-conflict-folder")});
+            libraryService.goToLibraryRoot();
+            libraryService.enterFolder(destId);
+            QEventLoop cutFolderLoop;
+            QObject::connect(&libraryService, &LibraryService::pasteFinished, &ctx, [&](int) { cutFolderLoop.quit(); });
+            QTimer::singleShot(1000, &cutFolderLoop, &QEventLoop::quit);
+            libraryService.pasteItems();
+            cutFolderLoop.exec();
+            // 验证：目标文件夹内有 MULTI-CONFLICT-FOLDER
+            const auto destSubs = libraryService.childFolders(destId);
+            bool foundMoved = false;
+            for (const auto& f : destSubs) {
+                if (f.toMap().value(QStringLiteral("name")).toString() == QStringLiteral("MULTI-CONFLICT-FOLDER")) {
+                    foundMoved = true;
+                    break;
+                }
+            }
+            if (!foundMoved) {
+                qWarning() << "[clipboard-smoke] FAIL: cut folder did not appear in destination (file lost?)";
+                return 1;
+            }
+            // 验证：根目录不再有 MULTI-CONFLICT-FOLDER（已被移动）
+            libraryService.goToLibraryRoot();
+            const auto rootFolders = libraryService.childFolders(QString());
+            bool foundInRoot = false;
+            for (const auto& f : rootFolders) {
+                if (f.toMap().value(QStringLiteral("name")).toString() == QStringLiteral("MULTI-CONFLICT-FOLDER")) {
+                    foundInRoot = true;
+                    break;
+                }
+            }
+            if (foundInRoot) {
+                qWarning() << "[clipboard-smoke] FAIL: cut folder still in root (not moved)";
+                return 1;
+            }
+            // 验证：移动后的文件夹内仍有 2 个乐谱（文件未丢失）
+            QString movedFolderId;
+            for (const auto& f : destSubs) {
+                if (f.toMap().value(QStringLiteral("name")).toString() == QStringLiteral("MULTI-CONFLICT-FOLDER")) {
+                    movedFolderId = f.toMap().value(QStringLiteral("id")).toString();
+                    break;
+                }
+            }
+            const auto movedScores = libraryService.scoresInFolder(movedFolderId);
+            if (movedScores.size() != 2) {
+                qWarning() << "[clipboard-smoke] FAIL: moved folder expected 2 scores, got" << movedScores.size() << "(file lost!)";
+                return 1;
+            }
+        }
+
+        qWarning() << "[clipboard-smoke] PASS: multi-copy, conflict per-item, cut, folder-inner-conflict, nested-folder-conflict, per-item-without-applyall, cut-folder-no-loss all work";
         return 0;
     }
 

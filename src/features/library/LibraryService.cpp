@@ -1197,6 +1197,23 @@ void LibraryService::expandFolderToQueue(const QString& sourceFolderId, const QS
     }
 }
 
+void LibraryService::deleteEmptyFolderTree(const QString& folderId)
+{
+    QString error;
+    // 先递归清理空子文件夹
+    const auto subFolders = m_repository.childFolders(folderId, &error);
+    for (const auto& f : subFolders) {
+        deleteEmptyFolderTree(f.toMap().value(QStringLiteral("id")).toString());
+    }
+    // 仅当文件夹内已无乐谱时才删除（被跳过的文件应保留在原位置）
+    const auto scores = m_repository.listAtFolder(folderId, QString(), &error);
+    if (scores.isEmpty()) {
+        if (!m_repository.deleteFolder(folderId, &error)) {
+            emit errorOccurred(QStringLiteral("清理空文件夹失败。"));
+        }
+    }
+}
+
 void LibraryService::pasteItems()
 {
     if (m_clipboardItems.isEmpty() || m_clipboardMode == QStringLiteral("none")) return;
@@ -1325,12 +1342,10 @@ void LibraryService::continuePaste()
         if (!m_pasteApplyToAll) m_pendingConflictAction.clear();
     }
 
-    // 剪切模式：内部内容移动完成后，删除源空文件夹（级联删除剩余空结构）
+    // 剪切模式：只删除已变空的源文件夹结构；被跳过的文件保留在原位置（对齐 Windows）
     if (isCut) {
         for (const auto& folderId : m_cutSourceFolderIds) {
-            if (!m_repository.deleteFolder(folderId, &error)) {
-                emit errorOccurred(QStringLiteral("删除源文件夹失败。"));
-            }
+            deleteEmptyFolderTree(folderId);
         }
         m_cutSourceFolderIds.clear();
         clearClipboard();

@@ -122,6 +122,7 @@ private:
     bool nameExistsInFolder(const QString& name, const QString& folderId, bool isFolder);
     QString getOrCreateFolder(const QString& name, const QString& parentId);
     void expandFolderToQueue(const QString& sourceFolderId, const QString& targetFolderId);
+    void deleteEmptyFolderTree(const QString& folderId);
     void continueMerge();
     void cleanupMergeState();
     void importBackupScore(const QVariantMap& item, const QString& targetFolderId);
