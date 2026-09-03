@@ -347,6 +347,7 @@ Rectangle {
                     required property var tags
                     readonly property string scoreId: itemId
                     readonly property bool contextMenuOpenedOnce: scoreMenu.openedOnce
+                    readonly property bool contextMenuVisible: scoreMenu.visible
                     readonly property real contextMenuWidth: scoreMenu.implicitWidth
                     readonly property bool folderSubmenuEnabled: folderSubmenu.enabled
                     readonly property bool tagSubmenuEnabled: tagSubmenu.enabled
@@ -742,7 +743,9 @@ Rectangle {
                                             }
                                             return
                                         }
-                                        if (checked) {
+                                        // 注意：checkable 的 MenuItem 在触发 onTriggered 之前会先自动切换 checked，
+                                        // 因此不能依据 UI 的 checked 判断"当前是否已打标"，必须直接读取服务端状态。
+                                        if (libraryService.itemHasTag(scoreDelegate.itemId, itemId)) {
                                             libraryService.removeItemTag(scoreDelegate.itemId, itemId)
                                         } else {
                                             libraryService.addItemTag(scoreDelegate.itemId, itemId)
@@ -775,6 +778,7 @@ Rectangle {
 
                     AppMenu {
                         id: folderCardMenu
+                        objectName: "folderCardContextMenu"
                         AppMenuItem {
                             symbol: scoreDelegate.favorite ? "star-filled" : "star"
                             text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
@@ -868,6 +872,7 @@ Rectangle {
                         }
                         AppMenu {
                             id: folderTagSubmenu
+                            objectName: "folderTagSubmenu"
                             title: "标签"
                             tagIcon: true
                             enabled: libraryService.tags.count > 0
@@ -896,7 +901,9 @@ Rectangle {
                                             }
                                             return
                                         }
-                                        if (checked) {
+                                        // 注意：checkable 的 MenuItem 在触发 onTriggered 之前会先自动切换 checked，
+                                        // 因此不能依据 UI 的 checked 判断"当前是否已打标"，必须直接读取服务端状态。
+                                        if (libraryService.itemHasTag(scoreDelegate.itemId, itemId)) {
                                             libraryService.removeItemTag(scoreDelegate.itemId, itemId)
                                         } else {
                                             libraryService.addItemTag(scoreDelegate.itemId, itemId)
@@ -1056,7 +1063,11 @@ Rectangle {
 
             TapHandler {
                 acceptedButtons: Qt.RightButton
-                onTapped: blankContextMenu.popup()
+                onTapped: {
+                    // 标签视图下若没有任何内容，空白区域不弹右键菜单
+                    if (appController.libraryFilter.startsWith("tag:") && libraryService.entries.count === 0) return
+                    blankContextMenu.popup()
+                }
             }
         }
 
