@@ -1294,7 +1294,7 @@ Rectangle {
             Row {
                 id: applyAllRow
                 spacing: 8
-                property bool checked: conflictDialog.applyToAll
+                property bool checked: false
                 onCheckedChanged: conflictDialog.applyToAll = checked
 
                 Rectangle {
@@ -1373,6 +1373,7 @@ Rectangle {
             conflictDialog.conflictIndex = index
             conflictDialog.conflictTotal = total
             conflictDialog.applyToAll = false
+            applyAllRow.checked = false
             conflictDialog.open()
         }
         function onMergeConflict(sourceName, targetName, index, total) {
@@ -1381,6 +1382,7 @@ Rectangle {
             conflictDialog.conflictIndex = index
             conflictDialog.conflictTotal = total
             conflictDialog.applyToAll = false
+            applyAllRow.checked = false
             conflictDialog.open()
         }
         function onCurrentFolderChanged() {

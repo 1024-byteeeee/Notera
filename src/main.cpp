@@ -737,6 +737,42 @@ int main(int argc, char* argv[])
                     qWarning() << "[clipboard-smoke] FAIL: insert nested score" << insertNestedScore.lastError().text();
                     return 1;
                 }
+                // 逐个冲突测试：文件夹内含 2 个乐谱，用于验证不勾选应用到所有时逐个弹窗
+                QSqlQuery insertMultiFolder(database);
+                insertMultiFolder.prepare(QStringLiteral("INSERT INTO folders (id, name, parent_id, created_at, updated_at) VALUES (?,?,?,?,?)"));
+                insertMultiFolder.addBindValue(QStringLiteral("multi-conflict-folder"));
+                insertMultiFolder.addBindValue(QStringLiteral("MULTI-CONFLICT-FOLDER"));
+                insertMultiFolder.addBindValue(QVariant());
+                insertMultiFolder.addBindValue(now);
+                insertMultiFolder.addBindValue(now);
+                if (!insertMultiFolder.exec()) {
+                    qWarning() << "[clipboard-smoke] FAIL: insert multi folder" << insertMultiFolder.lastError().text();
+                    return 1;
+                }
+                for (int i = 1; i <= 2; ++i) {
+                    const auto scoreId = QStringLiteral("multi-conflict-%1").arg(i);
+                    const auto scoreName = QStringLiteral("MULTI-CONFLICT-%1").arg(i);
+                    const auto fileName = QStringLiteral("multi-conflict-%1.png").arg(i);
+                    testImage.save(libDir + "/" + fileName);
+                    QSqlQuery insertMultiScore(database);
+                    insertMultiScore.prepare(QStringLiteral("INSERT INTO scores (id, title, composer, file_name, file_path, file_type, page_count, favorite, last_page, created_at, updated_at, folder_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"));
+                    insertMultiScore.addBindValue(scoreId);
+                    insertMultiScore.addBindValue(scoreName);
+                    insertMultiScore.addBindValue(QString());
+                    insertMultiScore.addBindValue(fileName);
+                    insertMultiScore.addBindValue(libDir + "/" + fileName);
+                    insertMultiScore.addBindValue(QStringLiteral("png"));
+                    insertMultiScore.addBindValue(1);
+                    insertMultiScore.addBindValue(0);
+                    insertMultiScore.addBindValue(1);
+                    insertMultiScore.addBindValue(now);
+                    insertMultiScore.addBindValue(now);
+                    insertMultiScore.addBindValue(QStringLiteral("multi-conflict-folder"));
+                    if (!insertMultiScore.exec()) {
+                        qWarning() << "[clipboard-smoke] FAIL: insert multi score" << i << insertMultiScore.lastError().text();
+                        return 1;
+                    }
+                }
                 database.close();
             }
             QSqlDatabase::removeDatabase(connection);
@@ -885,7 +921,38 @@ int main(int argc, char* argv[])
             }
         }
 
-        qWarning() << "[clipboard-smoke] PASS: multi-copy, conflict per-item, cut, folder-inner-conflict, nested-folder-conflict all work";
+        // 逐个冲突测试：文件夹内含 2 个冲突乐谱，不勾选应用到所有，第一个选替换后第二个应重新弹窗
+        {
+            QObject ctx;
+            int conflictCount = 0;
+            QEventLoop multiLoop;
+            QObject::connect(&libraryService, &LibraryService::pasteConflict, &ctx, [&](const QString&, const QString&, int, int) {
+                ++conflictCount;
+                if (conflictCount == 1) {
+                    // 第一个冲突：选替换，不应用到所有
+                    libraryService.resolvePasteConflict(QStringLiteral("overwrite"), false);
+                } else {
+                    // 第二个及以后冲突：说明逐个弹窗正常工作，选跳过结束
+                    multiLoop.quit();
+                }
+            });
+            QObject::connect(&libraryService, &LibraryService::pasteFinished, &ctx, [&](int) { multiLoop.quit(); });
+            QTimer::singleShot(1500, &multiLoop, &QEventLoop::quit);
+            libraryService.copyItems({QStringLiteral("multi-conflict-folder")});
+            libraryService.goToLibraryRoot();
+            libraryService.pasteItems();
+            multiLoop.exec();
+            if (conflictCount < 2) {
+                qWarning() << "[clipboard-smoke] FAIL: expected at least 2 conflict dialogs without apply-to-all, got" << conflictCount;
+                return 1;
+            }
+            // 清理：如果还在进行中，取消
+            if (libraryService.clipboardMode() != QStringLiteral("none")) {
+                libraryService.resolvePasteConflict(QStringLiteral("cancel"), false);
+            }
+        }
+
+        qWarning() << "[clipboard-smoke] PASS: multi-copy, conflict per-item, cut, folder-inner-conflict, nested-folder-conflict, per-item-without-applyall all work";
         return 0;
     }
 

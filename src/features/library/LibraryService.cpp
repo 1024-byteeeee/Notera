@@ -1290,7 +1290,11 @@ void LibraryService::continuePaste()
 
         if (isCut) {
             if (hasConflict) {
-                if (action == QStringLiteral("skip")) { ++m_pasteIndex; continue; }
+                if (action == QStringLiteral("skip")) {
+                    ++m_pasteIndex;
+                    if (!m_pasteApplyToAll) m_pendingConflictAction.clear();
+                    continue;
+                }
                 if (action == QStringLiteral("overwrite")) {
                     const auto scores = m_repository.listAtFolder(targetFolderId, QString(), &error);
                     for (const auto& s : scores) {
