@@ -155,10 +155,33 @@ bool popupIsOpen(QObject* root, const QString& objectName)
     return opened && width > 0.0 && height > 0.0;
 }
 
+// 等待对象某个布尔属性变为 false。用嵌套事件循环驱动动画计时器，
+// 确保 Popup 的关闭动画（exit Transition）跑完、遮罩真正撤销后再返回，
+// 避免"关闭后立刻点击"被仍在关闭的弹窗遮罩吞掉。
+bool waitForPropertyFalse(QObject* obj, const QByteArray& propertyName, int timeoutMs = 3000)
+{
+    if (!obj) return true;
+    const auto met = [obj, propertyName] { return !obj->property(propertyName).toBool(); };
+    if (met()) return true;
+    QEventLoop loop;
+    QTimer poll;
+    poll.setInterval(10);
+    QObject::connect(&poll, &QTimer::timeout, &loop, [&] {
+        if (met()) loop.quit();
+    });
+    QTimer::singleShot(timeoutMs, &loop, &QEventLoop::quit);
+    poll.start();
+    loop.exec();
+    return met();
+}
+
 bool closePopup(QObject* root, const QString& objectName)
 {
     auto* const popup = root->findChild<QObject*>(objectName);
-    return popup && QMetaObject::invokeMethod(popup, "close");
+    if (!popup || !QMetaObject::invokeMethod(popup, "close")) {
+        return false;
+    }
+    return waitForPropertyFalse(popup, "visible");
 }
 
 }
@@ -1838,6 +1861,10 @@ int main(int argc, char* argv[])
                 return;
             }
             QMetaObject::invokeMethod(scoreDelegate, "closeContextMenu");
+            if (!waitForPropertyFalse(scoreDelegate, "contextMenuVisible")) {
+                fail("score-context-menu-close");
+                return;
+            }
 
             if (!clickItemAt(root, QStringLiteral("librarySurface"), Qt::RightButton, 0.5, 0.92)
                 || !popupIsOpen(root, QStringLiteral("blankContextMenu"))) {
