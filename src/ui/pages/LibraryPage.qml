@@ -1099,11 +1099,11 @@ Rectangle {
         AppMenuItem { text: "新建标签"; tagIcon: true; onTriggered: newTagDialog.open() }
         AppMenuSeparator { visible: !appController.libraryFilter.startsWith("tag:") }
         AppMenuItem { text: "导入乐谱"; symbol: "import"; visible: !appController.libraryFilter.startsWith("tag:"); onTriggered: fileDialog.open() }
-        AppMenuSeparator { visible: libraryService.clipboardItems.length > 0 }
+        AppMenuSeparator { }
         AppMenuItem {
             text: libraryService.clipboardMode === "cut" ? "粘贴（移动）" : "粘贴"
             symbol: "paste"
-            visible: libraryService.clipboardItems.length > 0
+            enabled: libraryService.clipboardItems.length > 0
             onTriggered: libraryService.pasteItems()
         }
     }
@@ -1238,6 +1238,8 @@ Rectangle {
         function resolveConflict(action) {
             if (conflictDialog.conflictSource === "merge") {
                 libraryService.resolveMergeConflict(action, conflictDialog.applyToAll)
+            } else if (conflictDialog.conflictSource === "pasteFolder") {
+                libraryService.resolvePasteFolderConflict(action, conflictDialog.applyToAll)
             } else {
                 libraryService.resolvePasteConflict(action, conflictDialog.applyToAll)
             }
@@ -1369,6 +1371,15 @@ Rectangle {
         target: libraryService
         function onPasteConflict(sourceName, targetName, index, total) {
             conflictDialog.conflictSource = "paste"
+            conflictDialog.conflictName = sourceName
+            conflictDialog.conflictIndex = index
+            conflictDialog.conflictTotal = total
+            conflictDialog.applyToAll = false
+            applyAllRow.checked = false
+            conflictDialog.open()
+        }
+        function onPasteFolderConflict(sourceName, targetName, index, total) {
+            conflictDialog.conflictSource = "pasteFolder"
             conflictDialog.conflictName = sourceName
             conflictDialog.conflictIndex = index
             conflictDialog.conflictTotal = total

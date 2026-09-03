@@ -955,13 +955,14 @@ bool ScoreRepository::deleteFolder(const QString& folderId, QString* error)
         return false;
     }
     QSqlQuery query(m_database);
+    // First, collect all folder IDs in the tree (CTE is statement-scoped)
     query.prepare(QStringLiteral(R"(
         WITH RECURSIVE tree(id) AS (
             SELECT id FROM folders WHERE id = ?
             UNION ALL
             SELECT folders.id FROM folders JOIN tree ON folders.parent_id = tree.id
         )
-        DELETE FROM scores WHERE folder_id IN (SELECT id FROM tree)
+        SELECT id FROM tree
     )"));
     query.addBindValue(folderId);
     if (!query.exec()) {
@@ -969,11 +970,36 @@ bool ScoreRepository::deleteFolder(const QString& folderId, QString* error)
         *error = query.lastError().text();
         return false;
     }
-    query.prepare(QStringLiteral("DELETE FROM folders WHERE id = ?"));
-    query.addBindValue(folderId);
-    if (!query.exec() || query.numRowsAffected() != 1 || !m_database.commit()) {
+    QStringList folderIds;
+    while (query.next()) {
+        folderIds.append(query.value(0).toString());
+    }
+    if (folderIds.isEmpty()) {
+        m_database.commit();
+        return true;
+    }
+    // Delete all scores in these folders
+    QSqlQuery deleteScoresQuery(m_database);
+    deleteScoresQuery.prepare(QStringLiteral("DELETE FROM scores WHERE folder_id IN (%1)").arg(
+        QStringList(folderIds.size(), QStringLiteral("?")).join(QStringLiteral(","))));
+    for (const auto& id : folderIds) {
+        deleteScoresQuery.addBindValue(id);
+    }
+    if (!deleteScoresQuery.exec()) {
         m_database.rollback();
-        *error = query.lastError().text();
+        *error = deleteScoresQuery.lastError().text();
+        return false;
+    }
+    // Delete all folders
+    QSqlQuery deleteFoldersQuery(m_database);
+    deleteFoldersQuery.prepare(QStringLiteral("DELETE FROM folders WHERE id IN (%1)").arg(
+        QStringList(folderIds.size(), QStringLiteral("?")).join(QStringLiteral(","))));
+    for (const auto& id : folderIds) {
+        deleteFoldersQuery.addBindValue(id);
+    }
+    if (!deleteFoldersQuery.exec() || !m_database.commit()) {
+        m_database.rollback();
+        *error = deleteFoldersQuery.lastError().text();
         return false;
     }
     return true;

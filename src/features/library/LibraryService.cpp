@@ -1205,9 +1205,10 @@ void LibraryService::deleteEmptyFolderTree(const QString& folderId)
     for (const auto& f : subFolders) {
         deleteEmptyFolderTree(f.toMap().value(QStringLiteral("id")).toString());
     }
-    // 仅当文件夹内已无乐谱时才删除（被跳过的文件应保留在原位置）
+    // 重新检查：仅当文件夹内已无乐谱且无子文件夹时才删除
     const auto scores = m_repository.listAtFolder(folderId, QString(), &error);
-    if (scores.isEmpty()) {
+    const auto remainingSubFolders = m_repository.childFolders(folderId, &error);
+    if (scores.isEmpty() && remainingSubFolders.isEmpty()) {
         if (!m_repository.deleteFolder(folderId, &error)) {
             emit errorOccurred(QStringLiteral("清理空文件夹失败。"));
         }
@@ -1218,7 +1219,6 @@ void LibraryService::pasteItems()
 {
     if (m_clipboardItems.isEmpty() || m_clipboardMode == QStringLiteral("none")) return;
     m_pasteQueue.clear();
-    m_cutSourceFolderIds.clear();
     const auto isCut = m_clipboardMode == QStringLiteral("cut");
     QString error;
     for (const auto& item : m_clipboardItems) {
@@ -1227,14 +1227,13 @@ void LibraryService::pasteItems()
             {QStringLiteral("itemId"), itemId},
             {QStringLiteral("targetFolderId"), m_currentFolderId}
         });
-        if (isCut && m_repository.itemTypeById(itemId, &error) == QStringLiteral("folder")) {
-            m_cutSourceFolderIds.append(itemId);
-        }
     }
     m_pasteIndex = 0;
     m_pasteTargetFolderId = m_currentFolderId;
     m_pendingConflictAction.clear();
     m_pasteApplyToAll = false;
+    m_pendingFolderConflictAction.clear();
+    m_folderConflictApplyToAll = false;
     continuePaste();
 }
 
@@ -1242,6 +1241,21 @@ void LibraryService::resolvePasteConflict(const QString& action, bool applyToAll
 {
     m_pendingConflictAction = action;
     m_pasteApplyToAll = applyToAll;
+    if (action == QStringLiteral("cancel")) {
+        m_pasteQueue.clear();
+        m_pasteIndex = 0;
+        reloadFolders();
+        reload();
+        emit pasteFinished(0);
+        return;
+    }
+    continuePaste();
+}
+
+void LibraryService::resolvePasteFolderConflict(const QString& action, bool applyToAll)
+{
+    m_pendingFolderConflictAction = action;
+    m_folderConflictApplyToAll = applyToAll;
     if (action == QStringLiteral("cancel")) {
         m_pasteQueue.clear();
         m_pasteIndex = 0;
@@ -1277,13 +1291,82 @@ void LibraryService::continuePaste()
             continue;
         }
 
-        // 文件夹：同名自动合并（不弹窗），递归展开内部内容到队列逐个处理
+        // 文件夹处理
         if (isFolder) {
             const auto sourceName = m_repository.folderName(itemId, &error);
             if (sourceName.isEmpty()) { ++m_pasteIndex; continue; }
-            const auto mergedFolderId = getOrCreateFolder(sourceName, targetFolderId);
-            expandFolderToQueue(itemId, mergedFolderId);
+
+            const bool hasConflict = nameExistsInFolder(sourceName, targetFolderId, true);
+
+            // 剪切文件夹：直接移动整个文件夹
+            if (isCut) {
+                if (hasConflict) {
+                    QString action = m_pendingFolderConflictAction;
+                    if (action.isEmpty()) {
+                        emit pasteFolderConflict(sourceName, sourceName, m_pasteIndex, m_pasteQueue.size());
+                        return;
+                    }
+                    if (action == QStringLiteral("skip")) {
+                        ++m_pasteIndex;
+                        if (!m_folderConflictApplyToAll) m_pendingFolderConflictAction.clear();
+                        continue;
+                    }
+                    if (action == QStringLiteral("overwrite")) {
+                        // 删除目标文件夹
+                        const auto children = m_repository.childFolders(targetFolderId, &error);
+                        for (const auto& f : children) {
+                            if (f.toMap().value(QStringLiteral("name")).toString() == sourceName) {
+                                m_repository.deleteFolder(f.toMap().value(QStringLiteral("itemId")).toString(), &error);
+                                break;
+                            }
+                        }
+                    }
+                    if (action == QStringLiteral("rename")) {
+                        const auto newName = uniqueNameInFolder(sourceName, targetFolderId, true);
+                        m_repository.renameFolder(itemId, newName, &error);
+                    }
+                }
+                // 移动文件夹
+                if (!m_repository.moveFolder(itemId, targetFolderId, &error)) {
+                    emit errorOccurred(QStringLiteral("移动文件夹失败：%1").arg(error));
+                }
+                ++processed;
+                ++m_pasteIndex;
+                if (!m_folderConflictApplyToAll) m_pendingFolderConflictAction.clear();
+                continue;
+            }
+
+            // 复制文件夹：检查冲突并弹窗
+            if (hasConflict) {
+                QString action = m_pendingFolderConflictAction;
+                if (action.isEmpty()) {
+                    emit pasteFolderConflict(sourceName, sourceName, m_pasteIndex, m_pasteQueue.size());
+                    return;
+                }
+                if (action == QStringLiteral("skip")) {
+                    ++m_pasteIndex;
+                    if (!m_folderConflictApplyToAll) m_pendingFolderConflictAction.clear();
+                    continue;
+                }
+                if (action == QStringLiteral("overwrite")) {
+                    // 删除目标文件夹
+                    const auto children = m_repository.childFolders(targetFolderId, &error);
+                    for (const auto& f : children) {
+                        if (f.toMap().value(QStringLiteral("name")).toString() == sourceName) {
+                            m_repository.deleteFolder(f.toMap().value(QStringLiteral("itemId")).toString(), &error);
+                            break;
+                        }
+                    }
+                }
+            }
+            // 递归复制文件夹
+            const auto result = copyFolderRecursive(itemId, targetFolderId, m_pendingFolderConflictAction);
+            if (!result.isEmpty()) {
+                emit errorOccurred(result);
+            }
+            ++processed;
             ++m_pasteIndex;
+            if (!m_folderConflictApplyToAll) m_pendingFolderConflictAction.clear();
             continue;
         }
 
@@ -1342,12 +1425,7 @@ void LibraryService::continuePaste()
         if (!m_pasteApplyToAll) m_pendingConflictAction.clear();
     }
 
-    // 剪切模式：只删除已变空的源文件夹结构；被跳过的文件保留在原位置（对齐 Windows）
     if (isCut) {
-        for (const auto& folderId : m_cutSourceFolderIds) {
-            deleteEmptyFolderTree(folderId);
-        }
-        m_cutSourceFolderIds.clear();
         clearClipboard();
     }
     reloadFolders();

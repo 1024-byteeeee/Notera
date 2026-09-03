@@ -76,6 +76,7 @@ public:
     Q_INVOKABLE void clearClipboard();
     Q_INVOKABLE void pasteItems();
     Q_INVOKABLE void resolvePasteConflict(const QString& action, bool applyToAll);
+    Q_INVOKABLE void resolvePasteFolderConflict(const QString& action, bool applyToAll);
     Q_INVOKABLE QString favoriteItems(const QVariantList& itemIds);
     Q_INVOKABLE QString tagItems(const QVariantList& itemIds, const QString& tagId);
     Q_INVOKABLE QString saveScoreAs(const QString& scoreId, const QUrl& destination);
@@ -106,6 +107,7 @@ signals:
     void importRequested();
     void clipboardChanged();
     void pasteConflict(QString sourceName, QString targetName, int index, int total);
+    void pasteFolderConflict(QString sourceName, QString targetName, int index, int total);
     void pasteFinished(int processedCount);
     void mergeConflict(QString sourceName, QString targetName, int index, int total);
     void mergeFinished(int processedCount);
@@ -149,6 +151,8 @@ private:
     QString m_pendingConflictAction;
     bool m_pasteApplyToAll {false};
     QStringList m_cutSourceFolderIds;
+    QString m_pendingFolderConflictAction;
+    bool m_folderConflictApplyToAll {false};
     QScopedPointer<QTemporaryDir> m_mergeTempDir;
     QString m_mergeBackupRoot;
     QVariantList m_mergeQueue;
