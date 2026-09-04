@@ -70,7 +70,17 @@ jobs:
           fi
 
       - name: Create DMG
-        run: cpack --config build/macos-arm64/CPackConfig.cmake -G DragNDrop
+        run: |
+          for attempt in 1 2 3; do
+            if cpack --config build/macos-arm64/CPackConfig.cmake -G DragNDrop; then
+              exit 0
+            fi
+            hdiutil detach "/Volumes/Notera" -force || true
+            rm -rf build/macos-arm64/packages/_CPack_Packages
+            rm -f build/macos-arm64/packages/Notera-v*-macOS-arm64.dmg
+            sleep 3
+          done
+          exit 1
 
       - name: Verify DMG filename and architecture
         shell: bash
