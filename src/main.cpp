@@ -1505,8 +1505,15 @@ int main(int argc, char* argv[])
             return 1;
         }
         const auto previousCount = libraryService.scores()->rowCount();
+        auto waitForStitchImport = [&libraryService](int timeoutMs = 3000) {
+            QEventLoop loop;
+            QObject::connect(&libraryService, &LibraryService::importFinished, &loop, &QEventLoop::quit);
+            QTimer::singleShot(timeoutMs, &loop, &QEventLoop::quit);
+            loop.exec();
+        };
         libraryService.importAndStitchImages({QUrl::fromLocalFile(firstPath).toString(),
             QUrl::fromLocalFile(secondPath).toString()});
+        waitForStitchImport();
         if (libraryService.scores()->rowCount() != previousCount + 1) return 1;
         // 再次拼接同名图片：对齐 Windows，目标已存在同名“拼接乐谱”时应触发导入冲突弹窗，
         // 而不是静默产生重复项；选“保留两者”后生成“(2)”副本
@@ -1524,6 +1531,7 @@ int main(int argc, char* argv[])
             // 冲突未解决前不应产生重复项
             if (libraryService.scores()->rowCount() != previousCount + 1) return 1;
             libraryService.resolveImportConflict(QStringLiteral("rename"), false);
+            waitForStitchImport();
             if (libraryService.scores()->rowCount() != previousCount + 2) return 1;
         }
         return 0;
