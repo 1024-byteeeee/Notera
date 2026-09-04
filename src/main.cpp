@@ -1650,8 +1650,16 @@ int main(int argc, char* argv[])
         if (!image.save(imagePath) || !image.save(secondImagePath)) {
             return 1;
         }
-        libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
-        libraryService.importLocalFile(QUrl::fromLocalFile(secondImagePath));
+        libraryService.importFiles({
+            QVariant::fromValue(QUrl::fromLocalFile(imagePath)),
+            QVariant::fromValue(QUrl::fromLocalFile(secondImagePath))
+        });
+        {
+            QEventLoop importLoop;
+            QObject::connect(&libraryService, &LibraryService::importFinished, &importLoop, &QEventLoop::quit);
+            QTimer::singleShot(5000, &importLoop, &QEventLoop::quit);
+            importLoop.exec();
+        }
         libraryService.createFolder(QStringLiteral("Z界面测试文件夹"));
         libraryService.createFolder(QStringLiteral("A界面测试文件夹"));
         libraryService.createTag(QStringLiteral("界面测试标签"));
