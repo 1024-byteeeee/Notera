@@ -286,7 +286,7 @@ Rectangle {
             AppButton {
                 objectName: "importButton"
                 visible: !appController.libraryFilter.startsWith("tag:")
-                Layout.preferredWidth: 108
+                Layout.preferredWidth: 120
                 text: "导入"
                 primary: true
                 onClicked: fileDialog.open()

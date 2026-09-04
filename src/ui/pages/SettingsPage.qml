@@ -168,6 +168,67 @@ Rectangle {
                             spacing: 16
 
                             ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 3
+                                Label {
+                                    text: "全局主题色"
+                                    color: Theme.foreground
+                                    font.pixelSize: Theme.fontMd
+                                    font.weight: Font.Medium
+                                }
+                                Label {
+                                    text: appController.accentColor.length > 0
+                                        ? "当前颜色 " + appController.accentColor.toUpperCase()
+                                        : "使用 Notera 默认金色"
+                                    color: Theme.mutedForeground
+                                    font.pixelSize: Theme.fontXs
+                                }
+                            }
+
+                            Rectangle {
+                                objectName: "accentColorPreview"
+                                Layout.preferredWidth: 28
+                                Layout.preferredHeight: 28
+                                radius: 14
+                                color: Theme.accent
+                                border.width: 2
+                                border.color: Theme.strongBorder
+                            }
+
+                            AppButton {
+                                objectName: "resetAccentColorButton"
+                                text: "恢复默认"
+                                enabled: appController.accentColor.length > 0
+                                onClicked: appController.resetAccentColor()
+                            }
+
+                            AppButton {
+                                objectName: "changeAccentColorButton"
+                                text: "更改"
+                                primary: true
+                                onClicked: {
+                                    accentColorDialog.selectedColor = Theme.accent
+                                    accentColorDialog.open()
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 72
+                        radius: Theme.radiusMd
+                        color: Theme.elevatedSurface
+                        border.width: 1
+                        border.color: Theme.border
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 18
+                            anchors.rightMargin: 18
+                            spacing: 16
+
+                            ColumnLayout {
                                 spacing: 3
                                 Label {
                                     text: "界面动画"
@@ -674,6 +735,13 @@ Rectangle {
             border.width: 1
             border.color: Theme.strongBorder
         }
+    }
+
+    ColorDialog {
+        id: accentColorDialog
+        objectName: "accentColorDialog"
+        title: "选择全局主题色"
+        onAccepted: appController.accentColor = selectedColor.toString()
     }
 
     ConfirmDialog {

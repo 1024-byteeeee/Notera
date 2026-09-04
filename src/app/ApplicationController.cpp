@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <QCoreApplication>
+#include <QColor>
 #include <QDir>
 #include <QDirIterator>
 #include <QDesktopServices>
@@ -30,6 +31,8 @@ ApplicationController::ApplicationController(QObject* parent)
         m_themeMode = 0;
     }
     m_animationsEnabled = settings.value(QStringLiteral("appearance/animationsEnabled"), true).toBool();
+    const QColor storedAccent(settings.value(QStringLiteral("appearance/accentColor")).toString());
+    if (storedAccent.isValid()) m_accentColor = storedAccent.name(QColor::HexRgb);
     m_defaultScrollSpeed = settings.value(QStringLiteral("reader/defaultScrollSpeed"), 15.0).toDouble();
     if (m_defaultScrollSpeed < 1.0 || m_defaultScrollSpeed > 256.0) {
         m_defaultScrollSpeed = 15.0;
@@ -66,6 +69,30 @@ void ApplicationController::setAnimationsEnabled(const bool enabled)
     m_animationsEnabled = enabled;
     QSettings().setValue(QStringLiteral("appearance/animationsEnabled"), enabled);
     emit animationsEnabledChanged();
+}
+
+QString ApplicationController::accentColor() const
+{
+    return m_accentColor;
+}
+
+void ApplicationController::setAccentColor(const QString& color)
+{
+    const QColor parsed(color);
+    if (!parsed.isValid()) return;
+    const auto normalized = parsed.name(QColor::HexRgb);
+    if (m_accentColor == normalized) return;
+    m_accentColor = normalized;
+    QSettings().setValue(QStringLiteral("appearance/accentColor"), normalized);
+    emit accentColorChanged();
+}
+
+void ApplicationController::resetAccentColor()
+{
+    if (m_accentColor.isEmpty()) return;
+    m_accentColor.clear();
+    QSettings().remove(QStringLiteral("appearance/accentColor"));
+    emit accentColorChanged();
 }
 
 QString ApplicationController::currentScoreTitle() const

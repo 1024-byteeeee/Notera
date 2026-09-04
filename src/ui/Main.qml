@@ -25,6 +25,12 @@ ApplicationWindow {
     }
 
     Binding {
+        target: Theme
+        property: "customAccentColor"
+        value: appController.accentColor
+    }
+
+    Binding {
         target: Motion
         property: "enabled"
         value: appController.animationsEnabled
