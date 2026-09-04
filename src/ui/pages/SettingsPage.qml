@@ -737,11 +737,125 @@ Rectangle {
         }
     }
 
-    ColorDialog {
+    Dialog {
         id: accentColorDialog
         objectName: "accentColorDialog"
+        property color draftColor: Theme.accent
         title: "选择全局主题色"
-        onAccepted: appController.accentColor = selectedColor.toString()
+        parent: Overlay.overlay
+        modal: true
+        focus: true
+        width: parent ? Math.min(430, parent.width - 48) : 430
+        x: parent ? Math.round((parent.width - width) / 2) : 0
+        y: parent ? Math.round((parent.height - height) / 2) : 0
+        padding: 22
+        onOpened: hexColorInput.text = draftColor.toString().toUpperCase()
+        onDraftColorChanged: {
+            if (hexColorInput && hexColorInput.text !== draftColor.toString().toUpperCase())
+                hexColorInput.text = draftColor.toString().toUpperCase()
+        }
+
+        header: Label {
+            leftPadding: 22
+            rightPadding: 22
+            topPadding: 20
+            bottomPadding: 4
+            text: accentColorDialog.title
+            color: Theme.foreground
+            font.pixelSize: Theme.fontLg
+            font.weight: Font.DemiBold
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 14
+
+            Label {
+                text: "预设颜色"
+                color: Theme.secondaryForeground
+                font.pixelSize: Theme.fontSm
+            }
+
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 8
+                columnSpacing: 10
+                rowSpacing: 10
+
+                Repeater {
+                    model: ["#E0B45C", "#D97757", "#C96B8A", "#9B7BC4", "#5D8CC9", "#4D9A83", "#7A8B5A", "#8C6B4F"]
+                    delegate: Rectangle {
+                        required property string modelData
+                        Layout.preferredWidth: 30
+                        Layout.preferredHeight: 30
+                        radius: 15
+                        color: modelData
+                        border.width: Qt.colorEqual(accentColorDialog.draftColor, color) ? 3 : 1
+                        border.color: Qt.colorEqual(accentColorDialog.draftColor, color) ? Theme.foreground : Theme.strongBorder
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: accentColorDialog.draftColor = parent.color
+                        }
+                    }
+                }
+            }
+
+            Label {
+                text: "自定义颜色（十六进制）"
+                color: Theme.secondaryForeground
+                font.pixelSize: Theme.fontSm
+            }
+
+            TextField {
+                id: hexColorInput
+                Layout.fillWidth: true
+                implicitHeight: 42
+                color: Theme.foreground
+                placeholderText: "例如 #E0B45C"
+                placeholderTextColor: Theme.inputPlaceholder
+                selectByMouse: true
+                leftPadding: 12
+                rightPadding: 12
+                onTextChanged: {
+                    const value = text.trim()
+                    if (/^#[0-9a-fA-F]{6}$/.test(value)) accentColorDialog.draftColor = value
+                }
+                background: Rectangle {
+                    radius: Theme.radiusMd
+                    color: Theme.inputBackground
+                    border.width: 1
+                    border.color: hexColorInput.activeFocus ? Theme.inputFocusBorder : Theme.inputBorder
+                }
+            }
+        }
+
+        footer: Item {
+            implicitHeight: 62
+            RowLayout {
+                anchors.right: parent.right
+                anchors.rightMargin: 22
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 10
+                AppButton { text: "取消"; onClicked: accentColorDialog.reject() }
+                AppButton {
+                    text: "应用"
+                    primary: true
+                    enabled: /^#[0-9a-fA-F]{6}$/.test(hexColorInput.text.trim())
+                    onClicked: {
+                        appController.accentColor = hexColorInput.text.trim()
+                        accentColorDialog.accept()
+                    }
+                }
+            }
+        }
+
+        background: Rectangle {
+            radius: Theme.radiusLg
+            color: Theme.surface
+            border.width: 1
+            border.color: Theme.strongBorder
+        }
     }
 
     ConfirmDialog {

@@ -13,6 +13,7 @@
 #include <QIcon>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLibraryInfo>
 #include <QLocale>
 #include <QMouseEvent>
 #include <QPointingDevice>
@@ -31,6 +32,7 @@
 #include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QTimer>
+#include <QTranslator>
 #include <QtCore/private/qzipwriter_p.h>
 
 #include "app/ApplicationController.h"
@@ -197,6 +199,17 @@ int main(int argc, char* argv[])
     app.setOrganizationDomain(QStringLiteral("notera.app"));
     app.setApplicationName(QStringLiteral("Notera"));
     app.setWindowIcon(QIcon(QStringLiteral(":/src/assets/notera-icon.png")));
+
+    QTranslator qtBaseTranslator;
+    if (!qtBaseTranslator.load(QStringLiteral("qtbase_zh_CN"), QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
+        qWarning() << "Qt base Chinese translation is unavailable";
+    }
+    app.installTranslator(&qtBaseTranslator);
+    QTranslator qtTranslator;
+    if (!qtTranslator.load(QStringLiteral("qt_zh_CN"), QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
+        qWarning() << "Qt Chinese translation is unavailable";
+    }
+    app.installTranslator(&qtTranslator);
 
     const auto arguments = app.arguments();
     const auto isSmokeTest = arguments.contains(QStringLiteral("--theme-smoke-test"))

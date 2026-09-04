@@ -322,7 +322,7 @@ Rectangle {
                 visible: count > 0
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
-                interactive: !gridRubberBand.active
+                interactive: false
                 cellWidth: {
                     const columns = Math.max(1, Math.floor(width / 218))
                     return Math.floor(width / columns)
@@ -331,6 +331,11 @@ Rectangle {
                 model: libraryService.entries
 
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+                WheelHandler {
+                    target: grid
+                    property: "contentY"
+                }
 
                 delegate: Item {
                     id: scoreDelegate
