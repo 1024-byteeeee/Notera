@@ -11,11 +11,12 @@
 ThumbnailGenerator::ThumbnailGenerator(QObject* parent)
     : QObject(parent)
 {
+    m_threadPool.setMaxThreadCount(2);
 }
 
 void ThumbnailGenerator::generate(const QString& scoreId, const QString& scorePath, const QString& fileType)
 {
-    m_tasks.addFuture(QtConcurrent::run([this, scoreId, scorePath, fileType] {
+    m_tasks.addFuture(QtConcurrent::run(&m_threadPool, [this, scoreId, scorePath, fileType] {
         QImage image;
         if (fileType == QStringLiteral("pdf")) {
             QPdfDocument document;

@@ -3,6 +3,8 @@
 #include <QObject>
 #include <QUrl>
 #include <QHash>
+#include <QThreadPool>
+#include <QTimer>
 #include <QScopedPointer>
 #include <QTemporaryDir>
 #include "features/library/LibraryEntryModel.h"
@@ -119,11 +121,25 @@ signals:
     void mergeFinished(int processedCount);
 
 private:
+    struct ImportTaskResult {
+        QString scoreId;
+        QString sourcePath;
+        QString storedPath;
+        QString title;
+        QString fileType;
+        QString folderId;
+        QString error;
+        int pageCount {1};
+    };
+
     void reload();
     void reloadFolders();
     void reloadTags();
     void importFile(const QString& sourcePath, const QString& titleOverride = {});
     void continueImport();
+    void startImportTask(const QString& sourcePath, const QString& title, const QString& folderId);
+    void finishImportTask(ImportTaskResult result);
+    void flushThumbnailUpdates();
     void consumeImportTemp(const QString& path);
     static QString resolveImportPath(const QVariant& value);
     void continuePaste();
@@ -148,6 +164,9 @@ private:
     NamedListModel m_folders;
     NamedListModel m_tags;
     ThumbnailGenerator m_thumbnailGenerator;
+    QThreadPool m_importThreadPool;
+    QTimer m_thumbnailRefreshTimer;
+    QHash<QString, QString> m_pendingThumbnailPaths;
     QString m_searchQuery;
     QString m_filterMode {QStringLiteral("all")};
     QString m_currentFolderId;
@@ -169,6 +188,9 @@ private:
     QStringList m_importQueueTitles;
     QStringList m_importTempFiles;
     int m_importIndex {0};
+    int m_importSucceededCount {0};
+    int m_pendingInsertCount {0};
+    bool m_importTaskActive {false};
     QString m_importConflictAction;
     bool m_importApplyToAll {false};
     QScopedPointer<QTemporaryDir> m_mergeTempDir;

@@ -3,6 +3,7 @@
 #include <QFutureSynchronizer>
 #include <QObject>
 #include <QString>
+#include <QThreadPool>
 
 class ThumbnailGenerator final : public QObject
 {
@@ -18,4 +19,5 @@ signals:
 
 private:
     QFutureSynchronizer<void> m_tasks;
+    QThreadPool m_threadPool;
 };

@@ -1258,7 +1258,14 @@ int main(int argc, char* argv[])
             return 1;
         }
         const auto previousCount = libraryService.scores()->rowCount();
+        auto waitForImport = [&libraryService](int timeoutMs = 3000) {
+            QEventLoop loop;
+            QObject::connect(&libraryService, &LibraryService::importFinished, &loop, &QEventLoop::quit);
+            QTimer::singleShot(timeoutMs, &loop, &QEventLoop::quit);
+            loop.exec();
+        };
         libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
+        waitForImport();
         if (libraryService.scores()->rowCount() != previousCount + 1) return 1;
         // 再次导入同名文件：对齐 Windows，应触发导入冲突弹窗，而不是静默产生重复项
         {
@@ -1272,12 +1279,14 @@ int main(int argc, char* argv[])
             if (libraryService.scores()->rowCount() != previousCount + 1) return 1;
             // 选“替换”：总数不变（替换而非新增）
             libraryService.resolveImportConflict(QStringLiteral("overwrite"), false);
+            waitForImport();
             if (libraryService.scores()->rowCount() != previousCount + 1) return 1;
             // 选“保留两者”：新增一个“(2)”副本
             conflictFired = false;
             libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
             if (!conflictFired) return 1;
             libraryService.resolveImportConflict(QStringLiteral("rename"), false);
+            waitForImport();
             if (libraryService.scores()->rowCount() != previousCount + 2) return 1;
         }
         return 0;
@@ -1313,6 +1322,12 @@ int main(int argc, char* argv[])
         }
         libraryService.createFolder(QStringLiteral("TAG-SMOKE-FOLDER"));
         libraryService.importLocalFile(QUrl::fromLocalFile(file1));
+        {
+            QEventLoop importLoop;
+            QObject::connect(&libraryService, &LibraryService::importFinished, &importLoop, &QEventLoop::quit);
+            QTimer::singleShot(3000, &importLoop, &QEventLoop::quit);
+            importLoop.exec();
+        }
         const auto scoreId = [&dbPath]() {
             const auto connection = QStringLiteral("tag_smoke_lookup_score");
             QString id;

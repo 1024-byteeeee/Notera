@@ -196,6 +196,29 @@ bool ScoreRepository::insert(const Score& score, const QString& folderId, QStrin
     return false;
 }
 
+bool ScoreRepository::beginTransaction(QString* error)
+{
+    if (!m_database.transaction()) {
+        if (error) *error = m_database.lastError().text();
+        return false;
+    }
+    return true;
+}
+
+bool ScoreRepository::commitTransaction(QString* error)
+{
+    if (!m_database.commit()) {
+        if (error) *error = m_database.lastError().text();
+        return false;
+    }
+    return true;
+}
+
+void ScoreRepository::rollbackTransaction()
+{
+    m_database.rollback();
+}
+
 QList<Score> ScoreRepository::listAtFolder(const QString& folderId, const QString& searchQuery, QString* error) const
 {
     QSqlQuery query(m_database);
@@ -316,6 +339,32 @@ bool ScoreRepository::updateThumbnail(const QString& scoreId, const QString& thu
     return false;
 }
 
+bool ScoreRepository::updateThumbnails(const QHash<QString, QString>& thumbnailPaths, QString* error)
+{
+    if (thumbnailPaths.isEmpty()) return true;
+    if (!m_database.transaction()) {
+        *error = m_database.lastError().text();
+        return false;
+    }
+
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("UPDATE scores SET thumbnail_path = ?, updated_at = ? WHERE id = ?"));
+    for (auto it = thumbnailPaths.cbegin(); it != thumbnailPaths.cend(); ++it) {
+        query.bindValue(0, it.value());
+        query.bindValue(1, QDateTime::currentMSecsSinceEpoch());
+        query.bindValue(2, it.key());
+        if (!query.exec()) {
+            *error = query.lastError().text();
+            m_database.rollback();
+            return false;
+        }
+    }
+    if (m_database.commit()) return true;
+    *error = m_database.lastError().text();
+    m_database.rollback();
+    return false;
+}
+
 bool ScoreRepository::remove(const QString& scoreId, QString* error) const
 {
     QSqlQuery query(m_database);
@@ -372,6 +421,25 @@ QVariantList ScoreRepository::scoreTags(const QString& scoreId, QString* error) 
     QVariantList result;
     while (query.next()) {
         result.append(QVariantMap{{"id", query.value(0)}, {"name", query.value(1)}});
+    }
+    return result;
+}
+
+QHash<QString, QVariantList> ScoreRepository::allScoreTags(QString* error) const
+{
+    QHash<QString, QVariantList> result;
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral(
+        "SELECT score_tags.score_id, tags.id, tags.name "
+        "FROM score_tags JOIN tags ON tags.id = score_tags.tag_id "
+        "ORDER BY tags.name COLLATE NOCASE"));
+    if (!query.exec()) {
+        if (error) *error = query.lastError().text();
+        return result;
+    }
+    while (query.next()) {
+        const auto scoreId = query.value(0).toString();
+        result[scoreId].append(QVariantMap{{"id", query.value(1)}, {"name", query.value(2)}});
     }
     return result;
 }

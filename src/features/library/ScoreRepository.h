@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QSqlDatabase>
+#include <QHash>
 #include <QVariantList>
 
 #include "features/library/Score.h"
@@ -17,16 +18,21 @@ public:
     [[nodiscard]] QList<Score> listByFolder(const QString& folderId, const QString& searchQuery, QString* error) const;
     [[nodiscard]] QList<Score> listByTag(const QString& tagId, const QString& searchQuery, QString* error) const;
     [[nodiscard]] bool insert(const Score& score, const QString& folderId, QString* error) const;
+    [[nodiscard]] bool beginTransaction(QString* error);
+    [[nodiscard]] bool commitTransaction(QString* error);
+    void rollbackTransaction();
     [[nodiscard]] bool setFavorite(const QString& scoreId, bool favorite, QString* error) const;
     [[nodiscard]] bool setItemFavorite(const QString& itemId, bool favorite, QString* error) const;
     [[nodiscard]] bool markScoreOpened(const QString& scoreId, QString* error) const;
     [[nodiscard]] bool rename(const QString& scoreId, const QString& title, QString* error) const;
     [[nodiscard]] bool updateThumbnail(const QString& scoreId, const QString& thumbnailPath, QString* error) const;
+    [[nodiscard]] bool updateThumbnails(const QHash<QString, QString>& thumbnailPaths, QString* error);
     [[nodiscard]] bool remove(const QString& scoreId, QString* error) const;
     [[nodiscard]] bool setFolder(const QString& scoreId, const QString& folderId, QString* error) const;
     [[nodiscard]] bool addTag(const QString& scoreId, const QString& tagId, QString* error) const;
     [[nodiscard]] bool removeTag(const QString& scoreId, const QString& tagId, QString* error) const;
     [[nodiscard]] QVariantList scoreTags(const QString& scoreId, QString* error) const;
+    [[nodiscard]] QHash<QString, QVariantList> allScoreTags(QString* error) const;
     [[nodiscard]] QVariantList itemTags(const QString& itemId, QString* error) const;
     [[nodiscard]] bool addItemTag(const QString& itemId, const QString& tagId, QString* error) const;
     [[nodiscard]] bool removeItemTag(const QString& itemId, const QString& tagId, QString* error) const;

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <utility>
 #include <QBuffer>
 #include <QCryptographicHash>
 #include <QDir>
@@ -13,6 +14,7 @@
 #include <QJsonObject>
 #include <QPainter>
 #include <QPdfDocument>
+#include <QPointer>
 #include <QRegularExpression>
 #include <QSqlDatabase>
 #include <QSqlError>
@@ -150,6 +152,10 @@ LibraryService::LibraryService(QObject* parent)
     , m_tags(this)
     , m_thumbnailGenerator(this)
 {
+    m_importThreadPool.setMaxThreadCount(1);
+    m_thumbnailRefreshTimer.setSingleShot(true);
+    m_thumbnailRefreshTimer.setInterval(250);
+    connect(&m_thumbnailRefreshTimer, &QTimer::timeout, this, &LibraryService::flushThumbnailUpdates);
     QString error;
     if (!m_databaseService.initialize(&error)) {
         emit errorOccurred(QStringLiteral("初始化乐谱库数据库失败。"));
@@ -157,12 +163,8 @@ LibraryService::LibraryService(QObject* parent)
     }
     m_repository = ScoreRepository(m_databaseService.database());
     connect(&m_thumbnailGenerator, &ThumbnailGenerator::generated, this, [this](const QString& scoreId, const QString& path) {
-        QString error;
-        if (!m_repository.updateThumbnail(scoreId, path, &error)) {
-            emit errorOccurred(QStringLiteral("更新乐谱缩略图失败。"));
-            return;
-        }
-        reload();
+        m_pendingThumbnailPaths.insert(scoreId, path);
+        m_thumbnailRefreshTimer.start();
     });
     connect(&m_thumbnailGenerator, &ThumbnailGenerator::failed, this, [this](const QString&, const QString& message) {
         emit errorOccurred(message);
@@ -519,10 +521,18 @@ void LibraryService::importFiles(const QVariantList& paths)
         resolved.append(localPath);
     }
     if (resolved.isEmpty()) return;
+    // 导入进行中时追加到队列，而不是拒绝
+    if (m_importTaskActive || !m_importQueue.isEmpty()) {
+        m_importQueue.append(resolved);
+        return;
+    }
     m_importQueue = resolved;
     m_importQueueTitles.clear();
     m_importTempFiles.clear();
     m_importIndex = 0;
+    m_importSucceededCount = 0;
+    m_pendingInsertCount = 0;
+    m_importTaskActive = false;
     m_importConflictAction.clear();
     m_importApplyToAll = false;
     continueImport();
@@ -569,6 +579,10 @@ void LibraryService::resolveImportConflict(const QString& action, bool applyToAl
         m_importQueue.clear();
         m_importQueueTitles.clear();
         m_importIndex = 0;
+        if (m_pendingInsertCount > 0) {
+            m_repository.rollbackTransaction();
+            m_pendingInsertCount = 0;
+        }
         emit noticeOccurred(QStringLiteral("已取消导入"));
         emit importFinished(0);
         return;
@@ -585,6 +599,7 @@ void LibraryService::consumeImportTemp(const QString& path)
 
 void LibraryService::continueImport()
 {
+    if (m_importTaskActive) return;
     QString error;
     while (m_importIndex < m_importQueue.size()) {
         const auto sourcePath = m_importQueue[m_importIndex];
@@ -639,16 +654,13 @@ void LibraryService::continueImport()
                     continue;
                 }
             }
-            importFile(sourcePath, title);
-            consumeImportTemp(sourcePath);
-            ++m_importIndex;
+            startImportTask(sourcePath, title, folderId);
             if (!m_importApplyToAll) m_importConflictAction.clear();
-            continue;
+            return;
         }
 
-        importFile(sourcePath, baseTitle);
-        consumeImportTemp(sourcePath);
-        ++m_importIndex;
+        startImportTask(sourcePath, baseTitle, folderId);
+        return;
     }
     // 清理未消费的临时源文件（正常流程应在消费时删除，这里兜底）
     for (const auto& temp : m_importTempFiles) QFile::remove(temp);
@@ -657,7 +669,100 @@ void LibraryService::continueImport()
     m_importQueue.clear();
     m_importQueueTitles.clear();
     m_importIndex = 0;
+    // 提交批量导入中剩余的未提交事务
+    if (m_pendingInsertCount > 0) {
+        m_repository.commitTransaction(nullptr);
+        m_pendingInsertCount = 0;
+    }
+    reload();
+    if (m_importSucceededCount > 0) {
+        emit noticeOccurred(QStringLiteral("已导入 %1 份乐谱").arg(m_importSucceededCount));
+    }
     emit importFinished(processed);
+}
+
+void LibraryService::startImportTask(const QString& sourcePath, const QString& title, const QString& folderId)
+{
+    m_importTaskActive = true;
+    const auto scoreId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    const QPointer<LibraryService> service(this);
+    m_importThreadPool.start([service, sourcePath, title, folderId, scoreId] {
+        ImportTaskResult result;
+        result.scoreId = scoreId;
+        result.sourcePath = sourcePath;
+        result.title = title;
+        result.folderId = folderId;
+        result.fileType = FileService::canonicalSuffix(sourcePath);
+        result.storedPath = FileService::copyScoreIntoLibrary(sourcePath, scoreId, &result.error);
+        if (!result.storedPath.isEmpty()) {
+            result.pageCount = pageCountForFile(result.storedPath, result.fileType);
+        }
+        if (!service) return;
+        QMetaObject::invokeMethod(service, [service, result = std::move(result)]() mutable {
+            if (service) service->finishImportTask(std::move(result));
+        }, Qt::QueuedConnection);
+    });
+}
+
+void LibraryService::finishImportTask(ImportTaskResult result)
+{
+    m_importTaskActive = false;
+    consumeImportTemp(result.sourcePath);
+
+    if (result.storedPath.isEmpty()) {
+        emit errorOccurred(result.error.isEmpty() ? QStringLiteral("导入乐谱失败。") : result.error);
+    } else {
+        const auto now = QDateTime::currentDateTimeUtc();
+        Score score {
+            .id = result.scoreId,
+            .title = result.title,
+            .fileName = QFileInfo(result.storedPath).fileName(),
+            .filePath = result.storedPath,
+            .fileType = result.fileType,
+            .pageCount = result.pageCount,
+            .createdAt = now,
+            .updatedAt = now
+        };
+        QString error;
+        // 批量事务：每 32 条 insert 提交一次，避免每条都 fsync
+        if (m_pendingInsertCount == 0 && !m_repository.beginTransaction(&error)) {
+            emit errorOccurred(QStringLiteral("将乐谱添加到乐谱库失败。"));
+        } else if (!m_repository.insert(score, result.folderId, &error)) {
+            (void)FileService::removeFile(result.storedPath, &error);
+            m_repository.commitTransaction(nullptr); // 保留之前已成功的 insert
+            m_pendingInsertCount = 0;
+            emit errorOccurred(QStringLiteral("将乐谱添加到乐谱库失败。"));
+        } else {
+            if (FileService::isSupportedScoreFile(score.filePath)) {
+                m_thumbnailGenerator.generate(score.id, score.filePath, score.fileType);
+            }
+            ++m_importSucceededCount;
+            if (++m_pendingInsertCount >= 32) {
+                m_repository.commitTransaction(nullptr);
+                m_pendingInsertCount = 0;
+            }
+            // 导入过程中不做中间 reload：大量文件时全量刷新会导致 UI 卡顿，
+            // 全部导入完成后由 continueImport 末尾统一 reload。
+        }
+    }
+    ++m_importIndex;
+    continueImport();
+}
+
+void LibraryService::flushThumbnailUpdates()
+{
+    if (m_pendingThumbnailPaths.isEmpty()) return;
+    if (m_importTaskActive || !m_importQueue.isEmpty()) {
+        m_thumbnailRefreshTimer.start();
+        return;
+    }
+    const auto updates = std::exchange(m_pendingThumbnailPaths, {});
+    QString error;
+    if (!m_repository.updateThumbnails(updates, &error)) {
+        emit errorOccurred(QStringLiteral("更新乐谱缩略图失败。"));
+        return;
+    }
+    reload();
 }
 
 void LibraryService::importAndStitchImages(const QStringList& filePaths)
@@ -1148,8 +1253,13 @@ void LibraryService::reload()
         emit errorOccurred(QStringLiteral("加载乐谱库失败。"));
         return;
     }
+    const auto allTags = m_repository.allScoreTags(&error);
+    if (!error.isEmpty()) {
+        emit errorOccurred(QStringLiteral("加载乐谱库失败。"));
+        return;
+    }
     for (auto& score : scores) {
-        const auto values = m_repository.scoreTags(score.id, &error);
+        const auto values = allTags.value(score.id);
         for (const auto& value : values) score.tags.append(value.toMap().value(QStringLiteral("name")).toString());
     }
     m_scores.replaceAll(scores);
