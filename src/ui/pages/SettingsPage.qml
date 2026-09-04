@@ -168,7 +168,6 @@ Rectangle {
                             spacing: 16
 
                             ColumnLayout {
-                                Layout.fillWidth: true
                                 spacing: 3
                                 Label {
                                     text: "全局主题色"
@@ -184,6 +183,8 @@ Rectangle {
                                     font.pixelSize: Theme.fontXs
                                 }
                             }
+
+                            Item { Layout.fillWidth: true }
 
                             Rectangle {
                                 objectName: "accentColorPreview"
@@ -207,7 +208,7 @@ Rectangle {
                                 text: "更改"
                                 primary: true
                                 onClicked: {
-                                    accentColorDialog.selectedColor = Theme.accent
+                                    accentColorDialog.draftColor = Theme.accent
                                     accentColorDialog.open()
                                 }
                             }
