@@ -9,6 +9,7 @@ QtObject {
     readonly property bool dark: mode === 1
     readonly property bool hasCustomAccent: customAccentColor.length > 0
     readonly property color accentBase: hasCustomAccent ? customAccentColor : (dark ? "#e0b45c" : "#c9962e")
+    readonly property color selectionAccent: hasCustomAccent ? customAccentColor : "#e0b45c"
     readonly property real accentLuminance: 0.2126 * accentBase.r + 0.7152 * accentBase.g + 0.0722 * accentBase.b
 
     readonly property color background: dark ? "#0d0d0e" : "#f7f6f3"
@@ -30,8 +31,8 @@ QtObject {
     readonly property color accentSoft: Qt.rgba(accentBase.r, accentBase.g, accentBase.b, dark ? 0.16 : 0.11)
     readonly property color accentForeground: accentLuminance > 0.58 ? "#171717" : "#ffffff"
 
-    readonly property color marqueeFill: Qt.rgba(accentBase.r, accentBase.g, accentBase.b, 0.14)
-    readonly property color marqueeBorder: accentBase
+    readonly property color marqueeFill: Qt.rgba(selectionAccent.r, selectionAccent.g, selectionAccent.b, 0.10)
+    readonly property color marqueeBorder: selectionAccent
 
     readonly property color buttonBackground: dark ? "#232326" : "#f5f4f1"
     readonly property color buttonHover: dark ? "#2e2e32" : "#ebeae6"
