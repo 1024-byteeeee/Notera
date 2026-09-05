@@ -17,6 +17,11 @@ Rectangle {
     property string dragThumbnailPath: ""
     property real rubberAutoScrollSpeed: 0
     property bool rubberAccumulateSelection: false
+    // 本次框选是否发生过滚动：滚动（自动滚动/滚轮）会使已选项滚出视野，
+    // GridView 回收其 delegate 后无法再枚举，选择更新必须切换为并集模式
+    property bool rubberScrolled: false
+    property real rubberLastContentX: 0
+    property real rubberLastContentY: 0
 
     Timer {
         id: rubberAutoScrollTimer
@@ -153,6 +158,15 @@ Rectangle {
     function performSelectAll() { root.selectAll() }
 
     function updateRubberSelection() {
+        // 滚动检测：框选期间视图内容偏移一旦发生移动（自动滚动/滚轮滚动），
+        // 本次框选立即切换为并集模式；否则替换模式会把滚出视野、
+        // delegate 已被 GridView 回收的已选项误删。
+        if (!root.rubberScrolled
+            && (grid.contentX !== root.rubberLastContentX || grid.contentY !== root.rubberLastContentY)) {
+            root.rubberScrolled = true
+        }
+        root.rubberLastContentX = grid.contentX
+        root.rubberLastContentY = grid.contentY
         const ids = []
         const selectionRect = Qt.rect(selectionBox.x, selectionBox.y, selectionBox.width, selectionBox.height)
         for (let i = 0; i < grid.count; i++) {
@@ -166,8 +180,8 @@ Rectangle {
                 && itemRect.y + itemRect.height > selectionRect.y
             if (intersects) ids.push(item.itemId)
         }
-        if (root.rubberAccumulateSelection) {
-            // 自动滚动时用并集：保留已选中的，添加新进入框选区域的，
+        if (root.rubberAccumulateSelection || root.rubberScrolled) {
+            // 滚动期间用并集：保留已选中的，添加新进入框选区域的，
             // 避免滚出视野的 delegate 被回收后丢失选中状态
             const existing = libraryService.selection.selectedIds
             const merged = []
@@ -1006,8 +1020,13 @@ Rectangle {
                     if (!active) {
                         validStart = false
                         root.rubberAutoScrollSpeed = 0
+                        root.rubberScrolled = false
                         return
                     }
+                    // 记录框选起始时的内容偏移，作为本次框选滚动检测的基准
+                    root.rubberLastContentX = grid.contentX
+                    root.rubberLastContentY = grid.contentY
+                    root.rubberScrolled = false
                     const p = centroid.pressPosition
                     validStart = p.x >= 0 && p.y >= 0
                         && p.x <= librarySurface.width && p.y <= librarySurface.height

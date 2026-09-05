@@ -1842,6 +1842,81 @@ int main(int argc, char* argv[])
             }
             libraryService.selection()->clear();
 
+            // 回归测试：框选后滚动使已选项滚出视野，选择必须保持选中。
+            // 根因：滚动（自动滚动/滚轮）期间鼠标移动触发 updateRubberSelection 的
+            // 替换模式，GridView 回收滚出视野的 delegate 后 itemAtIndex 返回 null，
+            // 已选中项被 replace(ids) 误删；修复后检测到 contentY 变化即切换并集模式。
+            {
+                const int baseEntryCount = libraryService.entries()->rowCount();
+                // 1) 临时导入额外文件，制造网格溢出（滚动后 delegate 可被回收）
+                QTemporaryDir rollDir;
+                if (!rollDir.isValid()) return;
+                QStringList extraPaths;
+                for (int i = 0; i < 10; ++i) {
+                    const auto extraPath = rollDir.filePath(QStringLiteral("notera-roll-%1.png").arg(i));
+                    QImage extraImage(900, 1280, QImage::Format_RGB32);
+                    extraImage.fill(Qt::white);
+                    if (!extraImage.save(extraPath)) return;
+                    extraPaths.append(extraPath);
+                }
+                QVariantList extraUrls;
+                for (const auto& path : extraPaths) extraUrls.append(QVariant::fromValue(QUrl::fromLocalFile(path)));
+                libraryService.importFiles(extraUrls);
+                {
+                    QEventLoop importLoop;
+                    QObject::connect(&libraryService, &LibraryService::importFinished, &importLoop, &QEventLoop::quit);
+                    QTimer::singleShot(8000, &importLoop, &QEventLoop::quit);
+                    importLoop.exec();
+                }
+                if (libraryService.entries()->rowCount() <= baseEntryCount) {
+                    fail("rubber-scroll-regression-import");
+                    return;
+                }
+                // 2) 框选第一行并记录选中项
+                selectionBox->setX(0);
+                selectionBox->setY(0);
+                selectionBox->setWidth(librarySurface->width());
+                selectionBox->setHeight(rubberSelectionGrid->property("cellHeight").toDouble());
+                QMetaObject::invokeMethod(libraryPage, "updateRubberSelection");
+                const auto selectedBeforeScroll = libraryService.selection()->selectedIds();
+                if (selectedBeforeScroll.isEmpty()) {
+                    fail("rubber-scroll-regression-preselect");
+                    return;
+                }
+                // 3) 滚动到底：第一行滚出视野，delegate 被 GridView 回收
+                const auto maxContentY = qMax<qreal>(0.0,
+                    rubberSelectionGrid->property("contentHeight").toDouble()
+                    - rubberSelectionGrid->property("height").toDouble());
+                rubberSelectionGrid->setProperty("contentY", maxContentY);
+                for (int i = 0; i < 5; ++i) QCoreApplication::processEvents();
+                // 4) 模拟滚动期间鼠标移动触发的选择更新（rubberAccumulateSelection=false）
+                QMetaObject::invokeMethod(libraryPage, "updateRubberSelection");
+                const auto selectedAfterScroll = libraryService.selection()->selectedIds();
+                for (const auto& id : selectedBeforeScroll) {
+                    if (!selectedAfterScroll.contains(id)) {
+                        fail("rubber-selection-kept-after-scroll");
+                        return;
+                    }
+                }
+                libraryService.selection()->clear();
+                // 5) 清理：删除临时导入的文件，恢复现场
+                const auto entryIdRole = libraryService.entries()->roleNames().key("itemId", -1);
+                const auto rollTitleRole = libraryService.entries()->roleNames().key("title", -1);
+                QVariantList extraIds;
+                for (int i = 0; i < libraryService.entries()->rowCount(); ++i) {
+                    const auto idx = libraryService.entries()->index(i, 0);
+                    if (libraryService.entries()->data(idx, rollTitleRole).toString()
+                        .startsWith(QStringLiteral("notera-roll-"))) {
+                        extraIds.append(libraryService.entries()->data(idx, entryIdRole));
+                    }
+                }
+                if (!extraIds.isEmpty()) libraryService.deleteItems(extraIds);
+                if (libraryService.entries()->rowCount() != baseEntryCount) {
+                    fail("rubber-scroll-regression-cleanup");
+                    return;
+                }
+            }
+
             const auto dragScoreIdRole = libraryService.scores()->roleNames().key("scoreId", -1);
             const auto dragFolderIdRole = libraryService.folders()->roleNames().key("itemId", -1);
             const auto draggedScoreId = libraryService.scores()->data(
