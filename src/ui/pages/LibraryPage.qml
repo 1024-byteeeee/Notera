@@ -322,7 +322,7 @@ Rectangle {
                 visible: count > 0
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
-                interactive: false
+                interactive: !gridRubberBand.active
                 cellWidth: {
                     const columns = Math.max(1, Math.floor(width / 218))
                     return Math.floor(width / columns)
