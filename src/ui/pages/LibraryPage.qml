@@ -337,6 +337,7 @@ Rectangle {
             }
 
             AppButton {
+                id: importButton
                 objectName: "importButton"
                 visible: !appController.libraryFilter.startsWith("tag:")
                 Layout.preferredWidth: 120

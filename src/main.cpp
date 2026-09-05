@@ -1696,6 +1696,17 @@ int main(int argc, char* argv[])
                 fail("import-button-geometry");
                 return;
             }
+            // 回归：点击导入按钮应弹出导入菜单（导入文件… / 导入文件夹…），
+            // 防止 onClicked 引用未定义 id 导致点击无反应
+            auto* const importMenu = root->findChild<QObject*>(QStringLiteral("importMenu"));
+            if (!importMenu
+                || !clickItem(root, QStringLiteral("importButton"), Qt::LeftButton)
+                || !importMenu->property("visible").toBool()
+                || importMenu->property("count").toInt() < 2) {
+                fail("import-menu-opens-from-button");
+                return;
+            }
+            closePopup(root, QStringLiteral("importMenu"));
             auto* const window = qobject_cast<QQuickWindow*>(root);
             if (!window || !window->grabWindow().save(QStringLiteral("notera-library-smoke.png"))) {
                 fail("library-screenshot");
