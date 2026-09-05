@@ -16,6 +16,8 @@
 #include <QLibraryInfo>
 #include <QLocale>
 #include <QMouseEvent>
+#include <QPainter>
+#include <QPdfWriter>
 #include <QPointingDevice>
 #include <QPointer>
 #include <QProcess>
@@ -34,6 +36,7 @@
 #include <QTemporaryFile>
 #include <QTimer>
 #include <QTranslator>
+#include <QWheelEvent>
 #include <QtCore/private/qzipwriter_p.h>
 
 #include "app/ApplicationController.h"
@@ -79,6 +82,28 @@ QQuickItem* findVisualItem(QObject* root, const QString& objectName)
         return findVisualItem(window->contentItem(), objectName);
     }
     return findVisualItem(qobject_cast<QQuickItem*>(root), objectName);
+}
+
+// 按 objectName 收集所有匹配的 QQuickItem（childItems 可视树递归）。
+// 注意：contentItem() 上的 findChildren<QQuickItem*>()（QObject 树）在此应用
+// 的场景图结构下不可靠（曾出现仅返回 2 个顶层项），必须走 childItems 可视树。
+QList<QQuickItem*> findItemsByObjectName(QQuickItem* parent, const QString& objectName)
+{
+    QList<QQuickItem*> result;
+    if (!parent) return result;
+    if (parent->objectName() == objectName) result.append(parent);
+    for (auto* const child : parent->childItems()) {
+        result.append(findItemsByObjectName(child, objectName));
+    }
+    return result;
+}
+
+QList<QQuickItem*> findItemsByObjectName(QObject* root, const QString& objectName)
+{
+    if (auto* const window = qobject_cast<QQuickWindow*>(root)) {
+        return findItemsByObjectName(window->contentItem(), objectName);
+    }
+    return findItemsByObjectName(qobject_cast<QQuickItem*>(root), objectName);
 }
 
 bool clickItemAt(QObject* root, const QString& objectName, const Qt::MouseButton button,
@@ -1808,9 +1833,19 @@ int main(int argc, char* argv[])
             sendMouseEvent(window, QEvent::MouseButtonPress, rubberStart, Qt::LeftButton, Qt::LeftButton);
             sendMouseEvent(window, QEvent::MouseMove, rubberEnd, Qt::NoButton, Qt::LeftButton);
             const auto expectedStart = librarySurface->mapFromScene(rubberStart);
-            if (!selectionBox->isVisible()
-                || std::abs(selectionBox->x() - expectedStart.x()) > 4.0
-                || std::abs(selectionBox->y() - expectedStart.y()) > 4.0) {
+            // MouseMove 的框选位置更新可能在事件派发时序下延迟一帧，等待 selectionBox 收敛到预期起点
+            bool rubberOriginReady = false;
+            for (int attempt = 0; attempt < 40; ++attempt) {
+                if (selectionBox->isVisible()
+                    && std::abs(selectionBox->x() - expectedStart.x()) <= 4.0
+                    && std::abs(selectionBox->y() - expectedStart.y()) <= 4.0) {
+                    rubberOriginReady = true;
+                    break;
+                }
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 30);
+                QThread::msleep(10);
+            }
+            if (!rubberOriginReady) {
                 fail("library-rubber-selection-real-pointer-origin");
                 return;
             }
@@ -1916,6 +1951,50 @@ int main(int argc, char* argv[])
                     }
                 }
                 libraryService.selection()->clear();
+
+                // 回归：滚轮无限上滚/下滚已修复。
+                // 根因：GridView 的 WheelHandler 直接赋值 contentY 绕过 Flickable
+                // 边界限制，滚过末尾会把内容推出边界显示空白；修复后手动夹紧在
+                // [0, maxContentY]。此时网格因 10 个额外文件而超高，可真实滚动。
+                {
+                    const auto maxContentY = qMax<qreal>(0.0,
+                        rubberSelectionGrid->property("contentHeight").toDouble()
+                        - rubberSelectionGrid->property("height").toDouble());
+                    if (maxContentY <= 0.0) {
+                        fail("wheel-clamp-grid-not-scrollable");
+                        return;
+                    }
+                    const auto gridCenter = rubberSelectionGrid->mapToScene(QPointF(
+                        rubberSelectionGrid->width() / 2.0, rubberSelectionGrid->height() / 2.0));
+                    const auto globalCenter = QPointF(window->mapToGlobal(gridCenter.toPoint()));
+                    // 先移动鼠标到网格中心，确保滚轮事件路由到 grid 的 WheelHandler
+                    sendMouseEvent(window, QEvent::MouseMove, gridCenter, Qt::NoButton, Qt::NoButton);
+                    // 1) 从顶部向上滚：contentY 必须夹在 0
+                    rubberSelectionGrid->setProperty("contentY", 0.0);
+                    for (int i = 0; i < 5; ++i) QCoreApplication::processEvents();
+                    QWheelEvent upEvent(gridCenter, globalCenter, QPoint(0, 0), QPoint(0, 240),
+                        Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+                    QCoreApplication::sendEvent(window, &upEvent);
+                    QCoreApplication::processEvents();
+                    if (rubberSelectionGrid->property("contentY").toDouble() < 0.0) {
+                        fail("wheel-clamp-top");
+                        return;
+                    }
+                    // 2) 滚到底后继续向下滚：contentY 必须夹在 maxContentY
+                    rubberSelectionGrid->setProperty("contentY", maxContentY);
+                    for (int i = 0; i < 5; ++i) QCoreApplication::processEvents();
+                    QWheelEvent downEvent(gridCenter, globalCenter, QPoint(0, 0), QPoint(0, -240),
+                        Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+                    QCoreApplication::sendEvent(window, &downEvent);
+                    QCoreApplication::processEvents();
+                    if (rubberSelectionGrid->property("contentY").toDouble() > maxContentY + 0.5) {
+                        fail("wheel-clamp-bottom");
+                        return;
+                    }
+                    // 3) 滚回顶部（恢复现场），避免影响后续测试
+                    rubberSelectionGrid->setProperty("contentY", 0.0);
+                    for (int i = 0; i < 5; ++i) QCoreApplication::processEvents();
+                }
                 // 5) 清理：删除临时导入的文件，恢复现场
                 const auto entryIdRole = libraryService.entries()->roleNames().key("itemId", -1);
                 const auto rollTitleRole = libraryService.entries()->roleNames().key("title", -1);
@@ -2066,8 +2145,34 @@ int main(int argc, char* argv[])
             libraryService.setItemFolder(draggedScoreId, QString {});
             for (int i = 0; i < 10; ++i) QCoreApplication::processEvents();
 
-            if (!clickItem(root, QStringLiteral("folderNavItem"), Qt::RightButton)
-                || !popupIsOpen(root, QStringLiteral("folderContextMenu"))) {
+            // folder-import 段的异步 folders reload 可能导致 Sidebar 的 visibleFoldersModel 尚未收敛
+            // （Repeater 无 delegate 或残留宽度为 0 的旧 delegate）。等待真正可点击的 folderNavItem 就绪。
+            // 注意：contentItem() 上的 findChildren（QObject 树）在此场景不可靠，必须用 childItems()（QQuickItem 可视树）。
+            bool folderNavReady = false;
+            for (int attempt = 0; attempt < 80; ++attempt) {
+                const auto* win = qobject_cast<QQuickWindow*>(root);
+                if (win) {
+                    std::function<QQuickItem*(QQuickItem*)> findReadyNav = [&](QQuickItem* it) -> QQuickItem* {
+                        if (!it) return nullptr;
+                        if (it->objectName() == QStringLiteral("folderNavItem")
+                            && it->isVisible() && it->width() > 1.0 && it->height() > 1.0 && it->window()) {
+                            return it;
+                        }
+                        for (auto* const c : it->childItems()) {
+                            if (auto* const m = findReadyNav(c)) return m;
+                        }
+                        return nullptr;
+                    };
+                    folderNavReady = findReadyNav(win->contentItem()) != nullptr;
+                }
+                if (folderNavReady) break;
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 30);
+                QThread::msleep(20);
+            }
+
+            const bool folderNavClicked = folderNavReady
+                && clickItem(root, QStringLiteral("folderNavItem"), Qt::RightButton);
+            if (!folderNavClicked || !popupIsOpen(root, QStringLiteral("folderContextMenu"))) {
                 fail("folder-context-menu");
                 return;
             }
@@ -2531,6 +2636,81 @@ int main(int argc, char* argv[])
                 fail("batch-folder-cascade-delete");
                 return;
             }
+
+            // 回归：多页 PDF 懒加载。ReaderPage 的 Repeater delegate 退化为占位 Item，
+            // PdfPageImage 仅在页面与视口（含预加载余量）相交时才由 Loader 实例化，
+            // 打开多页 PDF 不再一次性创建/渲染全部页面。置于 smoke 末尾：openScore 会
+            // 改变 currentScoreId，避免污染前置 recent 排序等有状态断言。
+            {
+                auto* const pdfWindow = qobject_cast<QQuickWindow*>(root);
+                auto* const pdfReaderFlick = root->findChild<QObject*>(QStringLiteral("readerFlick"));
+                if (!pdfWindow || !pdfReaderFlick) {
+                    fail("pdf-lazy-env");
+                    return;
+                }
+                QTemporaryFile pdfLazyFile;
+                pdfLazyFile.setFileTemplate(QDir::tempPath() + QStringLiteral("/notera-pdf-lazy-XXXXXX.pdf"));
+                if (!pdfLazyFile.open()) {
+                    fail("pdf-lazy-tempfile");
+                    return;
+                }
+                const auto pdfLazyPath = pdfLazyFile.fileName();
+                pdfLazyFile.close();
+                {
+                    QPdfWriter pdfLazyWriter(pdfLazyPath);
+                    pdfLazyWriter.setPageSize(QPageSize(QPageSize::A4));
+                    QPainter pdfLazyPainter(&pdfLazyWriter);
+                    for (int page = 0; page < 10; ++page) {
+                        pdfLazyPainter.drawText(120, 200,
+                            QStringLiteral("PDF 懒加载回归测试页 %1").arg(page + 1));
+                        if (page < 9) pdfLazyWriter.newPage();
+                    }
+                    pdfLazyPainter.end();
+                }
+                controller.openScore(QStringLiteral("pdf-lazy-regression"),
+                    QStringLiteral("PDF懒加载回归"), pdfLazyPath, QStringLiteral("pdf"), 10, QString());
+                {
+                    QEventLoop pdfLazyWait;
+                    QTimer::singleShot(600, &pdfLazyWait, &QEventLoop::quit);
+                    pdfLazyWait.exec();
+                }
+                if (controller.currentPage() != QStringLiteral("reader")) {
+                    fail("pdf-lazy-open");
+                    return;
+                }
+                const auto pdfLoaders = findItemsByObjectName(pdfWindow, QStringLiteral("pdfPageLoader"));
+                if (pdfLoaders.size() < 10) {
+                    fail("pdf-lazy-delegates");
+                    return;
+                }
+                const auto countActiveLoaders = [&]() {
+                    int count = 0;
+                    for (auto* const l : findItemsByObjectName(pdfWindow, QStringLiteral("pdfPageLoader"))) {
+                        if (l->property("active").toBool()) ++count;
+                    }
+                    return count;
+                };
+                const auto pdfActiveLoaders = countActiveLoaders();
+                if (pdfActiveLoaders == 0 || pdfActiveLoaders > 5) {
+                    fail("pdf-lazy-active-range");
+                    return;
+                }
+                // 滚到底：active 集合应跟随视口移动（尾部页实例化，且数量仍受控）
+                const auto pdfMaxY = qMax<qreal>(0.0, pdfReaderFlick->property("contentHeight").toDouble()
+                    - pdfReaderFlick->property("height").toDouble());
+                pdfReaderFlick->setProperty("contentY", pdfMaxY);
+                {
+                    QEventLoop pdfLazyScrollWait;
+                    QTimer::singleShot(400, &pdfLazyScrollWait, &QEventLoop::quit);
+                    pdfLazyScrollWait.exec();
+                }
+                const auto pdfActiveAfterScroll = countActiveLoaders();
+                if (pdfActiveAfterScroll == 0 || pdfActiveAfterScroll > 5) {
+                    fail("pdf-lazy-scroll-active-range");
+                    return;
+                }
+            }
+
             QCoreApplication::exit(0);
         });
     }

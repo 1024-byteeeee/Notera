@@ -536,24 +536,41 @@ Rectangle {
                         height: rotated ? width * pageRatio : width / pageRatio
                         x: (documentColumn.width - width) / 2
 
-                        Rectangle {
-                            width: parent.rotated ? parent.height : parent.width
-                            height: parent.rotated ? parent.width : parent.height
-                            anchors.centerIn: parent
-                            rotation: root.viewRotation
-                            color: "white"
-                            radius: Theme.radiusSm
-                            border.color: Theme.border
-                            border.width: 1
+                        // 懒加载窗口：页面与视口（含预加载余量）相交时才实例化
+                        // PdfPageImage。多页 PDF 不再一次性创建/渲染全部页面，
+                        // 滚动进出视野时按需渲染（PdfDocument 内部按页缓存渲染结果）。
+                        readonly property bool nearViewport: {
+                            if (y <= 0 && index < 2) return true   // 布局未完成前先让首页进入
+                            const top = y + documentColumn.y
+                            const viewTop = readerFlick.contentY - 600
+                            const viewBottom = readerFlick.contentY + readerFlick.height + 600
+                            return top < viewBottom && top + height > viewTop
+                        }
 
-                            PdfPageImage {
-                                anchors.fill: parent
-                                document: pdfDocument
-                                currentFrame: index
-                                asynchronous: true
-                                fillMode: Image.PreserveAspectFit
-                                sourceSize.width: width
-                                sourceSize.height: height
+                        Loader {
+                            id: pdfPageLoader
+                            objectName: "pdfPageLoader"
+                            anchors.fill: parent
+                            active: nearViewport
+                            sourceComponent: Rectangle {
+                                width: rotated ? parent.height : parent.width
+                                height: rotated ? parent.width : parent.height
+                                anchors.centerIn: parent
+                                rotation: root.viewRotation
+                                color: "white"
+                                radius: Theme.radiusSm
+                                border.color: Theme.border
+                                border.width: 1
+
+                                PdfPageImage {
+                                    anchors.fill: parent
+                                    document: pdfDocument
+                                    currentFrame: index
+                                    asynchronous: true
+                                    fillMode: Image.PreserveAspectFit
+                                    sourceSize.width: width
+                                    sourceSize.height: height
+                                }
                             }
                         }
                     }

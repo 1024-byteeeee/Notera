@@ -387,8 +387,15 @@ Rectangle {
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
                 WheelHandler {
-                    target: grid
-                    property: "contentY"
+                    // 手动夹紧滚动：WheelHandler 直接赋值 contentY 不会触发
+                    // Flickable 的边界限制，滚过末尾会继续把内容推出边界显示空白，
+                    // 表现为"滚轮可以无限上滚/下滚"
+                    onWheel: function(event) {
+                        const delta = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y
+                        grid.contentY = Math.max(0, Math.min(grid.contentY - delta,
+                            Math.max(0, grid.contentHeight - grid.height)))
+                        event.accepted = true
+                    }
                 }
 
                 delegate: Item {
@@ -405,27 +412,28 @@ Rectangle {
                     required property string fileType
                     required property var tags
                     readonly property string scoreId: itemId
-                    readonly property bool contextMenuOpenedOnce: scoreMenu.openedOnce
-                    readonly property bool contextMenuVisible: scoreMenu.visible
-                    readonly property real contextMenuWidth: scoreMenu.implicitWidth
-                    readonly property bool folderSubmenuEnabled: folderSubmenu.enabled
-                    readonly property bool tagSubmenuEnabled: tagSubmenu.enabled
-                    readonly property int folderSubmenuItemCount: folderSubmenu.count
-                    readonly property int tagSubmenuItemCount: tagSubmenu.count
-                    readonly property int normalMenuArrowCount: favoriteMenuItem.visibleArrowCount
-                    readonly property int folderSubmenuArrowCount: scoreMenu.openedOnce && scoreMenu.count > 6
-                        && scoreMenu.itemAt(6) ? scoreMenu.itemAt(6).visibleArrowCount : -1
-                    readonly property real folderSubmenuArrowWidth: scoreMenu.openedOnce && scoreMenu.count > 6
-                        && scoreMenu.itemAt(6) ? scoreMenu.itemAt(6).arrowVisualWidth : -1
-                    readonly property real folderSubmenuArrowRightInset: scoreMenu.openedOnce && scoreMenu.count > 6
-                        && scoreMenu.itemAt(6) ? scoreMenu.itemAt(6).arrowRightInset : -1
-                    readonly property bool tagMenuHasDefaultCheckIndicator: tagSubmenu.count > 0
-                        && tagSubmenu.itemAt(0).indicator.visible
-                        && tagSubmenu.itemAt(0).indicator.implicitWidth > 0
+                    // 菜单懒加载：菜单未打开时 menuLoader.item 为 null，属性返回安全默认值
+                    readonly property bool contextMenuOpenedOnce: menuLoader.item ? menuLoader.item.openedOnce : false
+                    readonly property bool contextMenuVisible: menuLoader.item ? menuLoader.item.visible : false
+                    readonly property real contextMenuWidth: menuLoader.item ? menuLoader.item.implicitWidth : 0
+                    readonly property bool folderSubmenuEnabled: menuLoader.item ? menuLoader.item.folderSubmenuRef.enabled : false
+                    readonly property bool tagSubmenuEnabled: menuLoader.item ? menuLoader.item.tagSubmenuRef.enabled : false
+                    readonly property int folderSubmenuItemCount: menuLoader.item ? menuLoader.item.folderSubmenuRef.count : 0
+                    readonly property int tagSubmenuItemCount: menuLoader.item ? menuLoader.item.tagSubmenuRef.count : 0
+                    readonly property int normalMenuArrowCount: menuLoader.item ? menuLoader.item.favoriteMenuItemRef.visibleArrowCount : -1
+                    readonly property int folderSubmenuArrowCount: menuLoader.item && menuLoader.item.openedOnce && menuLoader.item.count > 6
+                        && menuLoader.item.itemAt(6) ? menuLoader.item.itemAt(6).visibleArrowCount : -1
+                    readonly property real folderSubmenuArrowWidth: menuLoader.item && menuLoader.item.openedOnce && menuLoader.item.count > 6
+                        && menuLoader.item.itemAt(6) ? menuLoader.item.itemAt(6).arrowVisualWidth : -1
+                    readonly property real folderSubmenuArrowRightInset: menuLoader.item && menuLoader.item.openedOnce && menuLoader.item.count > 6
+                        && menuLoader.item.itemAt(6) ? menuLoader.item.itemAt(6).arrowRightInset : -1
+                    readonly property bool tagMenuHasDefaultCheckIndicator: menuLoader.item && menuLoader.item.tagSubmenuRef.count > 0
+                        && menuLoader.item.tagSubmenuRef.itemAt(0).indicator.visible
+                        && menuLoader.item.tagSubmenuRef.itemAt(0).indicator.implicitWidth > 0
                     readonly property alias card: card
 
                     function closeContextMenu() {
-                        scoreMenu.close()
+                        if (menuLoader.item) menuLoader.item.close()
                     }
 
                     width: grid.cellWidth
@@ -594,9 +602,14 @@ Rectangle {
                             acceptedButtons: Qt.RightButton
                             gesturePolicy: TapHandler.ReleaseWithinBounds
                             onTapped: {
-                                // 标签视图下文件夹/文件的卡片右键菜单保留
-                                if (scoreDelegate.itemType === "folder") folderCardMenu.popup()
-                                else scoreMenu.popup()
+                                // 懒创建：右键时才实例化菜单（滚动经过的卡片不再背负整套菜单对象）
+                                if (scoreDelegate.itemType === "folder") {
+                                    folderMenuLoader.active = true
+                                    folderMenuLoader.item.popup()
+                                } else {
+                                    menuLoader.active = true
+                                    menuLoader.item.popup()
+                                }
                             }
                         }
 
@@ -679,20 +692,26 @@ Rectangle {
                         }
                     }
 
-                    AppMenu {
-                        id: scoreMenu
-                        objectName: scoreDelegate.itemType === "score" ? "scoreContextMenu" : ""
-                        AppMenuItem {
-                            id: favoriteMenuItem
-                            symbol: scoreDelegate.favorite ? "star-filled" : "star"
-                            text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
-                            onTriggered: {
-                                const ids = libraryService.selection.count > 0
-                                    ? libraryService.selection.selectedIds
-                                    : [scoreDelegate.itemId]
-                                libraryService.favoriteItems(ids)
+                    Loader {
+                        id: menuLoader
+                        active: false
+                        sourceComponent: AppMenu {
+                            id: scoreMenu
+                            readonly property AppMenu folderSubmenuRef: folderSubmenu
+                            readonly property AppMenu tagSubmenuRef: tagSubmenu
+                            readonly property AppMenuItem favoriteMenuItemRef: favoriteMenuItem
+                            objectName: scoreDelegate.itemType === "score" ? "scoreContextMenu" : ""
+                            AppMenuItem {
+                                id: favoriteMenuItem
+                                symbol: scoreDelegate.favorite ? "star-filled" : "star"
+                                text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
+                                onTriggered: {
+                                    const ids = libraryService.selection.count > 0
+                                        ? libraryService.selection.selectedIds
+                                        : [scoreDelegate.itemId]
+                                    libraryService.favoriteItems(ids)
+                                }
                             }
-                        }
                         AppMenuItem {
                             symbol: "edit"
                             text: "重命名"
@@ -834,21 +853,25 @@ Rectangle {
                                 deleteDialog.open()
                             }
                         }
+                        }
                     }
 
-                    AppMenu {
-                        id: folderCardMenu
-                        objectName: "folderCardContextMenu"
-                        AppMenuItem {
-                            symbol: scoreDelegate.favorite ? "star-filled" : "star"
-                            text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
-                            onTriggered: {
-                                const ids = libraryService.selection.count > 0
-                                    ? libraryService.selection.selectedIds
-                                    : [scoreDelegate.itemId]
-                                libraryService.favoriteItems(ids)
+                    Loader {
+                        id: folderMenuLoader
+                        active: false
+                        sourceComponent: AppMenu {
+                            id: folderCardMenu
+                            objectName: "folderCardContextMenu"
+                            AppMenuItem {
+                                symbol: scoreDelegate.favorite ? "star-filled" : "star"
+                                text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
+                                onTriggered: {
+                                    const ids = libraryService.selection.count > 0
+                                        ? libraryService.selection.selectedIds
+                                        : [scoreDelegate.itemId]
+                                    libraryService.favoriteItems(ids)
+                                }
                             }
-                        }
                         AppMenuItem {
                             symbol: "open"
                             text: "打开"
@@ -989,6 +1012,7 @@ Rectangle {
                                     deleteFolderDialog.open()
                                 }
                             }
+                        }
                         }
                     }
                 }
