@@ -16,6 +16,7 @@ Rectangle {
     property var dragItemIds: []
     property string dragThumbnailPath: ""
     property real rubberAutoScrollSpeed: 0
+    property bool rubberAccumulateSelection: false
 
     Timer {
         id: rubberAutoScrollTimer
@@ -25,7 +26,9 @@ Rectangle {
         onTriggered: {
             const maxY = Math.max(0, grid.contentHeight - grid.height)
             grid.contentY = Math.max(0, Math.min(maxY, grid.contentY + root.rubberAutoScrollSpeed))
+            root.rubberAccumulateSelection = true
             root.updateRubberSelection()
+            root.rubberAccumulateSelection = false
         }
     }
 
@@ -163,7 +166,18 @@ Rectangle {
                 && itemRect.y + itemRect.height > selectionRect.y
             if (intersects) ids.push(item.itemId)
         }
-        libraryService.selection.replace(ids)
+        if (root.rubberAccumulateSelection) {
+            // 自动滚动时用并集：保留已选中的，添加新进入框选区域的，
+            // 避免滚出视野的 delegate 被回收后丢失选中状态
+            const existing = libraryService.selection.selectedIds
+            const merged = []
+            const seen = {}
+            for (const id of existing) { if (!seen[id]) { seen[id] = true; merged.push(id) } }
+            for (const id of ids) { if (!seen[id]) { seen[id] = true; merged.push(id) } }
+            libraryService.selection.replace(merged)
+        } else {
+            libraryService.selection.replace(ids)
+        }
     }
 
     function updateRubberAutoScroll(y) {
