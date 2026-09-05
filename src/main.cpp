@@ -2660,15 +2660,15 @@ int main(int argc, char* argv[])
                     QPdfWriter pdfLazyWriter(pdfLazyPath);
                     pdfLazyWriter.setPageSize(QPageSize(QPageSize::A4));
                     QPainter pdfLazyPainter(&pdfLazyWriter);
-                    for (int page = 0; page < 10; ++page) {
+                    for (int page = 0; page < 82; ++page) {
                         pdfLazyPainter.drawText(120, 200,
                             QStringLiteral("PDF 懒加载回归测试页 %1").arg(page + 1));
-                        if (page < 9) pdfLazyWriter.newPage();
+                        if (page < 81) pdfLazyWriter.newPage();
                     }
                     pdfLazyPainter.end();
                 }
                 controller.openScore(QStringLiteral("pdf-lazy-regression"),
-                    QStringLiteral("PDF懒加载回归"), pdfLazyPath, QStringLiteral("pdf"), 10, QString());
+                    QStringLiteral("PDF懒加载回归"), pdfLazyPath, QStringLiteral("pdf"), 82, QString());
                 {
                     QEventLoop pdfLazyWait;
                     QTimer::singleShot(600, &pdfLazyWait, &QEventLoop::quit);
@@ -2679,7 +2679,7 @@ int main(int argc, char* argv[])
                     return;
                 }
                 const auto pdfLoaders = findItemsByObjectName(pdfWindow, QStringLiteral("pdfPageLoader"));
-                if (pdfLoaders.size() < 10) {
+                if (pdfLoaders.size() < 82) {
                     fail("pdf-lazy-delegates");
                     return;
                 }

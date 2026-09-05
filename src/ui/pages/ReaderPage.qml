@@ -542,8 +542,8 @@ Rectangle {
                         readonly property bool nearViewport: {
                             if (y <= 0 && index < 2) return true   // 布局未完成前先让首页进入
                             const top = y + documentColumn.y
-                            const viewTop = readerFlick.contentY - 600
-                            const viewBottom = readerFlick.contentY + readerFlick.height + 600
+                            const viewTop = readerFlick.contentY - 400
+                            const viewBottom = readerFlick.contentY + readerFlick.height + 400
                             return top < viewBottom && top + height > viewTop
                         }
 
@@ -563,6 +563,7 @@ Rectangle {
                                 border.width: 1
 
                                 PdfPageImage {
+                                    objectName: "pdfPageImageItem"
                                     anchors.fill: parent
                                     document: pdfDocument
                                     currentFrame: index
@@ -621,6 +622,34 @@ Rectangle {
 
             ScrollBar.vertical: ScrollBar {
                 policy: ScrollBar.AsNeeded
+            }
+
+            // PDF 解析加载指示：QPdfDocument 对多页/复杂 PDF 的解析是后台任务，
+            // 解析完成（status=Ready）前页面为空，给出明确提示避免用户误以为卡死。
+            Rectangle {
+                objectName: "pdfLoadingOverlay"
+                visible: root.isPdf && pdfDocument.status !== 2 && pdfDocument.status !== 4
+                    && appController.currentFileUrl.toString().length > 0
+                anchors.fill: parent
+                z: 20
+                color: Theme.background
+
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 14
+                    BusyIndicator {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        running: true
+                        width: 36
+                        height: 36
+                    }
+                    Label {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: "正在打开 PDF…"
+                        color: Theme.mutedForeground
+                        font.pixelSize: Theme.fontMd
+                    }
+                }
             }
         }
 
