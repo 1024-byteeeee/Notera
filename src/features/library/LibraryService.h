@@ -53,6 +53,7 @@ public:
 
     Q_INVOKABLE void importLocalFile(const QUrl& url);
     Q_INVOKABLE void importFiles(const QVariantList& paths);
+    Q_INVOKABLE void importFolder(const QVariant& folderPath);
     Q_INVOKABLE void importAndStitchImages(const QStringList& filePaths);
     Q_INVOKABLE void toggleFavorite(const QString& scoreId, bool favorite);
     Q_INVOKABLE void toggleItemFavorite(const QString& itemId, bool favorite);
@@ -141,6 +142,7 @@ private:
     void finishImportTask(ImportTaskResult result);
     void flushThumbnailUpdates();
     void consumeImportTemp(const QString& path);
+    [[nodiscard]] QString currentImportTargetFolder() const;
     static QString resolveImportPath(const QVariant& value);
     void continuePaste();
     void beginPasteToFolder(const QString& folderId);
@@ -186,6 +188,7 @@ private:
     QString m_pendingCreateFolderParentId;
     QStringList m_importQueue;
     QStringList m_importQueueTitles;
+    QStringList m_importQueueFolders;
     QStringList m_importTempFiles;
     int m_importIndex {0};
     int m_importSucceededCount {0};

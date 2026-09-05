@@ -342,7 +342,7 @@ Rectangle {
                 Layout.preferredWidth: 120
                 text: "导入"
                 primary: true
-                onClicked: fileDialog.open()
+                onClicked: importMenu.popup(importButton, 0, importButton.height)
             }
 
             AppButton {
@@ -1231,6 +1231,21 @@ Rectangle {
     }
 
     AppMenu {
+        id: importMenu
+        objectName: "importMenu"
+        AppMenuItem {
+            symbol: "import"
+            text: "导入文件…"
+            onTriggered: fileDialog.open()
+        }
+        AppMenuItem {
+            symbol: "folder"
+            text: "导入文件夹…"
+            onTriggered: folderImportDialog.open()
+        }
+    }
+
+    AppMenu {
         id: blankContextMenu
         objectName: "blankContextMenu"
         readonly property bool isTagView: appController.libraryFilter.startsWith("tag:")
@@ -1238,6 +1253,7 @@ Rectangle {
         AppMenuItem { text: "新建标签"; tagIcon: true; onTriggered: newTagDialog.open() }
         AppMenuSeparator { visible: !blankContextMenu.isTagView }
         AppMenuItem { text: "导入乐谱"; symbol: "import"; visible: !blankContextMenu.isTagView; onTriggered: fileDialog.open() }
+        AppMenuItem { text: "导入文件夹"; symbol: "folder"; visible: !blankContextMenu.isTagView; onTriggered: folderImportDialog.open() }
         AppMenuSeparator { visible: !blankContextMenu.isTagView }
         AppMenuItem {
             text: libraryService.clipboardMode === "cut" ? "粘贴（移动）" : "粘贴"
@@ -1373,6 +1389,14 @@ Rectangle {
         onAccepted: {
             libraryService.importFiles(selectedFiles)
         }
+    }
+
+    FolderDialog {
+        id: folderImportDialog
+        objectName: "folderImportDialog"
+        title: "选择要导入的文件夹"
+        currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
+        onAccepted: libraryService.importFolder(selectedFolder)
     }
 
     FileDialog {

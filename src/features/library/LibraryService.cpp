@@ -6,6 +6,7 @@
 #include <QBuffer>
 #include <QCryptographicHash>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
@@ -523,11 +524,19 @@ void LibraryService::importFiles(const QVariantList& paths)
     if (resolved.isEmpty()) return;
     // 导入进行中时追加到队列，而不是拒绝
     if (m_importTaskActive || !m_importQueue.isEmpty()) {
-        m_importQueue.append(resolved);
+        const auto defaultFolderId = currentImportTargetFolder();
+        for (int i = 0; i < resolved.size(); ++i) {
+            m_importQueue.append(resolved.at(i));
+            m_importQueueFolders.append(defaultFolderId);
+        }
         return;
     }
     m_importQueue = resolved;
     m_importQueueTitles.clear();
+    m_importQueueFolders.clear();
+    for (int i = 0; i < resolved.size(); ++i) {
+        m_importQueueFolders.append(currentImportTargetFolder());
+    }
     m_importTempFiles.clear();
     m_importIndex = 0;
     m_importSucceededCount = 0;
@@ -536,6 +545,106 @@ void LibraryService::importFiles(const QVariantList& paths)
     m_importConflictAction.clear();
     m_importApplyToAll = false;
     continueImport();
+}
+
+void LibraryService::importFolder(const QVariant& folderPathVariant)
+{
+    const auto resolvedPath = resolveImportPath(folderPathVariant);
+    if (resolvedPath.isEmpty()) {
+        emit errorOccurred(QStringLiteral("请选择电脑上的文件夹。"));
+        return;
+    }
+    // canonicalFilePath 解析符号链接（如 macOS 的 /var → /private/var），
+    // 保证 rootDir 与 QFileInfo::absolutePath 前缀一致，relativeFilePath 才能
+    // 正确得到相对目录，否则子文件夹会全部被误归到根目录
+    const auto rootPath = QFileInfo(resolvedPath).canonicalFilePath();
+    if (rootPath.isEmpty()) {
+        emit errorOccurred(QStringLiteral("所选文件夹不存在。"));
+        return;
+    }
+    const QFileInfo rootInfo(rootPath);
+    if (!rootInfo.exists() || !rootInfo.isDir()) {
+        emit errorOccurred(QStringLiteral("所选文件夹不存在。"));
+        return;
+    }
+
+    // 1) 递归扫描：相对目录 → 其中支持的乐谱文件（pdf + 图片），其余文件静默跳过
+    QHash<QString, QStringList> filesByDir;
+    const QDir rootDir(rootPath);
+    QDirIterator it(rootPath, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        it.next();
+        const auto info = it.fileInfo();
+        if (!info.isFile() || !FileService::isSupportedScoreFile(info.filePath())) continue;
+        // relativeFilePath 对根目录本身返回 "."，统一归一化为空串表示根
+        auto relDir = rootDir.relativeFilePath(info.absolutePath());
+        if (relDir == QLatin1String(".")) relDir.clear();
+        filesByDir[relDir].append(info.filePath());
+    }
+    if (filesByDir.isEmpty()) {
+        emit noticeOccurred(QStringLiteral("所选文件夹中没有可导入的乐谱文件。"));
+        return;
+    }
+
+    // 2) 按深度建库内文件夹：只创建包含支持文件的目录（含祖先链），
+    //    同名文件夹直接合并（文件级同名仍走现有冲突弹窗）
+    const auto targetRoot = currentImportTargetFolder();
+    QHash<QString, QString> dirToId;
+    dirToId.insert(QString(), targetRoot);
+    auto dirs = filesByDir.keys();
+    std::sort(dirs.begin(), dirs.end(), [](const QString& a, const QString& b) {
+        return a.count(QLatin1Char('/')) < b.count(QLatin1Char('/'));
+    });
+    for (const auto& dir : dirs) {
+        if (dir.isEmpty()) continue;
+        const auto slashPos = dir.lastIndexOf(QLatin1Char('/'));
+        const auto parentRel = slashPos < 0 ? QString() : dir.left(slashPos);
+        // 注意根目录 folderId 是空串，必须用 contains 判断祖先是否存在，
+        // 不能用 isEmpty()（会把"根"误判成祖先缺失导致子文件夹全被跳过）
+        if (!dirToId.contains(parentRel)) continue;
+        const auto id = getOrCreateFolder(dir.mid(slashPos + 1), dirToId.value(parentRel));
+        if (id.isEmpty()) return;   // 创建失败时错误已通过 errorOccurred 发出
+        dirToId.insert(dir, id);
+    }
+    reloadFolders();
+    reload();
+
+    // 3) 文件按各自目录入队，复用现有异步导入管线（冲突弹窗/批量事务/缩略图）
+    const auto enqueueFolderFiles = [this, &dirToId, &filesByDir] {
+        auto sortedDirs = filesByDir.keys();
+        std::sort(sortedDirs.begin(), sortedDirs.end());
+        for (const auto& dir : sortedDirs) {
+            const auto folderId = dirToId.value(dir);
+            const auto paths = filesByDir.value(dir);
+            for (const auto& path : paths) {
+                m_importQueue.append(path);
+                m_importQueueFolders.append(folderId);
+            }
+        }
+    };
+    if (m_importTaskActive || !m_importQueue.isEmpty()) {
+        // 已有导入在途：追加到队列，等待当前任务结束后统一处理
+        enqueueFolderFiles();
+        return;
+    }
+    m_importQueue.clear();
+    m_importQueueTitles.clear();
+    m_importQueueFolders.clear();
+    m_importTempFiles.clear();
+    m_importIndex = 0;
+    m_importSucceededCount = 0;
+    m_pendingInsertCount = 0;
+    m_importTaskActive = false;
+    m_importConflictAction.clear();
+    m_importApplyToAll = false;
+    enqueueFolderFiles();
+    continueImport();
+}
+
+QString LibraryService::currentImportTargetFolder() const
+{
+    return (m_filterMode == QStringLiteral("all")
+        || m_filterMode.startsWith(QStringLiteral("folder:"))) ? m_currentFolderId : QString {};
 }
 
 QString LibraryService::resolveImportPath(const QVariant& value)
@@ -578,6 +687,7 @@ void LibraryService::resolveImportConflict(const QString& action, bool applyToAl
         m_importTempFiles.clear();
         m_importQueue.clear();
         m_importQueueTitles.clear();
+        m_importQueueFolders.clear();
         m_importIndex = 0;
         if (m_pendingInsertCount > 0) {
             m_repository.rollbackTransaction();
@@ -613,8 +723,11 @@ void LibraryService::continueImport()
         // 队列项可携带标题覆盖（拼接导入等），否则取文件名主干
         const auto titleOverride = m_importIndex < m_importQueueTitles.size() ? m_importQueueTitles[m_importIndex] : QString {};
         const auto baseTitle = titleOverride.trimmed().isEmpty() ? source.completeBaseName() : titleOverride.trimmed();
-        const auto folderId = (m_filterMode == QStringLiteral("all")
-            || m_filterMode.startsWith(QStringLiteral("folder:"))) ? m_currentFolderId : QString {};
+        // 目标文件夹：优先取队列项携带的 folderId（文件夹导入按各自层级入位），
+        // 普通文件导入队列为空时回退到当前文件夹
+        const auto folderId = (m_importIndex < m_importQueueFolders.size())
+            ? m_importQueueFolders.at(m_importIndex)
+            : currentImportTargetFolder();
 
         // 目标目录存在同名乐谱：弹窗让用户决定如何处理（替换 / 保留两者 / 跳过 / 取消）
         if (nameExistsInFolder(baseTitle, folderId, false)) {
@@ -668,6 +781,7 @@ void LibraryService::continueImport()
     const int processed = m_importIndex;
     m_importQueue.clear();
     m_importQueueTitles.clear();
+    m_importQueueFolders.clear();
     m_importIndex = 0;
     // 提交批量导入中剩余的未提交事务
     if (m_pendingInsertCount > 0) {

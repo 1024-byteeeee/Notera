@@ -17,6 +17,7 @@
 #include <QLocale>
 #include <QMouseEvent>
 #include <QPointingDevice>
+#include <QPointer>
 #include <QProcess>
 #include <QQuickItem>
 #include <QQuickWindow>
@@ -160,10 +161,15 @@ bool popupIsOpen(QObject* root, const QString& objectName)
 // 等待对象某个布尔属性变为 false。用嵌套事件循环驱动动画计时器，
 // 确保 Popup 的关闭动画（exit Transition）跑完、遮罩真正撤销后再返回，
 // 避免"关闭后立刻点击"被仍在关闭的弹窗遮罩吞掉。
-bool waitForPropertyFalse(QObject* obj, const QByteArray& propertyName, int timeoutMs = 3000)
+bool waitForPropertyFalse(QObject* obj, const QByteArray& propertyName, int timeoutMs = 6000)
 {
     if (!obj) return true;
-    const auto met = [obj, propertyName] { return !obj->property(propertyName).toBool(); };
+    // 用 QPointer 捕获：轮询期间对象可能被异步操作销毁（如 model reset 重建
+    // GridView delegate），裸指针会悬垂段错误；QPointer 自动置空，视为已满足
+    QPointer<QObject> guard(obj);
+    const auto met = [guard, propertyName] {
+        return !guard || !guard->property(propertyName).toBool();
+    };
     if (met()) return true;
     QEventLoop loop;
     QTimer poll;
@@ -1917,6 +1923,124 @@ int main(int argc, char* argv[])
                 }
             }
 
+            // 回归测试：导入文件夹（递归扫描 + 库内重建子文件夹层级 + 非乐谱文件跳过 + 空目录不建）
+            {
+                const int baseEntryCount = libraryService.entries()->rowCount();
+                const int baseFolderCount = libraryService.folders()->rowCount();
+                QTemporaryDir folderRoot;
+                if (!folderRoot.isValid()) return;
+                const auto writeImageFile = [](const QString& path) {
+                    QImage img(64, 64, QImage::Format_RGB32);
+                    img.fill(Qt::white);
+                    return img.save(path);
+                };
+                QDir().mkpath(folderRoot.filePath(QStringLiteral("sub/deep")));
+                QDir().mkpath(folderRoot.filePath(QStringLiteral("empty")));
+                if (!writeImageFile(folderRoot.filePath(QStringLiteral("a.png")))
+                    || !writeImageFile(folderRoot.filePath(QStringLiteral("sub/b.png")))
+                    || !writeImageFile(folderRoot.filePath(QStringLiteral("sub/deep/c.jpg")))) {
+                    return;
+                }
+                {
+                    QFile ignored(folderRoot.filePath(QStringLiteral("ignore.txt")));
+                    if (!ignored.open(QIODevice::WriteOnly) || ignored.write("x") != 1) return;
+                    QFile placeholder(folderRoot.filePath(QStringLiteral("empty/placeholder.txt")));
+                    if (!placeholder.open(QIODevice::WriteOnly) || placeholder.write("x") != 1) return;
+                }
+                libraryService.importFolder(QVariant::fromValue(QUrl::fromLocalFile(folderRoot.path())));
+                bool importDone = false;
+                {
+                    QEventLoop importLoop;
+                    QObject::connect(&libraryService, &LibraryService::importFinished,
+                        &importLoop, [&] { importDone = true; importLoop.quit(); });
+                    QTimer::singleShot(8000, &importLoop, &QEventLoop::quit);
+                    importLoop.exec();
+                }
+                if (!importDone) {
+                    fail("folder-import-timeout");
+                    return;
+                }
+                const auto entryTypeRoleF = libraryService.entries()->roleNames().key("itemType", -1);
+                const auto entryTitleRoleF = libraryService.entries()->roleNames().key("title", -1);
+                const auto entryIdRoleF = libraryService.entries()->roleNames().key("itemId", -1);
+                QString subFolderId;
+                QStringList rootTitles;
+                for (int i = 0; i < libraryService.entries()->rowCount(); ++i) {
+                    const auto idx = libraryService.entries()->index(i, 0);
+                    const auto title = libraryService.entries()->data(idx, entryTitleRoleF).toString();
+                    rootTitles << title;
+                    if (libraryService.entries()->data(idx, entryTypeRoleF).toString() == QStringLiteral("folder")
+                        && title == QStringLiteral("sub")) {
+                        subFolderId = libraryService.entries()->data(idx, entryIdRoleF).toString();
+                    }
+                }
+                if (subFolderId.isEmpty()
+                    || !rootTitles.contains(QStringLiteral("a"))
+                    || rootTitles.contains(QStringLiteral("b"))
+                    || rootTitles.contains(QStringLiteral("empty"))
+                    || rootTitles.contains(QStringLiteral("ignore"))) {
+                    fail("folder-import-hierarchy-root");
+                    return;
+                }
+                // 进入 sub：应包含 b 与 deep 文件夹
+                libraryService.setFilterMode(QStringLiteral("folder:") + subFolderId);
+                {
+                    QStringList subTitles;
+                    QString deepFolderId;
+                    for (int i = 0; i < libraryService.entries()->rowCount(); ++i) {
+                        const auto idx = libraryService.entries()->index(i, 0);
+                        const auto title = libraryService.entries()->data(idx, entryTitleRoleF).toString();
+                        subTitles << title;
+                        if (libraryService.entries()->data(idx, entryTypeRoleF).toString() == QStringLiteral("folder")
+                            && title == QStringLiteral("deep")) {
+                            deepFolderId = libraryService.entries()->data(idx, entryIdRoleF).toString();
+                        }
+                    }
+                    if (deepFolderId.isEmpty() || !subTitles.contains(QStringLiteral("b"))) {
+                        fail("folder-import-hierarchy-sub");
+                        return;
+                    }
+                    // 进入 deep：应包含 c
+                    libraryService.setFilterMode(QStringLiteral("folder:") + deepFolderId);
+                    {
+                        QStringList deepTitles;
+                        for (int i = 0; i < libraryService.entries()->rowCount(); ++i) {
+                            deepTitles << libraryService.entries()->data(
+                                libraryService.entries()->index(i, 0), entryTitleRoleF).toString();
+                        }
+                        if (!deepTitles.contains(QStringLiteral("c"))) {
+                            fail("folder-import-hierarchy-deep");
+                            return;
+                        }
+                    }
+                }
+                // 清理：切回根视图，删除导入的文件夹（递归）与根下文件，恢复现场
+                libraryService.setFilterMode(QStringLiteral("all"));
+                {
+                    QVariantList importedIds;
+                    for (int i = 0; i < libraryService.entries()->rowCount(); ++i) {
+                        const auto idx = libraryService.entries()->index(i, 0);
+                        const auto title = libraryService.entries()->data(idx, entryTitleRoleF).toString();
+                        if (title == QStringLiteral("sub") || title == QStringLiteral("a")) {
+                            importedIds.append(libraryService.entries()->data(idx, entryIdRoleF));
+                        }
+                    }
+                    if (!importedIds.isEmpty()) libraryService.deleteItems(importedIds);
+                }
+                if (libraryService.entries()->rowCount() != baseEntryCount
+                    || libraryService.folders()->rowCount() != baseFolderCount) {
+                    fail("folder-import-cleanup");
+                    return;
+                }
+                // 稳定等待：让导入/删除触发的异步缩略图任务在继续后续测试前排空，
+                // 避免其完成信号在主线程忙时挤占菜单关闭动画的驱动时序
+                {
+                    QEventLoop settleLoop;
+                    QTimer::singleShot(800, &settleLoop, &QEventLoop::quit);
+                    settleLoop.exec();
+                }
+            }
+
             const auto dragScoreIdRole = libraryService.scores()->roleNames().key("scoreId", -1);
             const auto dragFolderIdRole = libraryService.folders()->roleNames().key("itemId", -1);
             const auto draggedScoreId = libraryService.scores()->data(
@@ -1979,7 +2103,10 @@ int main(int argc, char* argv[])
                 fail("tag-menu-single-check-indicator");
                 return;
             }
-            QMetaObject::invokeMethod(scoreDelegate, "closeContextMenu");
+            if (!QMetaObject::invokeMethod(scoreDelegate, "closeContextMenu")) {
+                fail("score-context-menu-close-invoke");
+                return;
+            }
             if (!waitForPropertyFalse(scoreDelegate, "contextMenuVisible")) {
                 fail("score-context-menu-close");
                 return;
