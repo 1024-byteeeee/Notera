@@ -15,6 +15,19 @@ Rectangle {
     property bool dragInProgress: false
     property var dragItemIds: []
     property string dragThumbnailPath: ""
+    property real rubberAutoScrollSpeed: 0
+
+    Timer {
+        id: rubberAutoScrollTimer
+        interval: 16
+        repeat: true
+        running: root.rubberAutoScrollSpeed !== 0
+        onTriggered: {
+            const maxY = Math.max(0, grid.contentHeight - grid.height)
+            grid.contentY = Math.max(0, Math.min(maxY, grid.contentY + root.rubberAutoScrollSpeed))
+            root.updateRubberSelection()
+        }
+    }
 
     Rectangle {
         id: dragPreview
@@ -151,6 +164,18 @@ Rectangle {
             if (intersects) ids.push(item.itemId)
         }
         libraryService.selection.replace(ids)
+    }
+
+    function updateRubberAutoScroll(y) {
+        const edgeSize = 48
+        const speed = 6
+        if (y < edgeSize) {
+            root.rubberAutoScrollSpeed = -speed
+        } else if (y > librarySurface.height - edgeSize) {
+            root.rubberAutoScrollSpeed = speed
+        } else {
+            root.rubberAutoScrollSpeed = 0
+        }
     }
 
     readonly property string filterTitle: {
@@ -966,6 +991,7 @@ Rectangle {
                 onActiveChanged: {
                     if (!active) {
                         validStart = false
+                        root.rubberAutoScrollSpeed = 0
                         return
                     }
                     const p = centroid.pressPosition
@@ -980,13 +1006,16 @@ Rectangle {
                 onActiveTranslationChanged: {
                     if (!active || !validStart) return
                     const start = centroid.pressPosition
-                    const curX = centroid.position.x
-                    const curY = centroid.position.y
+                    // 框选范围限制在板块内
+                    const curX = Math.max(0, Math.min(librarySurface.width, centroid.position.x))
+                    const curY = Math.max(0, Math.min(librarySurface.height, centroid.position.y))
                     selectionBox.x = Math.min(start.x, curX)
                     selectionBox.y = Math.min(start.y, curY)
                     selectionBox.width = Math.abs(curX - start.x)
                     selectionBox.height = Math.abs(curY - start.y)
                     root.updateRubberSelection()
+                    // 拖动到上下边缘时自动滚动
+                    root.updateRubberAutoScroll(centroid.position.y)
                 }
             }
 
