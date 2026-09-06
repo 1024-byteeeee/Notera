@@ -23,6 +23,16 @@ Rectangle {
     property real pinchViewportY: 0
     property bool viewInitializationPending: false
     property int viewInitializationToken: 0
+    readonly property real baseScaleUnit: {
+        // zoomLevel=1.0 时 PdfMultiPageView 应使用的 renderScale：
+        // 让页面显示宽 = min(视口宽-48, 1100)（与原 documentColumn.pageWidth 基准一致）
+        if (!root.isPdf || pdfDocument.status !== PdfDocument.Ready || pdfDocument.pageCount < 1)
+            return 0
+        const ps = pdfDocument.pagePointSize(0)
+        if (ps.width <= 0 || ps.height <= 0) return 0
+        const displayWidth = root.viewRotation % 180 !== 0 ? ps.height : ps.width
+        return displayWidth > 0 ? Math.min(pdfView.width - 48, 1100) / displayWidth : 0
+    }
     property var folderScores: []
     readonly property int currentScoreIndex: {
         for (let i = 0; i < root.folderScores.length; i++) {
@@ -67,17 +77,17 @@ Rectangle {
     }
 
     function restoreAnchor(normalizedX, normalizedY, viewportX, viewportY) {
-        readerFlick.contentX = clampScroll(normalizedX * readerFlick.contentWidth - viewportX,
-            readerFlick.contentWidth, readerFlick.width)
-        readerFlick.contentY = clampScroll(normalizedY * readerFlick.contentHeight - viewportY,
-            readerFlick.contentHeight, readerFlick.height)
+        pdfView.contentX = clampScroll(normalizedX * pdfView.contentWidth - viewportX,
+            pdfView.contentWidth, pdfView.width)
+        pdfView.contentY = clampScroll(normalizedY * pdfView.contentHeight - viewportY,
+            pdfView.contentHeight, pdfView.height)
     }
 
     function zoomAroundViewport(newZoom, viewportX, viewportY) {
-        const safeWidth = Math.max(readerFlick.width, readerFlick.contentWidth)
-        const safeHeight = Math.max(readerFlick.height, readerFlick.contentHeight)
-        const normalizedX = (readerFlick.contentX + viewportX) / safeWidth
-        const normalizedY = (readerFlick.contentY + viewportY) / safeHeight
+        const safeWidth = Math.max(pdfView.width, pdfView.contentWidth)
+        const safeHeight = Math.max(pdfView.height, pdfView.contentHeight)
+        const normalizedX = (pdfView.contentX + viewportX) / safeWidth
+        const normalizedY = (pdfView.contentY + viewportY) / safeHeight
         root.zoomLevel = Math.max(0.4, Math.min(3.0, newZoom))
         Qt.callLater(function() {
             root.restoreAnchor(normalizedX, normalizedY, viewportX, viewportY)
@@ -91,9 +101,10 @@ Rectangle {
                 && (!root.viewInitializationPending || initializationToken !== root.viewInitializationToken)) {
                 return
             }
-            readerFlick.contentX = root.clampScroll((readerFlick.contentWidth - readerFlick.width) / 2,
-                readerFlick.contentWidth, readerFlick.width)
-            readerFlick.contentY = 0
+            pdfView.contentX = 0
+            pdfView.contentY = 0
+            imageFlick.contentX = 0
+            imageFlick.contentY = 0
             if (initializationToken !== undefined) {
                 root.viewInitializationPending = false
             }
@@ -104,13 +115,13 @@ Rectangle {
         root.viewInitializationToken += 1
         root.viewInitializationPending = true
         root.autoScrolling = false
-        readerFlick.cancelFlick()
-        readerFlick.rotation = 0
-        readerFlick.scale = 1
+        pdfView.cancelFlick()
         root.viewRotation = 0
         root.zoomLevel = 1.0
-        readerFlick.contentX = 0
-        readerFlick.contentY = 0
+        pdfView.contentX = 0
+        pdfView.contentY = 0
+        imageFlick.contentX = 0
+        imageFlick.contentY = 0
         root.finishInitialViewIfReady(root.viewInitializationToken)
     }
 
@@ -121,8 +132,8 @@ Rectangle {
             return
         }
         const contentReady = root.isImage ? scoreImage.status === Image.Ready
-            : root.isPdf ? pdfDocument.pageCount > 0 : true
-        if (!contentReady || readerFlick.width <= 0 || readerFlick.height <= 0) {
+            : root.isPdf ? pdfDocument.status === PdfDocument.Ready && pdfDocument.pageCount > 0 : true
+        if (!contentReady || pdfView.width <= 0 || pdfView.height <= 0) {
             return
         }
         root.applyDefaultView(expectedToken)
@@ -136,38 +147,37 @@ Rectangle {
     function resetReaderView() {
         root.markUserInteraction()
         root.autoScrolling = false
-        readerFlick.cancelFlick()
-        readerFlick.rotation = 0
-        readerFlick.scale = 1
+        pdfView.cancelFlick()
         root.viewRotation = 0
         root.applyDefaultView()
     }
     function rotateBy(delta) {
         root.markUserInteraction()
-        const normalizedX = (readerFlick.contentX + readerFlick.width / 2)
-            / Math.max(readerFlick.width, readerFlick.contentWidth)
-        const normalizedY = (readerFlick.contentY + readerFlick.height / 2)
-            / Math.max(readerFlick.height, readerFlick.contentHeight)
+        const normalizedX = (pdfView.contentX + pdfView.width / 2)
+            / Math.max(pdfView.width, pdfView.contentWidth)
+        const normalizedY = (pdfView.contentY + pdfView.height / 2)
+            / Math.max(pdfView.height, pdfView.contentHeight)
         root.viewRotation = (root.viewRotation + delta + 360) % 360
         Qt.callLater(function() {
-            root.restoreAnchor(normalizedX, normalizedY, readerFlick.width / 2, readerFlick.height / 2)
+            root.restoreAnchor(normalizedX, normalizedY, pdfView.width / 2, pdfView.height / 2)
         })
     }
     function rotateLeft() { rotateBy(-90) }
     function rotateRight() { rotateBy(90) }
     function zoomIn() {
         root.markUserInteraction()
-        zoomAroundViewport(root.zoomLevel + 0.25, readerFlick.width / 2, readerFlick.height / 2)
+        zoomAroundViewport(root.zoomLevel + 0.25, pdfView.width / 2, pdfView.height / 2)
     }
     function zoomOut() {
         root.markUserInteraction()
-        zoomAroundViewport(root.zoomLevel - 0.25, readerFlick.width / 2, readerFlick.height / 2)
+        zoomAroundViewport(root.zoomLevel - 0.25, pdfView.width / 2, pdfView.height / 2)
     }
 
     function stopAtEnd() {
-        const maximum = Math.max(0, readerFlick.contentHeight - readerFlick.height)
-        if (readerFlick.contentY >= maximum) {
-            readerFlick.contentY = maximum
+        const target = root.isPdf ? pdfView : imageFlick
+        const maximum = Math.max(0, target.contentHeight - target.height)
+        if (target.contentY >= maximum) {
+            target.contentY = maximum
             autoScrolling = false
         }
     }
@@ -459,29 +469,35 @@ Rectangle {
             }
         }
 
-        Flickable {
-            id: readerFlick
-            objectName: "readerFlick"
+        Item {
+            id: readerViewport
+            objectName: "readerViewport"
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            contentWidth: documentColumn.width
-            contentHeight: documentColumn.height
-            boundsBehavior: Flickable.StopAtBounds
-            pixelAligned: true
             onWidthChanged: root.finishInitialViewIfReady()
             onHeightChanged: root.finishInitialViewIfReady()
-            onMovementStarted: root.markUserInteraction()
 
-            WheelHandler {
-                acceptedModifiers: Qt.NoModifier
-                onWheel: function(event) {
-                    root.markUserInteraction()
-                    const delta = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y
-                    readerFlick.contentY = root.clampScroll(readerFlick.contentY - delta,
-                        readerFlick.contentHeight, readerFlick.height)
-                    event.accepted = true
+            PdfDocument {
+                id: pdfDocument
+                source: root.isPdf ? appController.currentFileUrl : ""
+                onPageCountChanged: root.finishInitialViewIfReady()
+                onStatusChanged: {
+                    if (status === PdfDocument.Ready) root.finishInitialViewIfReady()
                 }
+            }
+
+            // 虚拟化多页 PDF 视图：TableView 只实例化可见行，万页不卡。
+            // 缩放由 root.zoomLevel 单一真源驱动（renderScale 绑定换算）。
+            PdfMultiPageView {
+                id: pdfView
+                objectName: "pdfView"
+                anchors.fill: parent
+                visible: root.isPdf
+                document: pdfDocument
+                pageRotation: root.viewRotation
+                renderScale: root.isPdf && root.baseScaleUnit > 0
+                    ? root.baseScaleUnit * root.zoomLevel : 1
             }
 
             PinchHandler {
@@ -493,10 +509,10 @@ Rectangle {
                         root.pinchBaseZoom = root.zoomLevel
                         root.pinchViewportX = centroid.position.x
                         root.pinchViewportY = centroid.position.y
-                        root.pinchAnchorX = (readerFlick.contentX + root.pinchViewportX)
-                            / Math.max(readerFlick.width, readerFlick.contentWidth)
-                        root.pinchAnchorY = (readerFlick.contentY + root.pinchViewportY)
-                            / Math.max(readerFlick.height, readerFlick.contentHeight)
+                        root.pinchAnchorX = (pdfView.contentX + root.pinchViewportX)
+                            / Math.max(pdfView.width, pdfView.contentWidth)
+                        root.pinchAnchorY = (pdfView.contentY + root.pinchViewportY)
+                            / Math.max(pdfView.height, pdfView.contentHeight)
                     }
                 }
                 onActiveScaleChanged: {
@@ -509,82 +525,26 @@ Rectangle {
                 }
             }
 
-            Column {
-                id: documentColumn
-                readonly property real maxPageWidth: root.isPdf ? 1100 : 1400
-                readonly property real basePageWidth: Math.min(readerFlick.width - 48, maxPageWidth)
-                readonly property real pageWidth: basePageWidth * root.zoomLevel
-                width: Math.max(readerFlick.width, pageWidth + 48)
-                spacing: 20
-                topPadding: 24
-                bottomPadding: 24
-
-                PdfDocument {
-                    id: pdfDocument
-                    source: root.isPdf ? appController.currentFileUrl : ""
-                    onPageCountChanged: root.finishInitialViewIfReady()
-                }
-
-                Repeater {
-                    model: root.isPdf ? pdfDocument.pageCount : 0
-                    delegate: Item {
-                        required property int index
-                        readonly property size pageSize: pdfDocument.pagePointSize(index)
-                        readonly property bool rotated: root.viewRotation % 180 !== 0
-                        readonly property real pageRatio: pageSize.height > 0 ? pageSize.width / pageSize.height : 0.7
-                        width: documentColumn.pageWidth
-                        height: rotated ? width * pageRatio : width / pageRatio
-                        x: (documentColumn.width - width) / 2
-
-                        // 懒加载窗口：页面与视口（含预加载余量）相交时才实例化
-                        // PdfPageImage。多页 PDF 不再一次性创建/渲染全部页面，
-                        // 滚动进出视野时按需渲染（PdfDocument 内部按页缓存渲染结果）。
-                        readonly property bool nearViewport: {
-                            if (y <= 0 && index < 2) return true   // 布局未完成前先让首页进入
-                            const top = y + documentColumn.y
-                            const viewTop = readerFlick.contentY - 400
-                            const viewBottom = readerFlick.contentY + readerFlick.height + 400
-                            return top < viewBottom && top + height > viewTop
-                        }
-
-                        Loader {
-                            id: pdfPageLoader
-                            objectName: "pdfPageLoader"
-                            anchors.fill: parent
-                            active: nearViewport
-                            sourceComponent: Rectangle {
-                                width: rotated ? parent.height : parent.width
-                                height: rotated ? parent.width : parent.height
-                                anchors.centerIn: parent
-                                rotation: root.viewRotation
-                                color: "white"
-                                radius: Theme.radiusSm
-                                border.color: Theme.border
-                                border.width: 1
-
-                                PdfPageImage {
-                                    objectName: "pdfPageImageItem"
-                                    anchors.fill: parent
-                                    document: pdfDocument
-                                    currentFrame: index
-                                    asynchronous: true
-                                    fillMode: Image.PreserveAspectFit
-                                    sourceSize.width: width
-                                    sourceSize.height: height
-                                }
-                            }
-                        }
-                    }
-                }
+            Flickable {
+                id: imageFlick
+                objectName: "imageFlick"
+                visible: root.isImage
+                anchors.fill: parent
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                onMovementStarted: root.markUserInteraction()
+                contentWidth: imageViewport.width
+                contentHeight: imageViewport.height
 
                 Item {
-                    visible: root.isImage
-                    width: visible ? documentColumn.pageWidth : 0
+                    id: imageViewport
+                    width: Math.min(readerViewport.width - 48, 1400) * root.zoomLevel
+                    height: rotated ? width * imageRatio : width / imageRatio
+                    x: Math.max(0, (readerViewport.width - width) / 2)
+                    y: 24
                     readonly property bool rotated: root.viewRotation % 180 !== 0
                     readonly property real imageRatio: scoreImage.sourceSize.height > 0
                         ? scoreImage.sourceSize.width / scoreImage.sourceSize.height : 0.7
-                    height: visible ? (rotated ? width * imageRatio : width / imageRatio) : 0
-                    x: (documentColumn.width - width) / 2
 
                     Image {
                         id: scoreImage
@@ -600,36 +560,35 @@ Rectangle {
                     }
                 }
 
-                Label {
-                    visible: appController.currentFileUrl.toString().length === 0
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: "请从乐谱库单击打开一份乐谱"
-                    color: Theme.mutedForeground
-                    font.pixelSize: Theme.fontLg
-                }
-
-                Label {
-                    visible: appController.currentFileUrl.toString().length > 0 && !root.isPdf && !root.isImage
-                    width: documentColumn.width - 72
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap
-                    text: "文件已安全导入资料库，但当前版本暂不支持预览此格式：" + (appController.currentFileType.length > 0 ? appController.currentFileType : "未知")
-                    color: Theme.mutedForeground
-                    font.pixelSize: Theme.fontMd
-                }
+                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
             }
 
-            ScrollBar.vertical: ScrollBar {
-                policy: ScrollBar.AsNeeded
+            Label {
+                visible: appController.currentFileUrl.toString().length === 0
+                anchors.centerIn: parent
+                text: "请从乐谱库单击打开一份乐谱"
+                color: Theme.mutedForeground
+                font.pixelSize: Theme.fontLg
             }
 
-            // PDF 解析加载指示：QPdfDocument 对多页/复杂 PDF 的解析是后台任务，
-            // 解析完成（status=Ready）前页面为空，给出明确提示避免用户误以为卡死。
+            Label {
+                visible: appController.currentFileUrl.toString().length > 0 && !root.isPdf && !root.isImage
+                anchors.centerIn: parent
+                width: parent.width - 72
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                text: "文件已安全导入资料库，但当前版本暂不支持预览此格式：" + (appController.currentFileType.length > 0 ? appController.currentFileType : "未知")
+                color: Theme.mutedForeground
+                font.pixelSize: Theme.fontMd
+            }
+
+            // 加载指示：显示到 PDF 解析完成且首屏渲染就绪，
+            // 避免"转圈 → 白页 → 内容"的感知断层。
             Rectangle {
                 objectName: "pdfLoadingOverlay"
-                visible: root.isPdf && pdfDocument.status !== 2 && pdfDocument.status !== 4
-                    && appController.currentFileUrl.toString().length > 0
+                visible: root.isPdf && appController.currentFileUrl.toString().length > 0
+                    && (pdfDocument.status !== PdfDocument.Ready
+                        || pdfView.currentPageRenderingStatus !== Image.Ready)
                 anchors.fill: parent
                 z: 20
                 color: Theme.background
@@ -677,7 +636,8 @@ Rectangle {
             root.scrollAccumulator += root.scrollSpeed * interval / 1000
             const step = Math.floor(root.scrollAccumulator)
             if (step > 0) {
-                readerFlick.contentY += step
+                const target = root.isPdf ? pdfView : imageFlick
+                target.contentY += step
                 root.scrollAccumulator -= step
             }
             root.stopAtEnd()
@@ -695,6 +655,13 @@ Rectangle {
             } else {
                 metronome.stop()
             }
+        }
+    }
+
+    Connections {
+        target: pdfView
+        function onViewMovementStarted() {
+            root.markUserInteraction()
         }
     }
 

@@ -79,6 +79,7 @@ qt_add_qml_module(Notera
         src/ui/components/FolderIcon.qml
         src/ui/components/TagIcon.qml
         src/ui/components/Sidebar.qml
+        src/ui/pdf/PdfMultiPageView.qml
         src/ui/pages/LibraryPage.qml
         src/ui/pages/ReaderPage.qml
         src/ui/pages/SettingsPage.qml

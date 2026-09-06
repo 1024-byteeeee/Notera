@@ -1667,8 +1667,8 @@ int main(int argc, char* argv[])
             }
         });
         QTimer::singleShot(1250, root, [root] {
-            const auto* const flickable = root->findChild<QObject*>(QStringLiteral("readerFlick"));
-            QCoreApplication::exit(flickable && flickable->property("contentY").toDouble() > 0.0 ? 0 : 1);
+            const auto* const imageFlick = root->findChild<QObject*>(QStringLiteral("imageFlick"));
+            QCoreApplication::exit(imageFlick && imageFlick->property("contentY").toDouble() > 0.0 ? 0 : 1);
         });
     }
 
@@ -2359,8 +2359,12 @@ int main(int argc, char* argv[])
             QCoreApplication::processEvents();
             const auto* const sidebar = root->findChild<QQuickItem*>(QStringLiteral("sidebar"));
             auto* const readerPage = root->findChild<QObject*>(QStringLiteral("readerPage"));
-            auto* const readerFlick = root->findChild<QObject*>(QStringLiteral("readerFlick"));
-            if (!sidebar || sidebar->isVisible()) {
+            auto* const pdfView = root->findChild<QObject*>(QStringLiteral("pdfView"));
+            const auto isPdfScore = readerPage->property("isPdf").toBool();
+            auto* const readerView = isPdfScore
+                ? pdfView
+                : root->findChild<QObject*>(QStringLiteral("imageFlick"));
+            if (!sidebar || sidebar->isVisible() || !readerView) {
                 fail("reader-focus-layout");
                 return;
             }
@@ -2373,14 +2377,14 @@ int main(int argc, char* argv[])
                 fail("reader-folder-sibling-navigation");
                 return;
             }
-            const auto centerBefore = (readerFlick->property("contentX").toDouble()
-                + readerFlick->property("width").toDouble() / 2.0)
-                / readerFlick->property("contentWidth").toDouble();
+            const auto centerBefore = (readerView->property("contentX").toDouble()
+                + readerView->property("width").toDouble() / 2.0)
+                / readerView->property("contentWidth").toDouble();
             QMetaObject::invokeMethod(readerPage, "zoomIn");
             QCoreApplication::processEvents();
-            const auto centerAfter = (readerFlick->property("contentX").toDouble()
-                + readerFlick->property("width").toDouble() / 2.0)
-                / readerFlick->property("contentWidth").toDouble();
+            const auto centerAfter = (readerView->property("contentX").toDouble()
+                + readerView->property("width").toDouble() / 2.0)
+                / readerView->property("contentWidth").toDouble();
             if (std::abs(centerBefore - centerAfter) > 0.02) {
                 fail("reader-centered-zoom");
                 return;
@@ -2399,8 +2403,10 @@ int main(int argc, char* argv[])
                 return;
             }
 
-            readerFlick->setProperty("rotation", 17.0);
-            readerFlick->setProperty("scale", 0.75);
+            // 弄脏视图（滚到中部），重开后应复位到顶部
+            const auto dirtyMaxY = qMax<qreal>(0.0, readerView->property("contentHeight").toDouble()
+                - readerView->property("height").toDouble());
+            readerView->setProperty("contentY", dirtyMaxY * 0.6);
 
             controller.setCurrentPage(QStringLiteral("library"));
             controller.openScore(controller.currentScoreId(), QStringLiteral("再次打开测试"), controller.currentFileUrl().toLocalFile(),
@@ -2409,14 +2415,12 @@ int main(int argc, char* argv[])
             QTimer::singleShot(250, &reopenWait, &QEventLoop::quit);
             reopenWait.exec();
             const auto reopenedZoom = readerPage->property("zoomLevel").toDouble();
-            const auto reopenedContentY = readerFlick->property("contentY").toDouble();
-            const auto reopenedContentHeight = readerFlick->property("contentHeight").toDouble();
-            const auto reopenedViewportHeight = readerFlick->property("height").toDouble();
+            const auto reopenedContentY = readerView->property("contentY").toDouble();
+            const auto reopenedContentHeight = readerView->property("contentHeight").toDouble();
+            const auto reopenedViewportHeight = readerView->property("height").toDouble();
             if (controller.currentPage() != QStringLiteral("reader")
                 || std::abs(reopenedZoom - 1.0) > 0.001
                 || std::abs(reopenedContentY) > 1.0
-                || std::abs(readerFlick->property("rotation").toDouble()) > 0.001
-                || std::abs(readerFlick->property("scale").toDouble() - 1.0) > 0.001
                 || reopenedContentHeight <= reopenedViewportHeight) {
                 fail("reader-reopen-default-view");
                 return;
@@ -2637,14 +2641,14 @@ int main(int argc, char* argv[])
                 return;
             }
 
-            // 回归：多页 PDF 懒加载。ReaderPage 的 Repeater delegate 退化为占位 Item，
-            // PdfPageImage 仅在页面与视口（含预加载余量）相交时才由 Loader 实例化，
-            // 打开多页 PDF 不再一次性创建/渲染全部页面。置于 smoke 末尾：openScore 会
-            // 改变 currentScoreId，避免污染前置 recent 排序等有状态断言。
+            // 回归：多页 PDF 虚拟化。ReaderPage 改用 PdfMultiPageView（TableView），
+            // 只实例化可见行 + 预加载缓冲内的页面；打开 82 页 PDF 时 PdfPageImage
+            // 实例数必须远小于页数，滚动后仍受控，且 currentPage 跟随滚动。
+            // 置于 smoke 末尾：openScore 会改变 currentScoreId，避免污染前置有状态断言。
             {
                 auto* const pdfWindow = qobject_cast<QQuickWindow*>(root);
-                auto* const pdfReaderFlick = root->findChild<QObject*>(QStringLiteral("readerFlick"));
-                if (!pdfWindow || !pdfReaderFlick) {
+                auto* const pdfView = root->findChild<QObject*>(QStringLiteral("pdfView"));
+                if (!pdfWindow || !pdfView) {
                     fail("pdf-lazy-env");
                     return;
                 }
@@ -2662,51 +2666,48 @@ int main(int argc, char* argv[])
                     QPainter pdfLazyPainter(&pdfLazyWriter);
                     for (int page = 0; page < 82; ++page) {
                         pdfLazyPainter.drawText(120, 200,
-                            QStringLiteral("PDF 懒加载回归测试页 %1").arg(page + 1));
+                            QStringLiteral("PDF 虚拟化回归测试页 %1").arg(page + 1));
                         if (page < 81) pdfLazyWriter.newPage();
                     }
                     pdfLazyPainter.end();
                 }
                 controller.openScore(QStringLiteral("pdf-lazy-regression"),
-                    QStringLiteral("PDF懒加载回归"), pdfLazyPath, QStringLiteral("pdf"), 82, QString());
+                    QStringLiteral("PDF虚拟化回归"), pdfLazyPath, QStringLiteral("pdf"), 82, QString());
                 {
                     QEventLoop pdfLazyWait;
                     QTimer::singleShot(600, &pdfLazyWait, &QEventLoop::quit);
                     pdfLazyWait.exec();
                 }
-                if (controller.currentPage() != QStringLiteral("reader")) {
+                if (controller.currentPage() != QStringLiteral("reader")
+                    || pdfView->property("pageCount").toInt() != 82) {
                     fail("pdf-lazy-open");
                     return;
                 }
-                const auto pdfLoaders = findItemsByObjectName(pdfWindow, QStringLiteral("pdfPageLoader"));
-                if (pdfLoaders.size() < 82) {
-                    fail("pdf-lazy-delegates");
-                    return;
-                }
-                const auto countActiveLoaders = [&]() {
-                    int count = 0;
-                    for (auto* const l : findItemsByObjectName(pdfWindow, QStringLiteral("pdfPageLoader"))) {
-                        if (l->property("active").toBool()) ++count;
-                    }
-                    return count;
+                const auto countRenderedPages = [&]() {
+                    return static_cast<int>(findItemsByObjectName(pdfWindow, QStringLiteral("pdfPageImageItem")).size());
                 };
-                const auto pdfActiveLoaders = countActiveLoaders();
-                if (pdfActiveLoaders == 0 || pdfActiveLoaders > 5) {
-                    fail("pdf-lazy-active-range");
+                const auto pdfRendered = countRenderedPages();
+                if (pdfRendered == 0 || pdfRendered > 25) {
+                    fail("pdf-lazy-virtualized-range");
                     return;
                 }
-                // 滚到底：active 集合应跟随视口移动（尾部页实例化，且数量仍受控）
-                const auto pdfMaxY = qMax<qreal>(0.0, pdfReaderFlick->property("contentHeight").toDouble()
-                    - pdfReaderFlick->property("height").toDouble());
-                pdfReaderFlick->setProperty("contentY", pdfMaxY);
+                // 滚到底：实例数仍受控，currentPage 应跟随滚动到末页附近
+                const auto pdfMaxY = qMax<qreal>(0.0, pdfView->property("contentHeight").toDouble()
+                    - pdfView->property("height").toDouble());
+                pdfView->setProperty("contentY", pdfMaxY);
                 {
                     QEventLoop pdfLazyScrollWait;
-                    QTimer::singleShot(400, &pdfLazyScrollWait, &QEventLoop::quit);
+                    QTimer::singleShot(500, &pdfLazyScrollWait, &QEventLoop::quit);
                     pdfLazyScrollWait.exec();
                 }
-                const auto pdfActiveAfterScroll = countActiveLoaders();
-                if (pdfActiveAfterScroll == 0 || pdfActiveAfterScroll > 5) {
-                    fail("pdf-lazy-scroll-active-range");
+                const auto pdfRenderedAfterScroll = countRenderedPages();
+                if (pdfRenderedAfterScroll == 0 || pdfRenderedAfterScroll > 25) {
+                    fail("pdf-lazy-scroll-virtualized-range");
+                    return;
+                }
+                const auto pdfLastPage = pdfView->property("currentPage").toInt();
+                if (pdfLastPage < 78) {
+                    fail("pdf-lazy-scroll-current-page");
                     return;
                 }
             }
