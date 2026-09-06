@@ -653,7 +653,11 @@ Rectangle {
         }
         function onCurrentPageChanged() {
             if (appController.currentPage === "reader") {
-                root.finishInitialViewIfReady()
+                // 每次进入 reader 页都重置视图：第二次打开同一个文件时
+                // currentScore 不变，onCurrentScoreChanged 不触发，必须在此
+                // 重置 zoomLevel / viewRotation / contentX/Y，否则残留上一次
+                // 用户缩放后的状态。
+                root.beginViewInitialization()
             } else {
                 metronome.stop()
             }

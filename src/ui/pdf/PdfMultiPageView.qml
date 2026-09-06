@@ -153,7 +153,16 @@ Item {
     onRenderScaleChanged: {
         if (pageNavigator.jumping)
             return
-        tableView.forceLayout()
+        // 强制 TableView 完全重新计算列宽/行高/delegate。
+        // 根因：Qt TableView 的 forceLayout() 不会重新调用 columnWidthProvider，
+        // 当 renderScale 变化（典型场景：ReaderPage 隐藏时 pdfView.width=0 →
+        // baseScaleUnit=0 → renderScale fallback 到 1 → contentW 被算成原始页宽；
+        // 重开时 width 恢复 → renderScale 恢复正常值，但 contentW 永久停在旧值），
+        // 必须临时重置 model 触发完整重布局。虚拟化下仅可见行（~2个 delegate），
+        // 销毁重建成本可忽略。
+        const savedModel = tableView.model
+        tableView.model = 0
+        tableView.model = savedModel
         const cell = tableView.cellAtPos(root.width / 2, root.height / 2)
         const currentItem = cell.x >= 0 ? tableView.itemAtCell(cell) : null
         if (currentItem) {
