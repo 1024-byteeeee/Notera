@@ -66,10 +66,12 @@ Item {
         onRot90Changed: forceLayout()
         property size firstPagePointSize: root.document && root.document.status === PdfDocument.Ready
             ? root.document.pagePointSize(0) : Qt.size(1, 1)
-        property real pageHolderWidth: Math.max(root.width,
-            ((root.document && (rot90 ? root.document.maxPageHeight : root.document.maxPageWidth)) ?? 0) * root.renderScale)
         columnWidthProvider: function(col) {
-            return root.document ? pageHolderWidth + vscroll.width + 2 : 0
+            // 直接计算，不依赖中间绑定（TableView 内部 property 绑定曾出现不随 renderScale 更新的问题）。
+            // 内容宽 = max(视口宽, 最大页显示宽)：页面不超视口时无水平滚动条，放大超出时才出现。
+            if (!root.document) return 0
+            const maxW = rot90 ? root.document.maxPageHeight : root.document.maxPageWidth
+            return Math.max(root.width, maxW * root.renderScale)
         }
         rowHeightProvider: function(row) {
             const s = root.document ? root.document.pagePointSize(row) : Qt.size(1, 1)
