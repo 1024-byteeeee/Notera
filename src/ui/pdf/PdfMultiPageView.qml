@@ -35,9 +35,16 @@ Item {
     readonly property int pageCount: root.document ? root.document.pageCount : 0
 
     function goToPage(page) {
-        if (page === pageNavigator.currentPage)
-            return
-        pageNavigator.jump(page, Qt.point(-1, -1), 0)
+        if (page < 0 || page >= root.pageCount) return
+        if (page === pageNavigator.currentPage) return
+        // 直接滚动到目标页顶部：页上边缘贴齐视口上边缘（TableView.AlignTop 会考虑 topMargin）。
+        // 不依赖 pageNavigator.jump() → onJumped 的异步回调链：
+        // 原实现中 onJumped 调用 positionViewAtRow 后，onContentYChanged 触发 syncTimer，
+        // syncTimer 又调用 pageNavigator.update()，存在时序竞态导致翻页偶发失效；
+        // 且 onJumped 中 currentYOffset 传入的是当前页偏移，不是 0，页顶不会贴齐视口顶。
+        tableView.positionViewAtRow(page, TableView.AlignTop)
+        // 同步更新 currentPage（不依赖 syncTimer 的 100ms 延迟，确保底部页码立即更新）
+        pageNavigator.update(page, Qt.point(-1, -1), root.renderScale)
     }
 
     function resetView() {
@@ -233,8 +240,8 @@ Item {
         property int previousPage: 0
         onJumped: function(current) {
             jumping = true
-            if (current.zoom > 0)
-                root.renderScale = current.zoom
+            // 注意：禁止 root.renderScale = current.zoom——renderScale 由外部 zoomLevel 绑定驱动，
+            // 直接赋值会断开外部绑定，导致缩放控制失效。Notera 不通过 jump() 传递缩放。
             if (current.location.y < 0) {
                 const previousPageDelegate = tableView.itemAtCell(0, previousPage)
                 const currentYOffset = previousPageDelegate
