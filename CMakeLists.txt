@@ -79,6 +79,7 @@ qt_add_qml_module(Notera
         src/ui/components/IconButton.qml
         src/ui/components/AppDialog.qml
         src/ui/components/ConfirmDialog.qml
+        src/ui/components/LoadingDialog.qml
         src/ui/components/AppMenu.qml
         src/ui/components/AppMenuItem.qml
         src/ui/components/AppMenuSeparator.qml
