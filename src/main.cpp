@@ -1720,24 +1720,20 @@ int main(int argc, char* argv[])
                 QCoreApplication::exit(1);
             };
             auto* const importButton = root->findChild<QQuickItem*>(QStringLiteral("importButton"));
-            const auto* const stitchButton = root->findChild<QObject*>(QStringLiteral("stitchButton"));
             if (!importButton || !importButton->isVisible() || importButton->width() < 96.0
                 || importButton->property("symbol").toString().length() > 0
                 || importButton->property("hoverTransitionDuration").toInt() != 0
-                || !stitchButton || stitchButton->property("symbol").toString().length() > 0
-                || std::abs(importButton->property("visualContentCenterX").toDouble() - importButton->width() / 2.0) > 1.0
-                || std::abs(stitchButton->property("visualContentCenterX").toDouble()
-                    - stitchButton->property("width").toDouble() / 2.0) > 1.0) {
+                || std::abs(importButton->property("visualContentCenterX").toDouble() - importButton->width() / 2.0) > 1.0) {
                 fail("import-button-geometry");
                 return;
             }
-            // 回归：点击导入按钮应弹出导入菜单（导入文件… / 导入文件夹…），
+            // 回归：点击导入按钮应弹出导入菜单（导入文件… / 导入文件夹… / 拼接导入…），
             // 防止 onClicked 引用未定义 id 导致点击无反应
             auto* const importMenu = root->findChild<QObject*>(QStringLiteral("importMenu"));
             if (!importMenu
                 || !clickItem(root, QStringLiteral("importButton"), Qt::LeftButton)
                 || !importMenu->property("visible").toBool()
-                || importMenu->property("count").toInt() < 2) {
+                || importMenu->property("count").toInt() < 3) {
                 fail("import-menu-opens-from-button");
                 return;
             }

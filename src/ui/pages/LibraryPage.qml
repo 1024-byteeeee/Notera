@@ -346,15 +346,6 @@ Rectangle {
                 onClicked: importMenu.popup(importButton, 0, importButton.height)
             }
 
-            AppButton {
-                objectName: "stitchButton"
-                visible: !appController.libraryFilter.startsWith("tag:")
-                Layout.preferredWidth: 120
-                text: "拼接导入"
-                primary: true
-                onClicked: stitchDialog.open()
-            }
-
         }
 
         Rectangle {
@@ -1267,6 +1258,13 @@ Rectangle {
             symbol: "folder"
             text: "导入文件夹…"
             onTriggered: folderImportDialog.open()
+        }
+        AppMenuSeparator {}
+        AppMenuItem {
+            symbol: "stitch"
+            text: "拼接导入…"
+            objectName: "stitchImportMenuItem"
+            onTriggered: stitchDialog.open()
         }
     }
 
