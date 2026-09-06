@@ -5,6 +5,7 @@
 #include <utility>
 #include <QBuffer>
 #include <QCryptographicHash>
+#include <QDebug>
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
@@ -785,7 +786,10 @@ void LibraryService::continueImport()
     m_importIndex = 0;
     // 提交批量导入中剩余的未提交事务
     if (m_pendingInsertCount > 0) {
-        m_repository.commitTransaction(nullptr);
+        QString txError;
+        if (!m_repository.commitTransaction(&txError)) {
+            qWarning() << "[LibraryService] commitTransaction failed at import end:" << txError;
+        }
         m_pendingInsertCount = 0;
     }
     reload();
@@ -843,7 +847,10 @@ void LibraryService::finishImportTask(ImportTaskResult result)
             emit errorOccurred(QStringLiteral("将乐谱添加到乐谱库失败。"));
         } else if (!m_repository.insert(score, result.folderId, &error)) {
             (void)FileService::removeFile(result.storedPath, &error);
-            m_repository.commitTransaction(nullptr); // 保留之前已成功的 insert
+            QString txError;
+            if (!m_repository.commitTransaction(&txError)) { // 保留之前已成功的 insert
+                qWarning() << "[LibraryService] commitTransaction failed after insert error:" << txError;
+            }
             m_pendingInsertCount = 0;
             emit errorOccurred(QStringLiteral("将乐谱添加到乐谱库失败。"));
         } else {
@@ -852,7 +859,10 @@ void LibraryService::finishImportTask(ImportTaskResult result)
             }
             ++m_importSucceededCount;
             if (++m_pendingInsertCount >= 32) {
-                m_repository.commitTransaction(nullptr);
+                QString txError;
+                if (!m_repository.commitTransaction(&txError)) {
+                    qWarning() << "[LibraryService] commitTransaction failed at batch boundary:" << txError;
+                }
                 m_pendingInsertCount = 0;
             }
             // 导入过程中不做中间 reload：大量文件时全量刷新会导致 UI 卡顿，
