@@ -45,7 +45,7 @@ public:
     [[nodiscard]] QVariantList recentFolders(const QString& searchQuery, QString* error) const;
     [[nodiscard]] QVariantList favoriteFolders(const QString& searchQuery, QString* error) const;
     [[nodiscard]] QVariantList foldersByTag(const QString& tagId, const QString& searchQuery, QString* error) const;
-    [[nodiscard]] QVariantList childFolders(const QString& parentId, QString* error) const;
+    [[nodiscard]] QVariantList childFolders(const QString& parentId, const QString& searchQuery, QString* error) const;
     [[nodiscard]] QString folderParent(const QString& folderId, QString* error) const;
     [[nodiscard]] QString folderName(const QString& folderId, QString* error) const;
     [[nodiscard]] QString folderBreadcrumb(const QString& folderId, QString* error) const;

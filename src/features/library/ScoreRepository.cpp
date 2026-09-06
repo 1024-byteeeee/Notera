@@ -714,18 +714,22 @@ QVariantList ScoreRepository::foldersByTag(const QString& tagId, const QString& 
     return result;
 }
 
-QVariantList ScoreRepository::childFolders(const QString& parentId, QString* error) const
+QVariantList ScoreRepository::childFolders(const QString& parentId, const QString& searchQuery, QString* error) const
 {
     QSqlQuery query(m_database);
     const auto condition = parentId.isEmpty()
         ? QStringLiteral("parent_id IS NULL")
         : QStringLiteral("parent_id = ?");
+    const auto searchCondition = searchQuery.isEmpty()
+        ? QString()
+        : QStringLiteral(" AND name LIKE ?");
     query.prepare(QStringLiteral(R"(
         SELECT id, name, created_at, favorite FROM folders
-        WHERE %1
+        WHERE %1%2
         ORDER BY name COLLATE NOCASE
-    )").arg(condition));
+    )").arg(condition, searchCondition));
     if (!parentId.isEmpty()) query.addBindValue(parentId);
+    if (!searchQuery.isEmpty()) query.addBindValue(QStringLiteral("%%1%").arg(searchQuery));
     if (!query.exec()) {
         *error = query.lastError().text();
         return {};

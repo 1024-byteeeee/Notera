@@ -132,8 +132,12 @@ Item {
                     // 只有左上块显示、其余块空白——表现为"页面小小的在左上角"。
                     // 整页渲染在 Qt 6.8 下已足够快，分块优化收益不抵稳定性风险。
                     tileCount: 1
-                    width: paper.pagePointSize.width * root.renderScale
-                    height: paper.pagePointSize.height * root.renderScale
+                    // 旋转 90/270 度时交换宽高，使布局尺寸与 CachedPdfPageImage 内部
+                    // _pageImageSize() 的渲染尺寸一致。否则布局尺寸仍是原始宽高，
+                    // 而渲染图像已交换宽高，Image.PreserveAspectFit 会压缩显示，
+                    // 表现为"90度旋转无效/页面空白"。
+                    width: (tableView.rot90 ? paper.pagePointSize.height : paper.pagePointSize.width) * root.renderScale
+                    height: (tableView.rot90 ? paper.pagePointSize.width : paper.pagePointSize.height) * root.renderScale
                     onStatusChanged: {
                         if (pageHolder.index === root.currentPage
                             || (root.currentPage < 0 && pageHolder.index === 0)) {

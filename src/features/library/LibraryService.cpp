@@ -393,7 +393,7 @@ void LibraryService::renameFolder(const QString& folderId, const QString& name)
     const auto trimmed = name.trimmed();
     // 对齐 Windows：同目录下已存在同名文件夹时拒绝重命名
     const auto parentId = m_repository.folderParent(folderId, &error);
-    const auto siblings = m_repository.childFolders(parentId, &error);
+    const auto siblings = m_repository.childFolders(parentId, QString(), &error);
     for (const auto& f : siblings) {
         const auto siblingId = f.toMap().value(QStringLiteral("id")).toString();
         if (siblingId != folderId
@@ -1354,14 +1354,14 @@ void LibraryService::reload()
         visibleFolders = m_repository.recentFolders(m_searchQuery, &error);
     } else if (m_filterMode.startsWith(QStringLiteral("folder:"))) {
         scores = m_repository.listAtFolder(m_currentFolderId, m_searchQuery, &error);
-        visibleFolders = m_repository.childFolders(m_currentFolderId, &error);
+        visibleFolders = m_repository.childFolders(m_currentFolderId, m_searchQuery, &error);
     } else if (m_filterMode.startsWith(QStringLiteral("tag:"))) {
         const auto tagId = m_filterMode.mid(4);
         scores = m_repository.listByTag(tagId, m_searchQuery, &error);
         visibleFolders = m_repository.foldersByTag(tagId, m_searchQuery, &error);
     } else {
         scores = m_repository.listAtFolder({}, m_searchQuery, &error);
-        visibleFolders = m_repository.childFolders({}, &error);
+        visibleFolders = m_repository.childFolders({}, m_searchQuery, &error);
     }
     if (!error.isEmpty()) {
         emit errorOccurred(QStringLiteral("加载乐谱库失败。"));
@@ -1441,7 +1441,7 @@ void LibraryService::importFile(const QString& sourcePath, const QString& titleO
 QVariantList LibraryService::childFolders(const QString& folderId)
 {
     QString error;
-    return m_repository.childFolders(folderId, &error);
+    return m_repository.childFolders(folderId, QString(), &error);
 }
 
 QVariantList LibraryService::clipboardItems() const { return m_clipboardItems; }
@@ -1472,7 +1472,7 @@ bool LibraryService::nameExistsInFolder(const QString& name, const QString& fold
 {
     QString error;
     if (isFolder) {
-        const auto folders = m_repository.childFolders(folderId, &error);
+        const auto folders = m_repository.childFolders(folderId, QString(), &error);
         for (const auto& f : folders) {
             // 对齐 Windows：名称比较忽略大小写
             if (QString::compare(f.toMap().value(QStringLiteral("name")).toString(), name, Qt::CaseInsensitive) == 0) {
@@ -1584,7 +1584,7 @@ QString LibraryService::copyFolderRecursive(const QString& folderId, const QStri
             targetName = uniqueNameInFolder(sourceName, targetParentId, true);
         } else if (conflictAction == QStringLiteral("overwrite")) {
             bool deletedAny = false;
-            const auto children = m_repository.childFolders(targetParentId, &error);
+            const auto children = m_repository.childFolders(targetParentId, QString(), &error);
             for (const auto& f : children) {
                 const auto existingId = f.toMap().value(QStringLiteral("id")).toString();
                 // 同目录复制：目标里的同名文件夹就是源自身，绝不能删除源文件夹
@@ -1604,7 +1604,7 @@ QString LibraryService::copyFolderRecursive(const QString& folderId, const QStri
         return QStringLiteral("创建文件夹失败。");
     }
     // createFolder 内部自己生成 UUID，创建后必须重新查询获取真实 id
-    const auto updated = m_repository.childFolders(targetParentId, &error);
+    const auto updated = m_repository.childFolders(targetParentId, QString(), &error);
     QString newFolderId;
     for (const auto& f : updated) {
         if (f.toMap().value(QStringLiteral("name")).toString() == targetName) {
@@ -1619,7 +1619,7 @@ QString LibraryService::copyFolderRecursive(const QString& folderId, const QStri
         copyScoreToFolder(s.id, newFolderId, conflictAction);
     }
 
-    const auto childFolders = m_repository.childFolders(folderId, &error);
+    const auto childFolders = m_repository.childFolders(folderId, QString(), &error);
     for (const auto& f : childFolders) {
         copyFolderRecursive(f.toMap().value(QStringLiteral("id")).toString(), newFolderId, conflictAction);
     }
@@ -1629,7 +1629,7 @@ QString LibraryService::copyFolderRecursive(const QString& folderId, const QStri
 QString LibraryService::getOrCreateFolder(const QString& name, const QString& parentId)
 {
     QString error;
-    const auto children = m_repository.childFolders(parentId, &error);
+    const auto children = m_repository.childFolders(parentId, QString(), &error);
     for (const auto& f : children) {
         if (f.toMap().value(QStringLiteral("name")).toString() == name) {
             return f.toMap().value(QStringLiteral("id")).toString();
@@ -1640,7 +1640,7 @@ QString LibraryService::getOrCreateFolder(const QString& name, const QString& pa
         emit errorOccurred(QStringLiteral("创建文件夹失败：%1").arg(name));
         return {};
     }
-    const auto updated = m_repository.childFolders(parentId, &error);
+    const auto updated = m_repository.childFolders(parentId, QString(), &error);
     for (const auto& f : updated) {
         if (f.toMap().value(QStringLiteral("name")).toString() == name) {
             return f.toMap().value(QStringLiteral("id")).toString();
@@ -1665,7 +1665,7 @@ void LibraryService::expandFolderToQueue(const QString& sourceFolderId, const QS
     }
 
     // 展开子文件夹：targetFolderId 为父目标，continuePaste 会自动合并同名子文件夹并递归展开
-    const auto subFolders = m_repository.childFolders(sourceFolderId, &error);
+    const auto subFolders = m_repository.childFolders(sourceFolderId, QString(), &error);
     for (const auto& f : subFolders) {
         m_pasteQueue.insert(m_pasteIndex + 1 + insertOffset, QVariantMap{
             {QStringLiteral("itemId"), f.toMap().value(QStringLiteral("id")).toString()},
@@ -1679,13 +1679,13 @@ void LibraryService::deleteEmptyFolderTree(const QString& folderId)
 {
     QString error;
     // 先递归清理空子文件夹
-    const auto subFolders = m_repository.childFolders(folderId, &error);
+    const auto subFolders = m_repository.childFolders(folderId, QString(), &error);
     for (const auto& f : subFolders) {
         deleteEmptyFolderTree(f.toMap().value(QStringLiteral("id")).toString());
     }
     // 重新检查：仅当文件夹内已无乐谱且无子文件夹时才删除
     const auto scores = m_repository.listAtFolder(folderId, QString(), &error);
-    const auto remainingSubFolders = m_repository.childFolders(folderId, &error);
+    const auto remainingSubFolders = m_repository.childFolders(folderId, QString(), &error);
     if (scores.isEmpty() && remainingSubFolders.isEmpty()) {
         if (!m_repository.deleteFolder(folderId, &error)) {
             emit errorOccurred(QStringLiteral("清理空文件夹失败。"));
@@ -1804,7 +1804,7 @@ void LibraryService::continuePaste()
                     }
                     if (action == QStringLiteral("overwrite")) {
                         // 删除目标文件夹（对齐 Windows：大小写不敏感比较）
-                        const auto children = m_repository.childFolders(targetFolderId, &error);
+                        const auto children = m_repository.childFolders(targetFolderId, QString(), &error);
                         for (const auto& f : children) {
                             if (QString::compare(f.toMap().value(QStringLiteral("name")).toString(), sourceName, Qt::CaseInsensitive) != 0) continue;
                             if (!m_repository.deleteFolder(f.toMap().value(QStringLiteral("id")).toString(), &error)) {
@@ -2151,7 +2151,7 @@ QString LibraryService::importDatabaseBackupMerged(const QUrl& backupFile)
                 if (map.value(QStringLiteral("parentId")).toString() != backupParentId) continue;
                 const auto name = map.value(QStringLiteral("name")).toString();
                 QString matchedId;
-                const auto children = m_repository.childFolders(targetParentId, &error);
+                const auto children = m_repository.childFolders(targetParentId, QString(), &error);
                 for (const auto& child : children) {
                     if (child.toMap().value(QStringLiteral("name")).toString() == name) {
                         matchedId = child.toMap().value(QStringLiteral("id")).toString();
