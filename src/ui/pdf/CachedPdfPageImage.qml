@@ -1,7 +1,11 @@
 // Notera 缓存版 PDF 页面图像组件。
 // 替换 PdfPageImage：先查 PdfRenderCache，命中直接显示（0ms）；
-// miss 则通过 QPdfPageRenderer 异步渲染并写入缓存；
-// 缩放时先用 closest 缓存（旧分辨率拉伸）显示，零空白（参考 Sioyek try_closest_rendered_page）。
+// miss 则通过 QPdfPageRenderer 异步渲染并写入缓存。
+//
+// Phase 2：可见页 High 优先级插队渲染，预渲染 Low 优先级可批量取消。
+// Phase 3：分块渲染——tileCount>1 时大页面分成 N×N 块，每块独立缓存/渲染，
+//          首块快速显示（参考 SumatraPDF TilePosition + Okular TilesManager）。
+//          整页模式(tileCount=1)支持 closest 缓存（Sioyek 技巧，缩放零空白）。
 
 import QtQuick
 import QtQuick.Pdf
@@ -25,16 +29,18 @@ Item {
     /*! 渲染状态（兼容 PdfPageImage.status：Image.Null/Loading/Ready） */
     property int status: Image.Null
 
-    // 内部跟踪：当前进行中的渲染请求 ID（用于属性变化时取消）
-    property var _pendingRequestId: 0
+    /*! 分块网格大小：1=整页渲染(默认)，2=2×2分块，3=3×3分块。
+        大页面(渲染宽度>1500px)建议设为 2 或 3，首块显示更快。 */
+    property int tileCount: 1
 
     // 与 C++ PdfRenderCache::makeKey / quantizeScale 保持一致
     function _quantizeScale(s) { return Math.round(s * 10000) }
-    function _cacheKey(page, scale, rot) {
-        return page + "_" + root._quantizeScale(scale) + "_" + Math.round(rot)
+    function _cacheKey(page, scale, rot, tileRow, tileCol) {
+        var key = page + "_" + root._quantizeScale(scale) + "_" + Math.round(rot)
+        if (tileRow !== undefined && tileRow >= 0 && tileCol !== undefined && tileCol >= 0)
+            key += "_" + tileRow + "_" + tileCol
+        return key
     }
-    function _myKey() { return root._cacheKey(root.currentFrame, root.renderScale, root.pageRotation) }
-
     function _pageImageSize() {
         if (!root.document || root.document.status !== PdfDocument.Ready) return Qt.size(0, 0)
         const ps = root.document.pagePointSize(root.currentFrame)
@@ -45,85 +51,132 @@ Item {
                         Math.max(1, Math.round(h * root.renderScale * Screen.devicePixelRatio)))
     }
 
-    function refresh() {
-        if (!root.document || root.document.status !== PdfDocument.Ready
-            || root.currentFrame < 0 || root.currentFrame >= root.document.pageCount) {
-            display.source = ""
-            root.status = Image.Null
-            return
-        }
-
-        // 取消旧请求（快速滚动/缩放时不再需要的渲染）
-        if (root._pendingRequestId !== 0) {
-            pdfRender.cancelRequest(root._pendingRequestId)
-            root._pendingRequestId = 0
-        }
-
-        const myKey = root._myKey()
-
-        // 1. 精确命中：直接显示缓存
-        if (pdfRender.hasCache(root.currentFrame, root.renderScale, root.pageRotation)) {
-            display.source = "image://pdfcache/" + myKey
-            root.status = Image.Ready
-            return
-        }
-
-        // 2. closest 命中（缩放时先用旧分辨率拉伸显示，零空白）
-        const closest = pdfRender.closestCacheKey(root.currentFrame, root.renderScale, root.pageRotation)
-        if (closest !== "" && closest !== myKey) {
-            display.source = "image://pdfcache/" + closest
-            root.status = Image.Ready // 临时显示，后台渲染新分辨率
-        } else {
-            display.source = ""
-            root.status = Image.Loading
-        }
-
-        // 3. 请求渲染新分辨率
-        const imgSize = root._pageImageSize()
-        if (imgSize.width > 0 && imgSize.height > 0) {
-            const reqId = pdfRender.requestRender(
-                root.currentFrame, root.renderScale, root.pageRotation, imgSize)
-            if (reqId !== 0) {
-                root._pendingRequestId = reqId
-            }
-        }
-    }
-
-    Image {
-        id: display
+    // 分块网格：tileCount=1 时退化为单页
+    Grid {
+        id: tileGrid
         anchors.fill: parent
-        fillMode: Image.PreserveAspectFit
-        asynchronous: false
-        cache: false // 不经过 QQuickPixmap 缓存，直接从 provider 取（缓存已在 PdfRenderCache）
-        source: ""
-    }
+        columns: Math.max(1, root.tileCount)
+        rows: Math.max(1, root.tileCount)
+        spacing: 0
 
-    Connections {
-        target: pdfRender
-        function onRenderFinished(reqId, page, scale, rotation) {
-            // 匹配到当前页/缩放/旋转才更新显示
-            if (page !== root.currentFrame) return
-            if (Math.abs(scale - root.renderScale) > 0.0001) return
-            if (Math.abs(rotation - root.pageRotation) > 0.5) return
+        Repeater {
+            model: Math.max(1, root.tileCount) * Math.max(1, root.tileCount)
 
-            if (root._pendingRequestId === reqId) {
-                root._pendingRequestId = 0
+            delegate: Item {
+                id: tileDelegate
+                required property int index
+
+                readonly property int tileRow: Math.floor(index / Math.max(1, root.tileCount))
+                readonly property int tileCol: index % Math.max(1, root.tileCount)
+                readonly property bool isWholePage: root.tileCount <= 1
+
+                property var pendingRequestId: 0
+
+                function tileKey() {
+                    return root._cacheKey(root.currentFrame, root.renderScale,
+                        root.pageRotation,
+                        isWholePage ? -1 : tileRow,
+                        isWholePage ? -1 : tileCol)
+                }
+
+                function refresh() {
+                    if (!root.document || root.document.status !== PdfDocument.Ready
+                        || root.currentFrame < 0 || root.currentFrame >= root.document.pageCount) {
+                        tileImage.source = ""
+                        if (isWholePage) root.status = Image.Null
+                        return
+                    }
+
+                    // 取消旧请求
+                    if (tileDelegate.pendingRequestId !== 0) {
+                        pdfRender.cancelRequest(tileDelegate.pendingRequestId)
+                        tileDelegate.pendingRequestId = 0
+                    }
+
+                    const tRow = isWholePage ? -1 : tileRow
+                    const tCol = isWholePage ? -1 : tileCol
+
+                    // 1. 精确命中
+                    if (pdfRender.hasCache(root.currentFrame, root.renderScale,
+                                           root.pageRotation, tRow, tCol)) {
+                        tileImage.source = "image://pdfcache/" + tileDelegate.tileKey()
+                        if (isWholePage) root.status = Image.Ready
+                        return
+                    }
+
+                    // 2. closest 命中（仅整页模式：缩放时先用旧分辨率拉伸显示，零空白）
+                    if (isWholePage) {
+                        const closest = pdfRender.closestCacheKey(
+                            root.currentFrame, root.renderScale, root.pageRotation)
+                        if (closest !== "" && closest !== tileDelegate.tileKey()) {
+                            tileImage.source = "image://pdfcache/" + closest
+                            root.status = Image.Ready // 临时显示
+                        } else {
+                            tileImage.source = ""
+                            root.status = Image.Loading
+                        }
+                    } else {
+                        tileImage.source = ""
+                    }
+
+                    // 3. 请求渲染（High 优先级：可见页立即插队）
+                    const imgSize = root._pageImageSize()
+                    if (imgSize.width > 0 && imgSize.height > 0) {
+                        const reqId = pdfRender.requestRender(
+                            root.currentFrame, root.renderScale, root.pageRotation,
+                            imgSize, 0, tRow, tCol, root.tileCount)
+                        if (reqId !== 0) {
+                            tileDelegate.pendingRequestId = reqId
+                        }
+                    }
+                }
+
+                Image {
+                    id: tileImage
+                    anchors.fill: parent
+                    fillMode: Image.PreserveAspectFit
+                    asynchronous: false
+                    cache: false
+                    source: ""
+                }
+
+                Connections {
+                    target: pdfRender
+                    function onRenderFinished(reqId, page, scale, rotation) {
+                        if (reqId !== tileDelegate.pendingRequestId) return
+                        if (page !== root.currentFrame) return
+                        if (Math.abs(scale - root.renderScale) > 0.0001) return
+                        if (Math.abs(rotation - root.pageRotation) > 0.5) return
+
+                        tileDelegate.pendingRequestId = 0
+                        tileImage.source = "image://pdfcache/" + tileDelegate.tileKey()
+                        if (tileDelegate.isWholePage) root.status = Image.Ready
+                    }
+                }
+
+                Component.onCompleted: tileDelegate.refresh()
             }
-            display.source = "image://pdfcache/" + root._myKey()
-            root.status = Image.Ready
         }
     }
 
-    Component.onCompleted: root.refresh()
-    onCurrentFrameChanged: root.refresh()
-    onRenderScaleChanged: root.refresh()
-    onPageRotationChanged: root.refresh()
+    // 属性变化时刷新所有分块
+    onCurrentFrameChanged: refreshAll()
+    onRenderScaleChanged: refreshAll()
+    onPageRotationChanged: refreshAll()
+    onTileCountChanged: refreshAll()
+
+    function refreshAll() {
+        for (var i = 0; i < tileGrid.children.length; i++) {
+            var child = tileGrid.children[i]
+            if (child && child.refresh) child.refresh()
+        }
+    }
 
     Connections {
         target: root.document
         function onStatusChanged() {
             if (root.document && root.document.status === PdfDocument.Ready)
-                root.refresh()
+                root.refreshAll()
         }
     }
 }

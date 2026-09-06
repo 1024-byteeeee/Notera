@@ -38,64 +38,195 @@ void PdfRenderService::setDocument(QObject* document)
     m_renderer->setDocument(pdfDoc);
 }
 
-quint64 PdfRenderService::requestRender(int page, qreal scale, int rotation, QSize imageSize)
+quint64 PdfRenderService::requestRender(int page, qreal scale, int rotation,
+    QSize imageSize, int priority, int tileRow, int tileCol, int tileCount)
 {
+    const Priority prio = (priority == 1) ? Priority::Low : Priority::High;
     if (!m_document || m_document->status() != QPdfDocument::Status::Ready)
         return 0;
     if (page < 0 || page >= m_document->pageCount())
         return 0;
     if (imageSize.isEmpty())
         return 0;
-    if (m_cache->has(page, scale, rotation))
+    if (m_cache->has(page, scale, rotation, tileRow, tileCol))
         return 0;
 
-    QPdfDocumentRenderOptions options;
-    options.setRotation(rotationFromDegrees(rotation));
+    // 生成对外请求 ID
+    const quint64 id = m_nextId++;
 
-    const quint64 id = m_renderer->requestPage(page, imageSize, options);
-    if (id != 0) {
-        m_pending.insert(id, {page, scale, rotation});
+    Request req;
+    req.id = id;
+    req.page = page;
+    req.scale = scale;
+    req.rotation = rotation;
+    req.imageSize = imageSize;
+    req.priority = prio;
+    req.tileRow = tileRow;
+    req.tileCol = tileCol;
+    req.tileCount = qMax(1, tileCount);
+
+    if (!m_inFlight) {
+        // 立即发送
+        const quint64 rendererId = m_renderer->requestPage(page, imageSize, buildOptions(req));
+        if (rendererId == 0)
+            return 0;
+        req.rendererId = rendererId;
+        req.inFlight = true;
+        m_inFlight = true;
+    } else {
+        // 入队：高优先级插队到低优先级前面（高优先级队列始终先于低优先级处理）
+        if (prio == Priority::High)
+            m_highQueue.append(id);
+        else
+            m_lowQueue.append(id);
     }
+
+    m_requests.insert(id, req);
     return id;
+}
+
+QPdfDocumentRenderOptions PdfRenderService::buildOptions(const Request& req) const
+{
+    QPdfDocumentRenderOptions options;
+    options.setRotation(rotationFromDegrees(req.rotation));
+    if (req.tileRow >= 0 && req.tileCol >= 0 && req.tileCount > 1) {
+        // 分块渲染：scaledSize = 整页渲染尺寸，scaledClipRect = 该块在整页中的矩形
+        const int blockW = req.imageSize.width() / req.tileCount;
+        const int blockH = req.imageSize.height() / req.tileCount;
+        options.setScaledSize(req.imageSize);
+        options.setScaledClipRect(QRect(
+            req.tileCol * blockW, req.tileRow * blockH, blockW, blockH));
+    }
+    return options;
+}
+
+void PdfRenderService::dispatchNext()
+{
+    if (m_inFlight)
+        return;
+    if (!m_document || m_document->status() != QPdfDocument::Status::Ready)
+        return;
+
+    // 高优先级优先，其次低优先级
+    quint64 id = 0;
+    if (!m_highQueue.isEmpty())
+        id = m_highQueue.takeFirst();
+    else if (!m_lowQueue.isEmpty())
+        id = m_lowQueue.takeFirst();
+    else
+        return;
+
+    auto it = m_requests.find(id);
+    if (it == m_requests.end()) {
+        // 已被取消，继续取下一个
+        dispatchNext();
+        return;
+    }
+
+    const quint64 rendererId = m_renderer->requestPage(
+        it->page, it->imageSize, buildOptions(*it));
+    if (rendererId == 0) {
+        // 发送失败，移除并继续
+        m_requests.erase(it);
+        dispatchNext();
+        return;
+    }
+
+    it->rendererId = rendererId;
+    it->inFlight = true;
+    m_inFlight = true;
+}
+
+void PdfRenderService::removeRequest(quint64 id)
+{
+    m_highQueue.removeAll(id);
+    m_lowQueue.removeAll(id);
+    m_requests.remove(id);
 }
 
 void PdfRenderService::cancelRequest(quint64 requestId)
 {
-    // QPdfPageRenderer 没有公开的 cancelPage API，无法真正中止后台渲染。
-    // 从 pending 表移除后，onPageRendered 会忽略该请求的结果（不写入缓存、不发信号）。
-    if (requestId != 0)
-        m_pending.remove(requestId);
+    if (requestId == 0)
+        return;
+    // 排队中的直接移除；在飞的保留在 m_requests 中但标记逻辑取消——
+    // 实际上直接移除即可，onPageRendered 用 rendererId 查找时找不到就忽略。
+    removeRequest(requestId);
 }
 
 void PdfRenderService::cancelAll()
 {
-    m_pending.clear();
+    m_highQueue.clear();
+    m_lowQueue.clear();
+    m_requests.clear();
+    // 注意：QPdfPageRenderer 中可能还有一个在飞请求，完成后 onPageRendered
+    // 找不到对应 Request（m_requests 已清空），会忽略结果。
+    m_inFlight = false;
+}
+
+void PdfRenderService::cancelLowPriority()
+{
+    // 移除所有低优先级排队请求
+    for (const quint64 id : m_lowQueue) {
+        m_requests.remove(id);
+    }
+    m_lowQueue.clear();
+
+    // 如果在飞的请求是低优先级，也移除（完成时忽略结果）
+    if (m_inFlight) {
+        for (auto it = m_requests.begin(); it != m_requests.end(); ) {
+            if (it->inFlight && it->priority == Priority::Low) {
+                it = m_requests.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
 }
 
 void PdfRenderService::onPageRendered(int pageNumber, QSize /*imageSize*/,
     const QImage& image, const QPdfDocumentRenderOptions& /*options*/, quint64 requestId)
 {
-    const auto it = m_pending.constFind(requestId);
-    if (it == m_pending.constEnd())
-        return; // 已被取消的请求：忽略结果
-    const RequestInfo info = it.value();
-    m_pending.erase(it);
+    // 用 rendererId 查找对应的 Request
+    Request req;
+    bool found = false;
+    for (auto it = m_requests.begin(); it != m_requests.end(); ++it) {
+        if (it->rendererId == requestId && it->inFlight) {
+            req = it.value();
+            found = true;
+            m_requests.erase(it);
+            break;
+        }
+    }
 
-    // 防御：pageNumber 应与 info.page 一致
-    if (pageNumber != info.page)
+    m_inFlight = false;
+
+    if (!found) {
+        // 已被取消的请求：忽略结果，继续处理队列
+        dispatchNext();
         return;
+    }
+
+    if (pageNumber != req.page) {
+        dispatchNext();
+        return;
+    }
 
     if (!image.isNull()) {
-        m_cache->insert(info.page, info.scale, info.rotation, image);
+        m_cache->insert(req.page, req.scale, req.rotation, image,
+            req.tileRow, req.tileCol);
     }
-    emit renderFinished(requestId, info.page, info.scale, info.rotation);
+    emit renderFinished(req.id, req.page, req.scale, req.rotation);
+
+    // 处理下一个排队请求
+    dispatchNext();
 }
 
 // ---- 缓存代理 ----
 
-bool PdfRenderService::hasCache(int page, qreal scale, int rotation) const
+bool PdfRenderService::hasCache(int page, qreal scale, int rotation,
+    int tileRow, int tileCol) const
 {
-    return m_cache->has(page, scale, rotation);
+    return m_cache->has(page, scale, rotation, tileRow, tileCol);
 }
 
 QString PdfRenderService::closestCacheKey(int page, qreal scale, int rotation) const

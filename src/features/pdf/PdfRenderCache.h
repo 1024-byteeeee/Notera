@@ -19,13 +19,17 @@ public:
     explicit PdfRenderCache(QObject* parent = nullptr);
 
     // 写入缓存。若已存在同 key 则覆盖并更新内存统计。
-    Q_INVOKABLE void insert(int page, qreal scale, int rotation, const QImage& image);
+    // tileRow/tileCol 默认 -1 表示整页；>=0 表示分块渲染的某一块。
+    Q_INVOKABLE void insert(int page, qreal scale, int rotation, const QImage& image,
+        int tileRow = -1, int tileCol = -1);
 
     // 精确匹配取图，命中则更新 lastAccess。未命中返回空 QImage。
-    Q_INVOKABLE QImage get(int page, qreal scale, int rotation);
+    Q_INVOKABLE QImage get(int page, qreal scale, int rotation,
+        int tileRow = -1, int tileCol = -1);
 
     // 精确匹配是否存在（不更新 lastAccess）。
-    Q_INVOKABLE bool has(int page, qreal scale, int rotation) const;
+    Q_INVOKABLE bool has(int page, qreal scale, int rotation,
+        int tileRow = -1, int tileCol = -1) const;
 
     // 返回同一 (page, rotation) 下 scale 最接近的缓存 key 字符串；
     // 无缓存返回空字符串。用于缩放时先用旧分辨率拉伸显示（Sioyek closest 技巧）。
@@ -47,7 +51,9 @@ public:
 
     // 量化 scale 到 4 位小数，避免浮点 hash 不稳定。
     static int quantizeScale(qreal scale);
-    static QString makeKey(int page, qreal scale, int rotation);
+    // 生成缓存 key。tileRow/tileCol 默认 -1 表示整页；>=0 生成分块 key。
+    static QString makeKey(int page, qreal scale, int rotation,
+        int tileRow = -1, int tileCol = -1);
 
 private:
     struct Entry {

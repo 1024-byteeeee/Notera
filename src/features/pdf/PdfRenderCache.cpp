@@ -19,11 +19,17 @@ int PdfRenderCache::quantizeScale(qreal scale)
     return qRound(scale * 10000.0);
 }
 
-QString PdfRenderCache::makeKey(int page, qreal scale, int rotation)
+QString PdfRenderCache::makeKey(int page, qreal scale, int rotation,
+    int tileRow, int tileCol)
 {
-    return QString::number(page) + QLatin1Char('_')
+    QString key = QString::number(page) + QLatin1Char('_')
         + QString::number(quantizeScale(scale)) + QLatin1Char('_')
         + QString::number(rotation);
+    if (tileRow >= 0 && tileCol >= 0) {
+        key += QLatin1Char('_') + QString::number(tileRow)
+            + QLatin1Char('_') + QString::number(tileCol);
+    }
+    return key;
 }
 
 size_t PdfRenderCache::imageBytes(const QImage& img)
@@ -35,13 +41,14 @@ size_t PdfRenderCache::imageBytes(const QImage& img)
         * static_cast<size_t>((img.depth() + 7) / 8);
 }
 
-void PdfRenderCache::insert(int page, qreal scale, int rotation, const QImage& image)
+void PdfRenderCache::insert(int page, qreal scale, int rotation, const QImage& image,
+    int tileRow, int tileCol)
 {
     if (image.isNull())
         return;
 
     QMutexLocker lock(&m_mutex);
-    const QString key = makeKey(page, scale, rotation);
+    const QString key = makeKey(page, scale, rotation, tileRow, tileCol);
     const size_t bytes = imageBytes(image);
 
     auto it = m_entries.find(key);
@@ -63,10 +70,11 @@ void PdfRenderCache::insert(int page, qreal scale, int rotation, const QImage& i
     evictIfNeeded();
 }
 
-QImage PdfRenderCache::get(int page, qreal scale, int rotation)
+QImage PdfRenderCache::get(int page, qreal scale, int rotation,
+    int tileRow, int tileCol)
 {
     QMutexLocker lock(&m_mutex);
-    const QString key = makeKey(page, scale, rotation);
+    const QString key = makeKey(page, scale, rotation, tileRow, tileCol);
     auto it = m_entries.find(key);
     if (it == m_entries.end())
         return {};
@@ -74,10 +82,11 @@ QImage PdfRenderCache::get(int page, qreal scale, int rotation)
     return it->image;
 }
 
-bool PdfRenderCache::has(int page, qreal scale, int rotation) const
+bool PdfRenderCache::has(int page, qreal scale, int rotation,
+    int tileRow, int tileCol) const
 {
     QMutexLocker lock(&m_mutex);
-    return m_entries.contains(makeKey(page, scale, rotation));
+    return m_entries.contains(makeKey(page, scale, rotation, tileRow, tileCol));
 }
 
 QString PdfRenderCache::closestKey(int page, qreal scale, int rotation) const

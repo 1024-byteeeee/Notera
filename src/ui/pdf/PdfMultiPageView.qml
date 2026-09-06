@@ -63,7 +63,8 @@ Item {
         boundsBehavior: Flickable.StopAtBounds
         onMovementStarted: {
             root.viewMovementStarted()
-            prefetchTimer.stop() // 快速滚动时取消预渲染（pdf.js 技巧：不渲染不再可见的页）
+            prefetchTimer.stop() // 快速滚动时取消预渲染调度
+            pdfRender.cancelLowPriority() // 批量取消所有 Low 优先级预渲染请求（pdf.js 技巧）
         }
         onMovementEnded: prefetchTimer.restart()
 
@@ -114,6 +115,12 @@ Item {
                     currentFrame: pageHolder.index
                     renderScale: root.renderScale
                     pageRotation: root.pageRotation
+                    // 大页面自动分块：渲染宽度>1800px 用 2×2 分块，首块显示更快
+                    // （参考 SumatraPDF TilePosition + Okular TilesManager）
+                    tileCount: {
+                        const pxW = paper.pagePointSize.width * root.renderScale * Screen.devicePixelRatio
+                        return pxW > 1800 ? 2 : 1
+                    }
                     width: paper.pagePointSize.width * root.renderScale
                     height: paper.pagePointSize.height * root.renderScale
                     onStatusChanged: {
@@ -175,7 +182,8 @@ Item {
                 const h = rot90 ? ps.width : ps.height
                 pdfRender.requestRender(p, root.renderScale, root.pageRotation,
                     Qt.size(Math.max(1, Math.round(w * root.renderScale * Screen.devicePixelRatio)),
-                             Math.max(1, Math.round(h * root.renderScale * Screen.devicePixelRatio))))
+                             Math.max(1, Math.round(h * root.renderScale * Screen.devicePixelRatio))),
+                    1) // Low 优先级：预渲染排队，可被 cancelLowPriority 批量取消
             }
         }
     }
