@@ -16,6 +16,7 @@ Rectangle {
     property real scrollAccumulator: 0
     property real zoomLevel: 1.0
     property int viewRotation: 0
+    onViewRotationChanged: root.updateBaseScaleUnit()
     property real pinchBaseZoom: 1.0
     property real pinchAnchorX: 0.5
     property real pinchAnchorY: 0.5
@@ -23,17 +24,31 @@ Rectangle {
     property real pinchViewportY: 0
     property bool viewInitializationPending: false
     property int viewInitializationToken: 0
-    readonly property real baseScaleUnit: {
-        // zoomLevel=1.0 时 PdfMultiPageView 应使用的 renderScale：
-        // 让文档最大页显示宽 = min(视口宽-48, 1100)（与原 documentColumn.pageWidth 基准一致）。
-        // 用 maxPageWidth 而非首页宽，避免首页尺寸异常导致后续页显示过大。
-        if (!root.isPdf || pdfDocument.status !== PdfDocument.Ready || pdfDocument.pageCount < 1)
-            return 0
+    // baseScaleUnit: zoomLevel=1.0 时 PdfMultiPageView 应使用的 renderScale。
+    // 让文档最大页显示宽 = min(视口宽-48, 1100)。
+    // 用 maxPageWidth 而非首页宽，避免首页尺寸异常导致后续页显示过大。
+    //
+    // 注意：不用 readonly property 绑定，因为 ReaderPage 在 StackLayout 中初始不可见，
+    // pdfView.width=0；切换到 reader 页时宽度从 0→正常值，QML 绑定在某些时序下
+    // 未正确重算（实测全屏窗口下 baseScaleUnit 停留在初始值 0，renderScale fallback
+    // 到 1，页面显示为原始点大小且偏左上角）。改为普通 property + 手动更新函数，
+    // 在所有相关变化点显式刷新，确保健壮性。
+    property real baseScaleUnit: 0
+
+    function updateBaseScaleUnit() {
+        if (!root.isPdf || !pdfDocument || pdfDocument.status !== PdfDocument.Ready || pdfDocument.pageCount < 1) {
+            root.baseScaleUnit = 0
+            return
+        }
         const maxW = pdfDocument.maxPageWidth
         const maxH = pdfDocument.maxPageHeight
-        if (maxW <= 0 || maxH <= 0) return 0
+        if (maxW <= 0 || maxH <= 0) {
+            root.baseScaleUnit = 0
+            return
+        }
         const displayWidth = root.viewRotation % 180 !== 0 ? maxH : maxW
-        return displayWidth > 0 ? Math.min(pdfView.width - 48, 1100) / displayWidth : 0
+        const w = pdfView.width > 0 ? pdfView.width : readerViewport.width
+        root.baseScaleUnit = displayWidth > 0 ? Math.min(w - 48, 1100) / displayWidth : 0
     }
     property var folderScores: []
     readonly property int currentScoreIndex: {
@@ -97,12 +112,14 @@ Rectangle {
     }
 
     function applyDefaultView(initializationToken) {
+        root.updateBaseScaleUnit()
         root.zoomLevel = 1.0
         Qt.callLater(function() {
             if (initializationToken !== undefined
                 && (!root.viewInitializationPending || initializationToken !== root.viewInitializationToken)) {
                 return
             }
+            root.updateBaseScaleUnit()
             pdfView.contentX = 0
             pdfView.contentY = 0
             imageFlick.contentX = 0
@@ -477,21 +494,23 @@ Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            onWidthChanged: root.finishInitialViewIfReady()
-            onHeightChanged: root.finishInitialViewIfReady()
+            onWidthChanged: { root.updateBaseScaleUnit(); root.finishInitialViewIfReady() }
+            onHeightChanged: { root.updateBaseScaleUnit(); root.finishInitialViewIfReady() }
 
             PdfDocument {
                 id: pdfDocument
                 source: root.isPdf ? appController.currentFileUrl : ""
-                onPageCountChanged: root.finishInitialViewIfReady()
+                onPageCountChanged: { root.updateBaseScaleUnit(); root.finishInitialViewIfReady() }
                 onStatusChanged: function(status) {
                     if (status === PdfDocument.Ready) {
                         // 设置文档到渲染服务（QPdfPageRenderer + LRU 缓存）
                         pdfRender.setDocument(pdfDocument)
+                        root.updateBaseScaleUnit()
                         root.finishInitialViewIfReady()
                     } else if (status === PdfDocument.Null) {
                         // 关闭文件时清缓存
                         pdfRender.clearCache()
+                        root.baseScaleUnit = 0
                     }
                 }
             }

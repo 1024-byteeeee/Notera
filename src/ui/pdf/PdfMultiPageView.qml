@@ -100,8 +100,12 @@ Item {
                 id: paper
                 width: image.width
                 height: image.height
+                // 用手动绑定代替 anchors.centerIn：
+                // TableView delegate 尺寸由 0→实际值变化时，anchors.centerIn 曾出现不重新布局的问题，
+                // 导致页面停留在左上角。手动 x/y 绑定会随 parent 尺寸和自身尺寸变化实时重算。
+                x: Math.max(0, (pageHolder.width - width) / 2)
+                y: Math.max(0, (pageHolder.height - height) / 2)
                 rotation: root.pageRotation
-                anchors.centerIn: parent
                 color: "white"
                 radius: 2
                 border.color: "#D5D4CC"
@@ -115,12 +119,12 @@ Item {
                     currentFrame: pageHolder.index
                     renderScale: root.renderScale
                     pageRotation: root.pageRotation
-                    // 大页面自动分块：渲染宽度>1800px 用 2×2 分块，首块显示更快
-                    // （参考 SumatraPDF TilePosition + Okular TilesManager）
-                    tileCount: {
-                        const pxW = paper.pagePointSize.width * root.renderScale * Screen.devicePixelRatio
-                        return pxW > 1800 ? 2 : 1
-                    }
+                    // 固定整页渲染(tileCount=1)。
+                    // 原自动分块(pxW>1800→2×2)在 Retina 屏(devicePixelRatio=2)下几乎
+                    // 所有页面都触发分块，但分块缓存 key 与渲染路径存在时序竞态，导致
+                    // 只有左上块显示、其余块空白——表现为"页面小小的在左上角"。
+                    // 整页渲染在 Qt 6.8 下已足够快，分块优化收益不抵稳定性风险。
+                    tileCount: 1
                     width: paper.pagePointSize.width * root.renderScale
                     height: paper.pagePointSize.height * root.renderScale
                     onStatusChanged: {
