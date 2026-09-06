@@ -52,7 +52,9 @@ Item {
     TableView {
         id: tableView
         anchors.fill: parent
-        anchors.leftMargin: 2
+        // 不设 leftMargin：若设 leftMargin=2，可见宽度=root.width-2，
+        // 而 columnWidthProvider 返回 root.width，差 2px 即触发水平滚动条。
+        // 页面已通过 paper anchors.centerIn 居中，不需要左边留缝。
         model: root.pageCount
         rowSpacing: root.rowSpacing
         topMargin: root.topMargin
