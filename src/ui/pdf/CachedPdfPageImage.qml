@@ -35,8 +35,12 @@ Item {
 
     // 与 C++ PdfRenderCache::makeKey / quantizeScale 保持一致
     function _quantizeScale(s) { return Math.round(s * 10000) }
-    function _cacheKey(page, scale, rot, tileRow, tileCol) {
-        var key = page + "_" + root._quantizeScale(scale) + "_" + Math.round(rot)
+    // 注意：缓存 key 中不包含 pageRotation，因为内部渲染时始终传入 rotation=0，
+    // 渲染图像为原始方向。页面旋转完全由外层 paper.rotation 负责（与 Qt 官方
+    // PdfPageImage 行为一致）。这样渲染图像宽高比与布局容器一致，
+    // Image.PreserveAspectFit 不会压缩显示。
+    function _cacheKey(page, scale, tileRow, tileCol) {
+        var key = page + "_" + root._quantizeScale(scale) + "_0"
         if (tileRow !== undefined && tileRow >= 0 && tileCol !== undefined && tileCol >= 0)
             key += "_" + tileRow + "_" + tileCol
         return key
@@ -44,11 +48,9 @@ Item {
     function _pageImageSize() {
         if (!root.document || root.document.status !== PdfDocument.Ready) return Qt.size(0, 0)
         const ps = root.document.pagePointSize(root.currentFrame)
-        const rot = Math.round(root.pageRotation) % 180 !== 0
-        const w = rot ? ps.height : ps.width
-        const h = rot ? ps.width : ps.height
-        return Qt.size(Math.max(1, Math.round(w * root.renderScale * Screen.devicePixelRatio)),
-                        Math.max(1, Math.round(h * root.renderScale * Screen.devicePixelRatio)))
+        // 渲染时不旋转，始终使用原始宽高
+        return Qt.size(Math.max(1, Math.round(ps.width * root.renderScale * Screen.devicePixelRatio)),
+                        Math.max(1, Math.round(ps.height * root.renderScale * Screen.devicePixelRatio)))
     }
 
     // 分块网格：tileCount=1 时退化为单页
@@ -80,7 +82,6 @@ Item {
 
                 function tileKey() {
                     return root._cacheKey(root.currentFrame, root.renderScale,
-                        root.pageRotation,
                         isWholePage ? -1 : tileRow,
                         isWholePage ? -1 : tileCol)
                 }
@@ -102,9 +103,9 @@ Item {
                     const tRow = isWholePage ? -1 : tileRow
                     const tCol = isWholePage ? -1 : tileCol
 
-                    // 1. 精确命中
+                    // 1. 精确命中（渲染时 rotation 始终为 0）
                     if (pdfRender.hasCache(root.currentFrame, root.renderScale,
-                                           root.pageRotation, tRow, tCol)) {
+                                           0, tRow, tCol)) {
                         tileImage.source = "image://pdfcache/" + tileDelegate.tileKey()
                         // 分块模式下第一个块命中即标记 Ready（首块可见=PDF已打开）
                         if (root.status !== Image.Ready) root.status = Image.Ready
@@ -114,7 +115,7 @@ Item {
                     // 2. closest 命中（仅整页模式：缩放时先用旧分辨率拉伸显示，零空白）
                     if (isWholePage) {
                         const closest = pdfRender.closestCacheKey(
-                            root.currentFrame, root.renderScale, root.pageRotation)
+                            root.currentFrame, root.renderScale, 0)
                         if (closest !== "" && closest !== tileDelegate.tileKey()) {
                             tileImage.source = "image://pdfcache/" + closest
                             root.status = Image.Ready // 临时显示
@@ -128,11 +129,11 @@ Item {
                         if (root.status !== Image.Ready) root.status = Image.Loading
                     }
 
-                    // 3. 请求渲染（High 优先级：可见页立即插队）
+                    // 3. 请求渲染（High 优先级：可见页立即插队，rotation 始终为 0）
                     const imgSize = root._pageImageSize()
                     if (imgSize.width > 0 && imgSize.height > 0) {
                         const reqId = pdfRender.requestRender(
-                            root.currentFrame, root.renderScale, root.pageRotation,
+                            root.currentFrame, root.renderScale, 0,
                             imgSize, 0, tRow, tCol, root.tileCount)
                         if (reqId !== 0) {
                             tileDelegate.pendingRequestId = reqId
@@ -155,7 +156,7 @@ Item {
                         if (reqId !== tileDelegate.pendingRequestId) return
                         if (page !== root.currentFrame) return
                         if (Math.abs(scale - root.renderScale) > 0.0001) return
-                        if (Math.abs(rotation - root.pageRotation) > 0.5) return
+                        // 渲染时 rotation 始终为 0，无需检查
 
                         tileDelegate.pendingRequestId = 0
                         tileImage.source = "image://pdfcache/" + tileDelegate.tileKey()
