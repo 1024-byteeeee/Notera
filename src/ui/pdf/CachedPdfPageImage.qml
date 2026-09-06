@@ -67,6 +67,11 @@ Item {
                 id: tileDelegate
                 required property int index
 
+                // Grid 的 delegate 必须显式设置尺寸，否则 Grid 无法计算 cell 尺寸，
+                // 会导致 delegate 尺寸为 0，Image 不显示（全白）。
+                width: tileGrid.width / Math.max(1, root.tileCount)
+                height: tileGrid.height / Math.max(1, root.tileCount)
+
                 readonly property int tileRow: Math.floor(index / Math.max(1, root.tileCount))
                 readonly property int tileCol: index % Math.max(1, root.tileCount)
                 readonly property bool isWholePage: root.tileCount <= 1
