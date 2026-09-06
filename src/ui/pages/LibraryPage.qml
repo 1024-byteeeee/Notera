@@ -356,7 +356,7 @@ Rectangle {
             radius: Theme.radiusLg
             color: Theme.surface
             border.width: 1
-            border.color: dropArea.containsDrag ? Theme.accent : Theme.border
+            border.color: Theme.border
 
             GridView {
                 id: grid
@@ -1106,42 +1106,16 @@ Rectangle {
                 }
             }
 
-            Rectangle {
-                anchors.fill: parent
-                anchors.margins: 8
-                visible: dropArea.containsDrag && dropArea.hasExternalUrls
-                radius: Theme.radiusLg
-                color: Theme.accentSoft
-                border.width: 2
-                border.color: Theme.accent
-                z: 10
-                Label {
-                    anchors.centerIn: parent
-                    text: "松开即可导入乐谱"
-                    color: Theme.selectedText
-                    font.pixelSize: Theme.fontLg
-                    font.weight: Font.DemiBold
-                }
-            }
-
             DropArea {
                 id: dropArea
-                property bool hasExternalUrls: false
                 anchors.fill: parent
                 z: 1
-                onEntered: function(drag) {
-                    hasExternalUrls = drag.urls.length > 0
-                }
-                onExited: hasExternalUrls = false
                 onDropped: function(drop) {
-                    hasExternalUrls = false
                     // 内部拖放（移动乐谱/文件夹）仅在文件夹卡片上生效；
                     // 松开在空白区域时不修改数据库，项目自动回到原位置。
                     if (root.dragIds(drop).length > 0) {
                         drop.acceptProposedAction()
-                        return
                     }
-                    libraryService.importFiles(drop.urls)
                 }
             }
 
