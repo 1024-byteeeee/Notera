@@ -73,6 +73,19 @@ Rectangle {
         const s = root.folderScores[root.currentScoreIndex + 1]
         appController.openScore(s.id, s.title, s.filePath, s.fileType, s.pageCount, s.folderId)
     }
+    function goToPrevPage() {
+        if (!root.isPdf || pdfView.currentPage <= 0) return
+        pdfView.goToPage(pdfView.currentPage - 1)
+    }
+    function goToNextPage() {
+        if (!root.isPdf || pdfDocument.pageCount < 1 || pdfView.currentPage >= pdfDocument.pageCount - 1) return
+        pdfView.goToPage(pdfView.currentPage + 1)
+    }
+    function jumpToPage(page) {
+        if (!root.isPdf || pdfDocument.pageCount < 1) return
+        const p = Math.max(0, Math.min(page, pdfDocument.pageCount - 1))
+        pdfView.goToPage(p)
+    }
 
     Connections {
         target: appController
@@ -81,11 +94,13 @@ Rectangle {
 
     Keys.onLeftPressed: function(event) {
         if (event.modifiers & Qt.ControlModifier) return
-        root.goToPrevScore()
+        if (root.isPdf) root.goToPrevPage()
+        else root.goToPrevScore()
     }
     Keys.onRightPressed: function(event) {
         if (event.modifiers & Qt.ControlModifier) return
-        root.goToNextScore()
+        if (root.isPdf) root.goToNextPage()
+        else root.goToNextScore()
     }
     focus: appController.currentPage === "reader"
 
@@ -275,21 +290,27 @@ Rectangle {
                 }
 
                 ToolButton {
-                    objectName: "prevScoreButton"
-                    btnText: "上一张"
+                    objectName: "prevButton"
+                    btnText: root.isPdf ? "上一页" : "上一张"
                     iconName: "previous"
-                    btnEnabled: root.hasPrev
+                    btnEnabled: root.isPdf ? (pdfView.currentPage > 0) : root.hasPrev
                     Layout.preferredWidth: 84
-                    onBtnClicked: root.goToPrevScore()
+                    onBtnClicked: {
+                        if (root.isPdf) root.goToPrevPage()
+                        else root.goToPrevScore()
+                    }
                 }
 
                 ToolButton {
-                    objectName: "nextScoreButton"
-                    btnText: "下一张"
+                    objectName: "nextButton"
+                    btnText: root.isPdf ? "下一页" : "下一张"
                     iconName: "next"
-                    btnEnabled: root.hasNext
+                    btnEnabled: root.isPdf ? (pdfDocument.pageCount > 0 && pdfView.currentPage < pdfDocument.pageCount - 1) : root.hasNext
                     Layout.preferredWidth: 84
-                    onBtnClicked: root.goToNextScore()
+                    onBtnClicked: {
+                        if (root.isPdf) root.goToNextPage()
+                        else root.goToNextScore()
+                    }
                 }
 
                 Label {
@@ -647,11 +668,55 @@ Rectangle {
             border.color: Theme.border
             border.width: 1
 
-            Label {
-                anchors.centerIn: parent
-                text: root.isPdf ? "共 " + pdfDocument.pageCount + " 页" : (root.isImage ? "图片乐谱" : "附件")
-                color: Theme.mutedForeground
-                font.pixelSize: Theme.fontSm
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 16
+                anchors.rightMargin: 16
+                spacing: 8
+
+                Label {
+                    Layout.fillWidth: true
+                    text: root.isPdf ? "第 " + (pdfView.currentPage + 1) + " / " + pdfDocument.pageCount + " 页"
+                         : (root.isImage ? "图片乐谱" : "附件")
+                    color: Theme.mutedForeground
+                    font.pixelSize: Theme.fontSm
+                }
+
+                // PDF 页码跳转
+                TextField {
+                    id: pageJumpField
+                    visible: root.isPdf
+                    Layout.preferredWidth: 64
+                    Layout.preferredHeight: 26
+                    placeholderText: "页码"
+                    placeholderTextColor: Theme.inputPlaceholder
+                    color: Theme.foreground
+                    font.pixelSize: Theme.fontSm
+                    horizontalAlignment: Text.AlignHCenter
+                    selectByMouse: true
+                    inputMethodHints: Qt.ImhDigitsOnly
+                    background: Rectangle {
+                        radius: Theme.radiusSm
+                        color: Theme.inputBackground
+                        border.width: 1
+                        border.color: pageJumpField.activeFocus ? Theme.inputFocusBorder : Theme.inputBorder
+                    }
+                    onAccepted: {
+                        const p = parseInt(text)
+                        if (!isNaN(p) && p >= 1 && p <= pdfDocument.pageCount) {
+                            root.jumpToPage(p - 1)
+                        }
+                        text = ""
+                    }
+                }
+
+                ToolButton {
+                    visible: root.isPdf
+                    btnText: "跳转"
+                    Layout.preferredWidth: 56
+                    Layout.preferredHeight: 26
+                    onBtnClicked: pageJumpField.accepted()
+                }
             }
         }
     }
