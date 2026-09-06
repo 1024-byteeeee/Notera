@@ -2722,6 +2722,95 @@ int main(int argc, char* argv[])
                 }
             }
 
+            // 大页面分块渲染打开回归测试：
+            // 生成 1200×1600pt 大页面 PDF（渲染宽度>1800px 触发 2×2 分块），
+            // 打开后必须在 3 秒内 currentPageRenderingStatus 变为 Image.Ready。
+            // 曾因分块模式下 CachedPdfPageImage.status 不更新，导致永远卡在"正在打开PDF…"转圈。
+            {
+                auto* const pdfTileWindow = qobject_cast<QQuickWindow*>(root);
+                auto* const pdfTileView = root->findChild<QObject*>(QStringLiteral("pdfView"));
+                if (!pdfTileWindow || !pdfTileView) {
+                    fail("pdf-tile-env");
+                    return;
+                }
+                QTemporaryFile pdfTileFile;
+                pdfTileFile.setFileTemplate(QDir::tempPath() + QStringLiteral("/notera-pdf-tile-XXXXXX.pdf"));
+                if (!pdfTileFile.open()) {
+                    fail("pdf-tile-tempfile");
+                    return;
+                }
+                const auto pdfTilePath = pdfTileFile.fileName();
+                pdfTileFile.close();
+                {
+                    QPdfWriter pdfTileWriter(pdfTilePath);
+                    pdfTileWriter.setPageSize(QPageSize(QSizeF(1200, 1600), QPageSize::Point));
+                    QPainter pdfTilePainter(&pdfTileWriter);
+                    for (int page = 0; page < 5; ++page) {
+                        pdfTilePainter.drawText(200, 300,
+                            QStringLiteral("PDF 分块渲染测试页 %1").arg(page + 1));
+                        if (page < 4) pdfTileWriter.newPage();
+                    }
+                    pdfTilePainter.end();
+                }
+                controller.openScore(QStringLiteral("pdf-tile-regression"),
+                    QStringLiteral("PDF分块渲染回归"), pdfTilePath, QStringLiteral("pdf"), 5, QString());
+
+                // 等待文档加载完成（最多 3 秒）
+                {
+                    QEventLoop docWait;
+                    QTimer docTimer;
+                    docTimer.setInterval(100);
+                    bool docReady = false;
+                    int docAttempts = 0;
+                    QObject::connect(&docTimer, &QTimer::timeout, [&]() {
+                        auto* const doc = pdfTileView->property("document").value<QObject*>();
+                        // PdfDocument.Status: Null=0, Loading=1, Ready=2, Error=3
+                        const int s = doc ? doc->property("status").toInt() : -1;
+                        if (s == 2 /* Ready */) {
+                            docReady = true;
+                            docWait.quit();
+                        } else if (++docAttempts > 30) {
+                            qWarning() << "pdf-tile-open: document not ready, status=" << s;
+                            docWait.quit();
+                        }
+                    });
+                    docTimer.start();
+                    docWait.exec();
+                    docTimer.stop();
+                    if (!docReady) {
+                        fail("pdf-tile-document-not-ready");
+                        return;
+                    }
+                }
+
+                // 轮询等待渲染完成（分块模式下第一个块完成即标记 Ready）
+                QEventLoop tileWait;
+                QTimer tileTimer;
+                tileTimer.setInterval(100);
+                bool tileReady = false;
+                int tileAttempts = 0;
+                QObject::connect(&tileTimer, &QTimer::timeout, [&]() {
+                    // QQuickImageBase::Status: Null=0, Ready=1, Loading=2, Error=3
+                    const int status = pdfTileView->property("currentPageRenderingStatus").toInt();
+                    if (status == 1 /* Image.Ready */) {
+                        tileReady = true;
+                        tileWait.quit();
+                    } else if (++tileAttempts > 30) {
+                        tileWait.quit(); // 超时 3 秒
+                    }
+                });
+                tileTimer.start();
+                tileWait.exec();
+                tileTimer.stop();
+                if (!tileReady) {
+                    const int finalStatus = pdfTileView->property("currentPageRenderingStatus").toInt();
+                    qWarning() << "pdf-tile-open: currentPageRenderingStatus stuck at" << finalStatus
+                               << "(expected 1=Ready)";
+                    fail("pdf-tile-open-status-not-ready");
+                    return;
+                }
+            }
+
             QCoreApplication::exit(0);
         });
     }

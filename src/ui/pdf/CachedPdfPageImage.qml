@@ -60,6 +60,7 @@ Item {
         spacing: 0
 
         Repeater {
+            id: tileRepeater
             model: Math.max(1, root.tileCount) * Math.max(1, root.tileCount)
 
             delegate: Item {
@@ -100,7 +101,8 @@ Item {
                     if (pdfRender.hasCache(root.currentFrame, root.renderScale,
                                            root.pageRotation, tRow, tCol)) {
                         tileImage.source = "image://pdfcache/" + tileDelegate.tileKey()
-                        if (isWholePage) root.status = Image.Ready
+                        // 分块模式下第一个块命中即标记 Ready（首块可见=PDF已打开）
+                        if (root.status !== Image.Ready) root.status = Image.Ready
                         return
                     }
 
@@ -116,7 +118,9 @@ Item {
                             root.status = Image.Loading
                         }
                     } else {
+                        // 分块模式 miss：标记 Loading，等待第一个块渲染完成
                         tileImage.source = ""
+                        if (root.status !== Image.Ready) root.status = Image.Loading
                     }
 
                     // 3. 请求渲染（High 优先级：可见页立即插队）
@@ -150,7 +154,8 @@ Item {
 
                         tileDelegate.pendingRequestId = 0
                         tileImage.source = "image://pdfcache/" + tileDelegate.tileKey()
-                        if (tileDelegate.isWholePage) root.status = Image.Ready
+                        // 分块模式下第一个块渲染完成即标记 Ready（首块可见=PDF已打开）
+                        if (root.status !== Image.Ready) root.status = Image.Ready
                     }
                 }
 
@@ -166,8 +171,18 @@ Item {
     onTileCountChanged: refreshAll()
 
     function refreshAll() {
-        for (var i = 0; i < tileGrid.children.length; i++) {
-            var child = tileGrid.children[i]
+        // 切换页面/缩放/旋转/分块模式时重置 status（分块需要重新渲染）
+        if (root.document && root.document.status === PdfDocument.Ready
+            && root.currentFrame >= 0) {
+            root.status = Image.Loading
+        } else {
+            root.status = Image.Null
+        }
+        // 注意：必须用 tileRepeater.itemAt(i) 遍历 delegate，
+        // 不能用 tileGrid.children——Grid 的直接子项只有 Repeater 对象，
+        // 不包含 Repeater 创建的 delegate。
+        for (var i = 0; i < tileRepeater.count; i++) {
+            var child = tileRepeater.itemAt(i)
             if (child && child.refresh) child.refresh()
         }
     }
@@ -177,6 +192,16 @@ Item {
         function onStatusChanged() {
             if (root.document && root.document.status === PdfDocument.Ready)
                 root.refreshAll()
+        }
+    }
+
+    // pdfRender 文档设置完成（此时 document 已 Ready），触发刷新。
+    // 这是最可靠的刷新触发点：pdfRender.setDocument 在 ReaderPage 的
+    // pdfDocument.onStatusChanged(Ready) 中调用，此时 document 一定是 Ready。
+    Connections {
+        target: pdfRender
+        function onDocumentChanged() {
+            root.refreshAll()
         }
     }
 }

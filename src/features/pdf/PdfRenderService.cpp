@@ -2,6 +2,8 @@
 
 #include "features/pdf/PdfRenderCache.h"
 
+#include <QUrl>
+
 namespace Notera {
 
 PdfRenderService::PdfRenderService(QObject* parent)
@@ -16,6 +18,13 @@ PdfRenderService::PdfRenderService(QObject* parent)
 
 PdfRenderService::~PdfRenderService() = default;
 
+void PdfRenderService::onOwnedDocumentStatusChanged(QPdfDocument::Status status)
+{
+    if (status == QPdfDocument::Status::Ready && m_document == m_ownedDocument) {
+        emit documentChanged();
+    }
+}
+
 QPdfDocumentRenderOptions::Rotation PdfRenderService::rotationFromDegrees(int degrees)
 {
     const int norm = ((degrees % 360) + 360) % 360;
@@ -29,13 +38,43 @@ QPdfDocumentRenderOptions::Rotation PdfRenderService::rotationFromDegrees(int de
 
 void PdfRenderService::setDocument(QObject* document)
 {
-    QPdfDocument* pdfDoc = document ? qobject_cast<QPdfDocument*>(document) : nullptr;
+    // QML 的 PdfDocument 实际上是 QQuickPdfDocument（QML 包装类），它通过
+    // QML_EXTENDED(QPdfDocument) 机制内部持有一个真正的 QPdfDocument 实例。
+    // qobject_cast<QPdfDocument*> 会失败（对象实际是 QQuickPdfDocument），
+    // 且 QQuickPdfDocument::document() 是私有的无法访问。
+    // 解决方案：创建自己的 QPdfDocument，从 QQuickPdfDocument 复制 source 加载。
+    // QPdfDocument::load() 是懒加载（只加载目录结构，不加载页面内容），开销小。
+    QPdfDocument* pdfDoc = nullptr;
+    if (document) {
+        // 1. 尝试直接 qobject_cast（如果外部直接传入 QPdfDocument*）
+        pdfDoc = qobject_cast<QPdfDocument*>(document);
+        // 2. 如果是 QQuickPdfDocument（QML 的 PdfDocument），读取 source 加载到自己的文档
+        if (!pdfDoc) {
+            const QVariant sourceVar = document->property("source");
+            if (sourceVar.isValid() && sourceVar.canConvert<QUrl>()) {
+                const QUrl source = sourceVar.toUrl();
+                if (source.isValid() && !source.isEmpty()) {
+                    if (!m_ownedDocument) {
+                        m_ownedDocument = new QPdfDocument(this);
+                        connect(m_ownedDocument, &QPdfDocument::statusChanged,
+                            this, &PdfRenderService::onOwnedDocumentStatusChanged);
+                    }
+                    m_ownedDocument->load(source.toLocalFile());
+                    pdfDoc = m_ownedDocument;
+                }
+            }
+        }
+    }
     if (m_document == pdfDoc)
         return;
     cancelAll();
     m_cache->clear();
     m_document = pdfDoc;
     m_renderer->setDocument(pdfDoc);
+    // 如果文档已经 Ready，立即发出 documentChanged()；否则等 onOwnedDocumentStatusChanged
+    if (m_document && m_document->status() == QPdfDocument::Status::Ready) {
+        emit documentChanged();
+    }
 }
 
 quint64 PdfRenderService::requestRender(int page, qreal scale, int rotation,

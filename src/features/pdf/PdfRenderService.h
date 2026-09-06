@@ -72,10 +72,13 @@ public:
 signals:
     // 渲染完成（QImage 已写入缓存）。QML 端通过 image://pdfcache/<key> 取图显示。
     void renderFinished(quint64 requestId, int page, qreal scale, int rotation);
+    // 文档设置/切换完成（此时 document 已 Ready）。QML 端监听此信号触发刷新。
+    void documentChanged();
 
 private slots:
     void onPageRendered(int pageNumber, QSize imageSize,
         const QImage& image, const QPdfDocumentRenderOptions& options, quint64 requestId);
+    void onOwnedDocumentStatusChanged(QPdfDocument::Status status);
 
 private:
     struct Request {
@@ -99,7 +102,8 @@ private:
 
     QPdfPageRenderer* m_renderer{nullptr};
     PdfRenderCache* m_cache{nullptr};
-    QPdfDocument* m_document{nullptr};
+    QPdfDocument* m_document{nullptr};       // 当前用于渲染的文档（可能是 m_ownedDocument 或外部传入）
+    QPdfDocument* m_ownedDocument{nullptr};  // 自己创建的文档（从 QQuickPdfDocument 复制 source）
 
     QHash<quint64, Request> m_requests;   // 所有请求（在飞 + 排队）
     QList<quint64> m_highQueue;            // 高优先级排队请求 ID（FIFO）
