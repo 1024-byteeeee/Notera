@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QFutureWatcher>
 #include <QObject>
 #include <QString>
 #include <QUrl>
@@ -56,6 +57,10 @@ public:
     Q_INVOKABLE QString openDataDirectory() const;
     Q_INVOKABLE QString exportDatabaseBackup(const QUrl& destinationFile) const;
     Q_INVOKABLE QString importDatabaseBackup(const QUrl& backupFile);
+    // 异步版本：耗时文件操作在后台线程执行，完成后发射对应 *Finished 信号，
+    // 主线程 UI（加载动画）不会被阻塞。QML 侧应优先使用这两个接口。
+    Q_INVOKABLE void startExportDatabaseBackup(const QUrl& destinationFile);
+    Q_INVOKABLE void startImportDatabaseBackup(const QUrl& backupFile);
     Q_INVOKABLE void requestRestart();
     Q_INVOKABLE QString clearAllData(const QString& confirmation);
     Q_INVOKABLE void openScore(const QString& scoreId, const QString& title, const QString& filePath,
@@ -73,8 +78,17 @@ signals:
     void defaultScrollSpeedChanged();
     void dataDirectoryChanged();
     void restartRequested();
+    // 异步导入导出完成信号（success=false 时 error 为可展示的中文错误信息）
+    void exportDatabaseBackupFinished(bool success, QString error);
+    void importDatabaseBackupFinished(bool success, QString error);
 
 private:
+    // 后台线程执行体（静态，不依赖实例状态，便于 QtConcurrent::run 调用）
+    static QString runExportBackup(const QUrl& destinationFile);
+    static QString runImportBackup(const QUrl& backupFile);
+
+    QFutureWatcher<QString>* m_exportWatcher = nullptr;
+    QFutureWatcher<QString>* m_importWatcher = nullptr;
     QString m_currentPage {QStringLiteral("library")};
     QString m_libraryFilter {QStringLiteral("all")};
     int m_themeMode {0};

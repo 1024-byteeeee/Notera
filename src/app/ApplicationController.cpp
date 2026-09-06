@@ -19,6 +19,7 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QUuid>
+#include <QtConcurrent>
 #include <QtCore/private/qzipreader_p.h>
 #include <QtCore/private/qzipwriter_p.h>
 
@@ -430,7 +431,7 @@ QString ApplicationController::openDataDirectory() const
         ? QString {} : QStringLiteral("无法打开数据存储目录");
 }
 
-QString ApplicationController::exportDatabaseBackup(const QUrl& destinationFile) const
+QString ApplicationController::runExportBackup(const QUrl& destinationFile)
 {
     if (!destinationFile.isValid() || !destinationFile.isLocalFile()) {
         return QStringLiteral("请选择本机保存位置");
@@ -452,11 +453,29 @@ QString ApplicationController::exportDatabaseBackup(const QUrl& destinationFile)
 
     QString error;
     const auto snapshotPath = backupRoot + QStringLiteral("/database/notera.db");
-    auto database = QSqlDatabase::database(QStringLiteral("notera-library"), false);
-    QSqlQuery query(database);
-    const auto snapshotSql = QStringLiteral("VACUUM INTO '%1'").arg(escapedSqlString(snapshotPath));
-    if (!database.isOpen() || !query.exec(snapshotSql)) {
-        return QStringLiteral("创建数据库一致性快照失败：%1").arg(query.lastError().text());
+    // 后台线程不能复用主线程创建的 SQLite 连接（线程亲和），这里使用线程本地连接。
+    // VACUUM INTO 会把源库的一致性快照写到目标文件，等价于原主线程实现。
+    const auto connectionName = QStringLiteral("notera_export_")
+        + QUuid::createUuid().toString(QUuid::WithoutBraces);
+    bool snapshotOk = false;
+    QString snapshotError;
+    {
+        auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+        database.setDatabaseName(QDir::cleanPath(AppDataPaths::databaseDirectory())
+            + QStringLiteral("/notera.db"));
+        if (database.open()) {
+            QSqlQuery query(database);
+            const auto snapshotSql = QStringLiteral("VACUUM INTO '%1'").arg(escapedSqlString(snapshotPath));
+            snapshotOk = query.exec(snapshotSql);
+            if (!snapshotOk) snapshotError = query.lastError().text();
+        }
+        database.close();
+    }
+    QSqlDatabase::removeDatabase(connectionName);
+    if (!snapshotOk) {
+        return snapshotError.isEmpty()
+            ? QStringLiteral("创建数据库一致性快照失败")
+            : QStringLiteral("创建数据库一致性快照失败：%1").arg(snapshotError);
     }
 
     const auto sourceRoot = AppDataPaths::root();
@@ -482,7 +501,29 @@ QString ApplicationController::exportDatabaseBackup(const QUrl& destinationFile)
     return {};
 }
 
-QString ApplicationController::importDatabaseBackup(const QUrl& backupFile)
+QString ApplicationController::exportDatabaseBackup(const QUrl& destinationFile) const
+{
+    return runExportBackup(destinationFile);
+}
+
+void ApplicationController::startExportDatabaseBackup(const QUrl& destinationFile)
+{
+    if (m_exportWatcher && m_exportWatcher->isRunning()) {
+        return; // 已有导出任务进行中，忽略重复请求
+    }
+    if (!m_exportWatcher) {
+        m_exportWatcher = new QFutureWatcher<QString>(this);
+        connect(m_exportWatcher, &QFutureWatcher<QString>::finished, this, [this]() {
+            const auto error = m_exportWatcher->result();
+            emit exportDatabaseBackupFinished(error.isEmpty(), error);
+        });
+    }
+    m_exportWatcher->setFuture(QtConcurrent::run([destinationFile]() {
+        return runExportBackup(destinationFile);
+    }));
+}
+
+QString ApplicationController::runImportBackup(const QUrl& backupFile)
 {
     if (!backupFile.isValid() || !backupFile.isLocalFile()) {
         return QStringLiteral("请选择本机备份文件");
@@ -513,6 +554,9 @@ QString ApplicationController::importDatabaseBackup(const QUrl& backupFile)
         removeDirectoryRecursively(stagedRoot);
         return error;
     }
+    // 后台线程使用线程局部 QSettings 实例（底层 QConfFile 由 Qt 内部锁保护，
+    // 与主线程实例互不干扰），把待恢复目录登记到 staging，应用重启时由
+    // applyPendingBackupRestore() 完成切换。
     QSettings settings;
     settings.setValue(QStringLiteral("storage/pendingBackupRestore"), stagedRoot);
     settings.sync();
@@ -520,8 +564,33 @@ QString ApplicationController::importDatabaseBackup(const QUrl& backupFile)
         removeDirectoryRecursively(stagedRoot);
         return QStringLiteral("无法保存数据库导入任务");
     }
-    emit restartRequested();
     return {};
+}
+
+QString ApplicationController::importDatabaseBackup(const QUrl& backupFile)
+{
+    const auto error = runImportBackup(backupFile);
+    if (error.isEmpty()) {
+        emit restartRequested();
+    }
+    return error;
+}
+
+void ApplicationController::startImportDatabaseBackup(const QUrl& backupFile)
+{
+    if (m_importWatcher && m_importWatcher->isRunning()) {
+        return; // 已有导入任务进行中，忽略重复请求
+    }
+    if (!m_importWatcher) {
+        m_importWatcher = new QFutureWatcher<QString>(this);
+        connect(m_importWatcher, &QFutureWatcher<QString>::finished, this, [this]() {
+            const auto error = m_importWatcher->result();
+            emit importDatabaseBackupFinished(error.isEmpty(), error);
+        });
+    }
+    m_importWatcher->setFuture(QtConcurrent::run([backupFile]() {
+        return runImportBackup(backupFile);
+    }));
 }
 
 bool ApplicationController::applyPendingBackupRestore(QString* error)

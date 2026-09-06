@@ -988,20 +988,17 @@ Rectangle {
         confirmText: "确定"
     }
 
-    // 延迟执行同步阻塞操作：给全局加载对话框一帧渲染时间
+    // 延迟触发异步导出/导入：先渲染加载对话框，再启动后台线程任务。
+    // 完成后由 appController 的 exportDatabaseBackupFinished /
+    // importDatabaseBackupFinished 信号回调 hideLoading 与结果提示，
+    // 主线程不再被文件操作阻塞，加载动画可正常旋转。
     Timer {
         id: exportTimer
         interval: 50
         repeat: false
         property url targetFile: ""
         onTriggered: {
-            const error = appController.exportDatabaseBackup(targetFile)
-            appShell.hideLoading()
-            backupResultDialog.title = error.length > 0 ? "导出失败" : "导出成功"
-            backupResultDialog.message = error.length > 0
-                ? error
-                : "备份已导出到所选位置"
-            backupResultDialog.open()
+            appController.startExportDatabaseBackup(targetFile)
         }
     }
     Timer {
@@ -1025,9 +1022,33 @@ Rectangle {
         repeat: false
         property url backupFile: ""
         onTriggered: {
-            const error = appController.importDatabaseBackup(backupFile)
+            appController.startImportDatabaseBackup(backupFile)
+        }
+    }
+    // 替换导入成功后，等待结果弹窗展示完毕再重启应用以完成恢复
+    Timer {
+        id: restartTimer
+        interval: 1500
+        repeat: false
+        onTriggered: appController.requestRestart()
+    }
+
+    Connections {
+        target: appController
+        function onExportDatabaseBackupFinished(success, error) {
             appShell.hideLoading()
-            if (error.length > 0) {
+            backupResultDialog.title = success ? "导出成功" : "导出失败"
+            backupResultDialog.message = success ? "备份已导出到所选位置" : error
+            backupResultDialog.open()
+        }
+        function onImportDatabaseBackupFinished(success, error) {
+            appShell.hideLoading()
+            if (success) {
+                backupResultDialog.title = "导入成功"
+                backupResultDialog.message = "数据库已导入，应用将自动重启以完成恢复"
+                backupResultDialog.open()
+                restartTimer.restart()
+            } else {
                 backupResultDialog.title = "导入失败"
                 backupResultDialog.message = error
                 backupResultDialog.open()
