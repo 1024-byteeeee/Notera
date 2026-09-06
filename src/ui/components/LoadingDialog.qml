@@ -11,7 +11,7 @@ Popup {
 
     property string message: "正在加载"
     // 最小显示时长（毫秒）：保证加载动画至少可见一段时间，避免秒开时完全无感。
-    property int minDisplayDuration: 350
+    property int minDisplayDuration: 500
 
     parent: Overlay.overlay
     x: 0

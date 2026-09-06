@@ -1053,9 +1053,9 @@ Rectangle {
     // 文件加载对话框：打开文件时显示加载动画，加载完成后自动隐藏。
     // 即使秒开也保证至少显示 minDisplayDuration，避免完全无感。
     onViewInitializationPendingChanged: {
-        if (root.viewInitializationPending && appController.currentPage === "reader") {
+        if (root.viewInitializationPending) {
             loadingDialog.show(root.isPdf ? "正在打开乐谱" : "正在加载图片")
-        } else if (!root.viewInitializationPending) {
+        } else {
             loadingDialog.hide()
         }
     }
