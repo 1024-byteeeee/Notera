@@ -39,7 +39,7 @@ QString copyScoreIntoLibrary(const QString& sourcePath, const QString& scoreId, 
 {
     const QFileInfo source(sourcePath);
     if (!source.exists() || !source.isFile()) {
-        *error = QStringLiteral("所选乐谱文件已不存在。");
+        *error = QStringLiteral("所选乐谱文件已不存在");
         return {};
     }
 
@@ -47,7 +47,7 @@ QString copyScoreIntoLibrary(const QString& sourcePath, const QString& scoreId, 
     const auto destination = AppDataPaths::libraryDirectory() + QLatin1Char('/') + scoreId
         + (suffix.isEmpty() ? QString() : QLatin1Char('.') + suffix);
     if (!QFile::copy(sourcePath, destination)) {
-        *error = QStringLiteral("Notera 无法将乐谱复制到乐谱库。");
+        *error = QStringLiteral("Notera 无法将乐谱复制到乐谱库");
         return {};
     }
     return destination;
@@ -61,7 +61,7 @@ bool removeFile(const QString& path, QString* error)
     if (QFile::remove(path)) {
         return true;
     }
-    *error = QStringLiteral("Notera 无法删除乐谱库文件。");
+    *error = QStringLiteral("Notera 无法删除乐谱库文件");
     return false;
 }
 

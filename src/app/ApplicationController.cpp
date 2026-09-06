@@ -251,7 +251,7 @@ static bool zipDirectory(const QString& srcDir, const QString& zipPath, QString*
     QZipWriter writer(zipPath);
     writer.setCompressionPolicy(QZipWriter::AutoCompress);
     if (writer.status() != QZipWriter::NoError) {
-        if (error) *error = QStringLiteral("无法创建备份压缩包。");
+        if (error) *error = QStringLiteral("无法创建备份压缩包");
         return false;
     }
 
@@ -275,7 +275,7 @@ static bool zipDirectory(const QString& srcDir, const QString& zipPath, QString*
     }
     writer.close();
     if (writer.status() != QZipWriter::NoError) {
-        if (error) *error = QStringLiteral("写入备份压缩包失败。");
+        if (error) *error = QStringLiteral("写入备份压缩包失败");
         return false;
     }
     return true;
@@ -285,7 +285,7 @@ static bool unzipToDirectory(const QString& zipPath, const QString& dstDir, QStr
 {
     QZipReader reader(zipPath);
     if (!reader.exists()) {
-        if (error) *error = QStringLiteral("无法打开备份压缩包。");
+        if (error) *error = QStringLiteral("无法打开备份压缩包");
         return false;
     }
     const auto entries = reader.fileInfoList();
@@ -323,7 +323,7 @@ static bool writeBackupManifest(const QString& backupRoot, const QString& source
 {
     QFile file(backupRoot + QStringLiteral("/manifest.json"));
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        *error = QStringLiteral("无法写入备份清单。");
+        *error = QStringLiteral("无法写入备份清单");
         return false;
     }
     const QJsonObject manifest {
@@ -334,7 +334,7 @@ static bool writeBackupManifest(const QString& backupRoot, const QString& source
         {QStringLiteral("sourceRoot"), sourceRoot}
     };
     if (file.write(QJsonDocument(manifest).toJson(QJsonDocument::Indented)) < 0) {
-        *error = QStringLiteral("无法写入备份清单。");
+        *error = QStringLiteral("无法写入备份清单");
         return false;
     }
     return true;
@@ -344,20 +344,20 @@ static bool readBackupManifest(const QString& backupRoot, QJsonObject* manifest,
 {
     QFile file(backupRoot + QStringLiteral("/manifest.json"));
     if (!file.open(QIODevice::ReadOnly)) {
-        *error = QStringLiteral("所选目录不是 Notera 数据库备份。");
+        *error = QStringLiteral("所选目录不是 Notera 数据库备份");
         return false;
     }
     QJsonParseError parseError;
     const auto document = QJsonDocument::fromJson(file.readAll(), &parseError);
     if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
-        *error = QStringLiteral("备份清单已损坏。");
+        *error = QStringLiteral("备份清单已损坏");
         return false;
     }
     *manifest = document.object();
     if (manifest->value(QStringLiteral("format")).toString() != QStringLiteral("notera-backup")
         || manifest->value(QStringLiteral("formatVersion")).toInt() != 1
         || !QFileInfo::exists(backupRoot + QStringLiteral("/database/notera.db"))) {
-        *error = QStringLiteral("备份格式不受支持或数据库文件缺失。");
+        *error = QStringLiteral("备份格式不受支持或数据库文件缺失");
         return false;
     }
     return true;
@@ -377,7 +377,7 @@ static bool validateBackupDatabase(const QString& databasePath, QString* error)
             valid = query.exec(QStringLiteral("PRAGMA integrity_check")) && query.next()
                 && query.value(0).toString() == QStringLiteral("ok");
         }
-        if (!valid) *error = QStringLiteral("备份数据库完整性校验失败。");
+        if (!valid) *error = QStringLiteral("备份数据库完整性校验失败");
         database.close();
     }
     QSqlDatabase::removeDatabase(connectionName);
@@ -387,34 +387,34 @@ static bool validateBackupDatabase(const QString& databasePath, QString* error)
 QString ApplicationController::migrateDataDirectory(const QUrl& newDirectory)
 {
     if (!newDirectory.isValid() || !newDirectory.isLocalFile()) {
-        return QStringLiteral("请选择本机文件夹。");
+        return QStringLiteral("请选择本机文件夹");
     }
     const auto newPath = newDirectory.toLocalFile();
     const auto oldPath = AppDataPaths::root();
     const auto cleanNewPath = QDir::cleanPath(newPath);
 
     if (cleanNewPath.isEmpty() || cleanNewPath == oldPath) {
-        return QStringLiteral("路径无效或与当前路径相同。");
+        return QStringLiteral("路径无效或与当前路径相同");
     }
     const auto oldPrefix = QDir::cleanPath(oldPath) + QDir::separator();
     if (cleanNewPath.startsWith(oldPrefix, Qt::CaseInsensitive)) {
-        return QStringLiteral("新数据目录不能位于当前数据目录内部。");
+        return QStringLiteral("新数据目录不能位于当前数据目录内部");
     }
 
     QDir newDir(cleanNewPath);
     if (newDir.exists() && !newDir.isEmpty()) {
-        return QStringLiteral("目标目录不为空，请选择一个空目录或新建目录。");
+        return QStringLiteral("目标目录不为空，请选择一个空目录或新建目录");
     }
 
     if (!QDir().mkpath(cleanNewPath)) {
-        return QStringLiteral("无法创建目标目录。");
+        return QStringLiteral("无法创建目标目录");
     }
 
     QSettings settings;
     settings.setValue(QStringLiteral("storage/pendingDataDirectory"), cleanNewPath);
     settings.sync();
     if (settings.status() != QSettings::NoError) {
-        return QStringLiteral("无法保存新的数据目录设置。");
+        return QStringLiteral("无法保存新的数据目录设置");
     }
     emit dataDirectoryChanged();
     return {};
@@ -424,16 +424,16 @@ QString ApplicationController::openDataDirectory() const
 {
     const auto path = AppDataPaths::root();
     if (!QDir(path).exists()) {
-        return QStringLiteral("数据存储目录不存在。");
+        return QStringLiteral("数据存储目录不存在");
     }
     return QDesktopServices::openUrl(QUrl::fromLocalFile(path))
-        ? QString {} : QStringLiteral("无法打开数据存储目录。");
+        ? QString {} : QStringLiteral("无法打开数据存储目录");
 }
 
 QString ApplicationController::exportDatabaseBackup(const QUrl& destinationFile) const
 {
     if (!destinationFile.isValid() || !destinationFile.isLocalFile()) {
-        return QStringLiteral("请选择本机保存位置。");
+        return QStringLiteral("请选择本机保存位置");
     }
     auto zipPath = QDir::cleanPath(destinationFile.toLocalFile());
     if (!zipPath.endsWith(QStringLiteral(".zip"), Qt::CaseInsensitive)
@@ -441,13 +441,13 @@ QString ApplicationController::exportDatabaseBackup(const QUrl& destinationFile)
         zipPath += QStringLiteral(".notera-backup.zip");
     }
     const auto parentPath = QFileInfo(zipPath).absolutePath();
-    if (!QDir(parentPath).exists()) return QStringLiteral("目标文件夹不存在。");
+    if (!QDir(parentPath).exists()) return QStringLiteral("目标文件夹不存在");
 
     QTemporaryDir tempDir;
-    if (!tempDir.isValid()) return QStringLiteral("无法创建临时目录。");
+    if (!tempDir.isValid()) return QStringLiteral("无法创建临时目录");
     const auto backupRoot = tempDir.path();
     if (!QDir().mkpath(backupRoot + QStringLiteral("/database"))) {
-        return QStringLiteral("无法创建备份目录。");
+        return QStringLiteral("无法创建备份目录");
     }
 
     QString error;
@@ -473,7 +473,7 @@ QString ApplicationController::exportDatabaseBackup(const QUrl& destinationFile)
     }
 
     if (QFileInfo::exists(zipPath) && !QFile::remove(zipPath)) {
-        return QStringLiteral("无法覆盖已存在的备份文件。");
+        return QStringLiteral("无法覆盖已存在的备份文件");
     }
     if (!zipDirectory(backupRoot, zipPath, &error)) {
         QFile::remove(zipPath);
@@ -485,13 +485,13 @@ QString ApplicationController::exportDatabaseBackup(const QUrl& destinationFile)
 QString ApplicationController::importDatabaseBackup(const QUrl& backupFile)
 {
     if (!backupFile.isValid() || !backupFile.isLocalFile()) {
-        return QStringLiteral("请选择本机备份文件。");
+        return QStringLiteral("请选择本机备份文件");
     }
     const auto zipPath = QDir::cleanPath(backupFile.toLocalFile());
-    if (!QFileInfo::exists(zipPath)) return QStringLiteral("备份文件不存在。");
+    if (!QFileInfo::exists(zipPath)) return QStringLiteral("备份文件不存在");
 
     QTemporaryDir tempDir;
-    if (!tempDir.isValid()) return QStringLiteral("无法创建临时目录。");
+    if (!tempDir.isValid()) return QStringLiteral("无法创建临时目录");
     const auto backupRoot = tempDir.path();
 
     QString error;
@@ -518,7 +518,7 @@ QString ApplicationController::importDatabaseBackup(const QUrl& backupFile)
     settings.sync();
     if (settings.status() != QSettings::NoError) {
         removeDirectoryRecursively(stagedRoot);
-        return QStringLiteral("无法保存数据库导入任务。");
+        return QStringLiteral("无法保存数据库导入任务");
     }
     emit restartRequested();
     return {};
@@ -540,12 +540,12 @@ bool ApplicationController::applyPendingBackupRestore(QString* error)
     const auto rollbackRoot = QDir(QFileInfo(currentRoot).absolutePath()).filePath(
         QStringLiteral(".notera-rollback-") + QUuid::createUuid().toString(QUuid::WithoutBraces));
     if (QDir(currentRoot).exists() && !QDir().rename(currentRoot, rollbackRoot)) {
-        *error = QStringLiteral("无法暂存当前数据，数据库导入已取消。");
+        *error = QStringLiteral("无法暂存当前数据，数据库导入已取消");
         return false;
     }
     if (!QDir().rename(stagedRoot, currentRoot)) {
         if (QDir(rollbackRoot).exists()) QDir().rename(rollbackRoot, currentRoot);
-        *error = QStringLiteral("无法启用导入的数据，原数据已保留。");
+        *error = QStringLiteral("无法启用导入的数据，原数据已保留");
         return false;
     }
 
@@ -574,7 +574,7 @@ bool ApplicationController::applyPendingBackupRestore(QString* error)
     if (!updated) {
         removeDirectoryRecursively(currentRoot);
         QDir().rename(rollbackRoot, currentRoot);
-        *error = QStringLiteral("无法更新导入数据库中的资源路径，原数据已恢复。");
+        *error = QStringLiteral("无法更新导入数据库中的资源路径，原数据已恢复");
         return false;
     }
     removeDirectoryRecursively(rollbackRoot);
@@ -591,22 +591,22 @@ void ApplicationController::requestRestart()
 QString ApplicationController::clearAllData(const QString& confirmation)
 {
     if (confirmation != QStringLiteral("确认清空所有数据")) {
-        return QStringLiteral("请输入完整的“确认清空所有数据”。");
+        return QStringLiteral("请输入完整的“确认清空所有数据”");
     }
     const auto clearRoot = QDir::cleanPath(AppDataPaths::root());
     if (clearRoot.isEmpty() || clearRoot == QDir::rootPath()
         || clearRoot == QDir::homePath()) {
-        return QStringLiteral("数据目录不安全，已取消清空操作。");
+        return QStringLiteral("数据目录不安全，已取消清空操作");
     }
     if (!QFileInfo::exists(clearRoot + QStringLiteral("/database/notera.db"))) {
-        return QStringLiteral("未找到 Notera 数据库，已取消清空操作。");
+        return QStringLiteral("未找到 Notera 数据库，已取消清空操作");
     }
     QSettings settings;
     settings.clear();
     settings.setValue(QStringLiteral("storage/pendingClearRoot"), clearRoot);
     settings.sync();
     if (settings.status() != QSettings::NoError) {
-        return QStringLiteral("无法保存清空任务，请稍后重试。");
+        return QStringLiteral("无法保存清空任务，请稍后重试");
     }
     emit restartRequested();
     return {};
@@ -619,21 +619,21 @@ bool ApplicationController::applyPendingDataClear(QString* error)
         settings.value(QStringLiteral("storage/pendingClearRoot")).toString());
     if (clearRoot.isEmpty()) return true;
     if (clearRoot == QDir::rootPath() || clearRoot == QDir::homePath()) {
-        *error = QStringLiteral("拒绝清空不安全的数据目录。");
+        *error = QStringLiteral("拒绝清空不安全的数据目录");
         return false;
     }
     if (!QFileInfo::exists(clearRoot + QStringLiteral("/database/notera.db"))) {
-        *error = QStringLiteral("待清空目录不是有效的 Notera 数据目录。");
+        *error = QStringLiteral("待清空目录不是有效的 Notera 数据目录");
         return false;
     }
     if (!removeDirectoryRecursively(clearRoot)) {
-        *error = QStringLiteral("无法清空旧数据目录。");
+        *error = QStringLiteral("无法清空旧数据目录");
         return false;
     }
     settings.remove(QStringLiteral("storage/pendingClearRoot"));
     settings.sync();
     if (settings.status() != QSettings::NoError) {
-        *error = QStringLiteral("无法完成清空状态更新。");
+        *error = QStringLiteral("无法完成清空状态更新");
         return false;
     }
     return true;
@@ -653,18 +653,18 @@ bool ApplicationController::applyPendingDataMigration(QString* error)
     }
     QDir newDir(cleanNewPath);
     if (newDir.exists() && !newDir.isEmpty()) {
-        *error = QStringLiteral("待迁移的目标目录不再为空。");
+        *error = QStringLiteral("待迁移的目标目录不再为空");
         return false;
     }
     if (!QDir().mkpath(cleanNewPath)) {
-        *error = QStringLiteral("无法创建目标目录。");
+        *error = QStringLiteral("无法创建目标目录");
         return false;
     }
 
     QString copyError;
     if (!copyDirectoryRecursively(oldPath, cleanNewPath, &copyError)) {
         removeDirectoryRecursively(cleanNewPath);
-        *error = copyError.isEmpty() ? QStringLiteral("复制文件失败。") : copyError;
+        *error = copyError.isEmpty() ? QStringLiteral("复制文件失败") : copyError;
         return false;
     }
 
@@ -694,7 +694,7 @@ bool ApplicationController::applyPendingDataMigration(QString* error)
         QSqlDatabase::removeDatabase(connName);
         if (!databaseUpdated) {
             removeDirectoryRecursively(cleanNewPath);
-            *error = QStringLiteral("无法更新迁移后数据库中的文件路径。");
+            *error = QStringLiteral("无法更新迁移后数据库中的文件路径");
             return false;
         }
     }
@@ -704,7 +704,7 @@ bool ApplicationController::applyPendingDataMigration(QString* error)
     settings.sync();
     if (settings.status() != QSettings::NoError) {
         removeDirectoryRecursively(cleanNewPath);
-        *error = QStringLiteral("无法保存迁移后的数据目录设置。");
+        *error = QStringLiteral("无法保存迁移后的数据目录设置");
         return false;
     }
     AppDataPaths::setCustomRoot(cleanNewPath);

@@ -69,7 +69,7 @@ bool unzipBackupToDirectory(const QString& zipPath, const QString& dstDir, QStri
 {
     QZipReader reader(zipPath);
     if (!reader.exists()) {
-        *error = QStringLiteral("无法打开备份压缩包。");
+        *error = QStringLiteral("无法打开备份压缩包");
         return false;
     }
     const auto entries = reader.fileInfoList();
@@ -102,20 +102,20 @@ bool readBackupManifest(const QString& backupRoot, QJsonObject* manifest, QStrin
 {
     QFile file(backupRoot + QStringLiteral("/manifest.json"));
     if (!file.open(QIODevice::ReadOnly)) {
-        *error = QStringLiteral("所选文件不是 Notera 数据库备份。");
+        *error = QStringLiteral("所选文件不是 Notera 数据库备份");
         return false;
     }
     QJsonParseError parseError;
     const auto document = QJsonDocument::fromJson(file.readAll(), &parseError);
     if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
-        *error = QStringLiteral("备份清单已损坏。");
+        *error = QStringLiteral("备份清单已损坏");
         return false;
     }
     *manifest = document.object();
     if (manifest->value(QStringLiteral("format")).toString() != QStringLiteral("notera-backup")
         || manifest->value(QStringLiteral("formatVersion")).toInt() != 1
         || !QFileInfo::exists(backupRoot + QStringLiteral("/database/notera.db"))) {
-        *error = QStringLiteral("备份格式不受支持或数据库文件缺失。");
+        *error = QStringLiteral("备份格式不受支持或数据库文件缺失");
         return false;
     }
     return true;
@@ -135,7 +135,7 @@ bool validateBackupDatabase(const QString& databasePath, QString* error)
             valid = query.exec(QStringLiteral("PRAGMA integrity_check")) && query.next()
                 && query.value(0).toString() == QStringLiteral("ok");
         }
-        if (!valid) *error = QStringLiteral("备份数据库完整性校验失败。");
+        if (!valid) *error = QStringLiteral("备份数据库完整性校验失败");
         database.close();
     }
     QSqlDatabase::removeDatabase(connectionName);
@@ -160,7 +160,7 @@ LibraryService::LibraryService(QObject* parent)
     connect(&m_thumbnailRefreshTimer, &QTimer::timeout, this, &LibraryService::flushThumbnailUpdates);
     QString error;
     if (!m_databaseService.initialize(&error)) {
-        emit errorOccurred(QStringLiteral("初始化乐谱库数据库失败。"));
+        emit errorOccurred(QStringLiteral("初始化乐谱库数据库失败"));
         return;
     }
     m_repository = ScoreRepository(m_databaseService.database());
@@ -252,11 +252,11 @@ void LibraryService::enterFolder(const QString& folderId)
     const auto name = m_repository.folderName(folderId, &error);
     const auto breadcrumb = m_repository.folderBreadcrumb(folderId, &error);
     if (!error.isEmpty() || name.isEmpty()) {
-        emit errorOccurred(QStringLiteral("无法打开文件夹。"));
+        emit errorOccurred(QStringLiteral("无法打开文件夹"));
         return;
     }
     if (!m_repository.markFolderOpened(folderId, &error)) {
-        emit errorOccurred(QStringLiteral("无法记录文件夹打开时间。"));
+        emit errorOccurred(QStringLiteral("无法记录文件夹打开时间"));
         return;
     }
     m_selection.clear();
@@ -274,7 +274,7 @@ void LibraryService::markScoreOpened(const QString& scoreId)
     if (scoreId.isEmpty()) return;
     QString error;
     if (!m_repository.markScoreOpened(scoreId, &error)) {
-        emit errorOccurred(QStringLiteral("无法记录乐谱打开时间。"));
+        emit errorOccurred(QStringLiteral("无法记录乐谱打开时间"));
         return;
     }
     if (m_filterMode == QStringLiteral("recent")) reload();
@@ -286,7 +286,7 @@ void LibraryService::goUp()
     QString error;
     const auto parentId = m_repository.folderParent(m_currentFolderId, &error);
     if (!error.isEmpty()) {
-        emit errorOccurred(QStringLiteral("无法返回上一级。"));
+        emit errorOccurred(QStringLiteral("无法返回上一级"));
         return;
     }
     if (parentId.isEmpty()) {
@@ -312,7 +312,7 @@ void LibraryService::createFolder(const QString& name)
 {
     const auto trimmed = name.trimmed();
     if (trimmed.isEmpty()) {
-        emit errorOccurred(QStringLiteral("文件夹名称不能为空。"));
+        emit errorOccurred(QStringLiteral("文件夹名称不能为空"));
         return;
     }
     QString error;
@@ -326,7 +326,7 @@ void LibraryService::createFolder(const QString& name)
         return;
     }
     if (!m_repository.createFolder(trimmed, parentId, &error)) {
-        emit errorOccurred(QStringLiteral("创建文件夹失败。"));
+        emit errorOccurred(QStringLiteral("创建文件夹失败"));
         return;
     }
     reloadFolders();
@@ -352,7 +352,7 @@ void LibraryService::resolveCreateFolderConflict(const QString& action)
         targetName = uniqueNameInFolder(name, parentId, true);
     }
     if (!m_repository.createFolder(targetName, parentId, &error)) {
-        emit errorOccurred(QStringLiteral("创建文件夹失败。"));
+        emit errorOccurred(QStringLiteral("创建文件夹失败"));
         return;
     }
     reloadFolders();
@@ -363,7 +363,7 @@ void LibraryService::resolveCreateFolderConflict(const QString& action)
 void LibraryService::createTag(const QString& name)
 {
     if (name.trimmed().isEmpty()) {
-        emit errorOccurred(QStringLiteral("标签名称不能为空。"));
+        emit errorOccurred(QStringLiteral("标签名称不能为空"));
         return;
     }
     const auto trimmed = name.trimmed();
@@ -372,12 +372,12 @@ void LibraryService::createTag(const QString& name)
     const auto existing = m_repository.tags(&error);
     for (const auto& t : existing) {
         if (QString::compare(t.toMap().value(QStringLiteral("name")).toString(), trimmed, Qt::CaseInsensitive) == 0) {
-            emit errorOccurred(QStringLiteral("已存在同名标签。"));
+            emit errorOccurred(QStringLiteral("已存在同名标签"));
             return;
         }
     }
     if (!m_repository.createTag(trimmed, &error)) {
-        emit errorOccurred(QStringLiteral("创建标签失败。"));
+        emit errorOccurred(QStringLiteral("创建标签失败"));
         return;
     }
     reloadTags();
@@ -387,7 +387,7 @@ void LibraryService::createTag(const QString& name)
 void LibraryService::renameFolder(const QString& folderId, const QString& name)
 {
     if (name.trimmed().isEmpty()) {
-        emit errorOccurred(QStringLiteral("文件夹名称不能为空。"));
+        emit errorOccurred(QStringLiteral("文件夹名称不能为空"));
         return;
     }
     QString error;
@@ -399,12 +399,12 @@ void LibraryService::renameFolder(const QString& folderId, const QString& name)
         const auto siblingId = f.toMap().value(QStringLiteral("id")).toString();
         if (siblingId != folderId
             && QString::compare(f.toMap().value(QStringLiteral("name")).toString(), trimmed, Qt::CaseInsensitive) == 0) {
-            emit errorOccurred(QStringLiteral("当前文件夹已存在同名文件夹。"));
+            emit errorOccurred(QStringLiteral("当前文件夹已存在同名文件夹"));
             return;
         }
     }
     if (!m_repository.renameFolder(folderId, trimmed, &error)) {
-        emit errorOccurred(QStringLiteral("重命名文件夹失败。"));
+        emit errorOccurred(QStringLiteral("重命名文件夹失败"));
         return;
     }
     reloadFolders();
@@ -423,7 +423,7 @@ void LibraryService::deleteFolder(const QString& folderId)
     QString error;
     const auto files = m_repository.folderScoresRecursive(folderId, &error);
     if (!error.isEmpty()) {
-        emit errorOccurred(QStringLiteral("读取文件夹内容失败。"));
+        emit errorOccurred(QStringLiteral("读取文件夹内容失败"));
         return;
     }
     for (const auto& value : files) {
@@ -435,7 +435,7 @@ void LibraryService::deleteFolder(const QString& folderId)
         }
     }
     if (!m_repository.deleteFolder(folderId, &error)) {
-        emit errorOccurred(QStringLiteral("删除文件夹失败。"));
+        emit errorOccurred(QStringLiteral("删除文件夹失败"));
         return;
     }
     // 对齐 Windows：仅当删除的是当前所在文件夹时才退回乐谱库根目录；
@@ -456,7 +456,7 @@ void LibraryService::deleteFolder(const QString& folderId)
 void LibraryService::renameTag(const QString& tagId, const QString& name)
 {
     if (name.trimmed().isEmpty()) {
-        emit errorOccurred(QStringLiteral("标签名称不能为空。"));
+        emit errorOccurred(QStringLiteral("标签名称不能为空"));
         return;
     }
     const auto trimmed = name.trimmed();
@@ -467,12 +467,12 @@ void LibraryService::renameTag(const QString& tagId, const QString& name)
         const auto existingTagId = t.toMap().value(QStringLiteral("id")).toString();
         if (existingTagId != tagId
             && QString::compare(t.toMap().value(QStringLiteral("name")).toString(), trimmed, Qt::CaseInsensitive) == 0) {
-            emit errorOccurred(QStringLiteral("已存在同名标签。"));
+            emit errorOccurred(QStringLiteral("已存在同名标签"));
             return;
         }
     }
     if (!m_repository.renameTag(tagId, trimmed, &error)) {
-        emit errorOccurred(QStringLiteral("重命名标签失败。"));
+        emit errorOccurred(QStringLiteral("重命名标签失败"));
         return;
     }
     reloadTags();
@@ -483,7 +483,7 @@ void LibraryService::deleteTag(const QString& tagId)
 {
     QString error;
     if (!m_repository.deleteTag(tagId, &error)) {
-        emit errorOccurred(QStringLiteral("删除标签失败。"));
+        emit errorOccurred(QStringLiteral("删除标签失败"));
         return;
     }
     if (m_filterMode.startsWith(QStringLiteral("tag:"))) {
@@ -503,7 +503,7 @@ void LibraryService::requestImport()
 void LibraryService::importLocalFile(const QUrl& url)
 {
     if (!url.isValid()) {
-        emit errorOccurred(QStringLiteral("请选择电脑上的文件。"));
+        emit errorOccurred(QStringLiteral("请选择电脑上的文件"));
         return;
     }
     // 统一走导入队列，以支持"同目录导入同名文件"时的冲突弹窗
@@ -517,7 +517,7 @@ void LibraryService::importFiles(const QVariantList& paths)
     for (const auto& value : paths) {
         const QString localPath = resolveImportPath(value);
         if (localPath.isEmpty()) {
-            emit errorOccurred(QStringLiteral("请选择电脑上的文件。"));
+            emit errorOccurred(QStringLiteral("请选择电脑上的文件"));
             return;
         }
         resolved.append(localPath);
@@ -552,7 +552,7 @@ void LibraryService::importFolder(const QVariant& folderPathVariant)
 {
     const auto resolvedPath = resolveImportPath(folderPathVariant);
     if (resolvedPath.isEmpty()) {
-        emit errorOccurred(QStringLiteral("请选择电脑上的文件夹。"));
+        emit errorOccurred(QStringLiteral("请选择电脑上的文件夹"));
         return;
     }
     // canonicalFilePath 解析符号链接（如 macOS 的 /var → /private/var），
@@ -560,12 +560,12 @@ void LibraryService::importFolder(const QVariant& folderPathVariant)
     // 正确得到相对目录，否则子文件夹会全部被误归到根目录
     const auto rootPath = QFileInfo(resolvedPath).canonicalFilePath();
     if (rootPath.isEmpty()) {
-        emit errorOccurred(QStringLiteral("所选文件夹不存在。"));
+        emit errorOccurred(QStringLiteral("所选文件夹不存在"));
         return;
     }
     const QFileInfo rootInfo(rootPath);
     if (!rootInfo.exists() || !rootInfo.isDir()) {
-        emit errorOccurred(QStringLiteral("所选文件夹不存在。"));
+        emit errorOccurred(QStringLiteral("所选文件夹不存在"));
         return;
     }
 
@@ -583,7 +583,7 @@ void LibraryService::importFolder(const QVariant& folderPathVariant)
         filesByDir[relDir].append(info.filePath());
     }
     if (filesByDir.isEmpty()) {
-        emit noticeOccurred(QStringLiteral("所选文件夹中没有可导入的乐谱文件。"));
+        emit noticeOccurred(QStringLiteral("所选文件夹中没有可导入的乐谱文件"));
         return;
     }
 
@@ -757,7 +757,7 @@ void LibraryService::continueImport()
                     if (m_repository.remove(s.id, &error)) {
                         removedAny = true;
                     } else {
-                        emit errorOccurred(QStringLiteral("替换旧乐谱失败。"));
+                        emit errorOccurred(QStringLiteral("替换旧乐谱失败"));
                     }
                 }
                 if (!removedAny) {
@@ -828,7 +828,7 @@ void LibraryService::finishImportTask(ImportTaskResult result)
     consumeImportTemp(result.sourcePath);
 
     if (result.storedPath.isEmpty()) {
-        emit errorOccurred(result.error.isEmpty() ? QStringLiteral("导入乐谱失败。") : result.error);
+        emit errorOccurred(result.error.isEmpty() ? QStringLiteral("导入乐谱失败") : result.error);
     } else {
         const auto now = QDateTime::currentDateTimeUtc();
         Score score {
@@ -844,7 +844,7 @@ void LibraryService::finishImportTask(ImportTaskResult result)
         QString error;
         // 批量事务：每 32 条 insert 提交一次，避免每条都 fsync
         if (m_pendingInsertCount == 0 && !m_repository.beginTransaction(&error)) {
-            emit errorOccurred(QStringLiteral("将乐谱添加到乐谱库失败。"));
+            emit errorOccurred(QStringLiteral("将乐谱添加到乐谱库失败"));
         } else if (!m_repository.insert(score, result.folderId, &error)) {
             (void)FileService::removeFile(result.storedPath, &error);
             QString txError;
@@ -852,7 +852,7 @@ void LibraryService::finishImportTask(ImportTaskResult result)
                 qWarning() << "[LibraryService] commitTransaction failed after insert error:" << txError;
             }
             m_pendingInsertCount = 0;
-            emit errorOccurred(QStringLiteral("将乐谱添加到乐谱库失败。"));
+            emit errorOccurred(QStringLiteral("将乐谱添加到乐谱库失败"));
         } else {
             if (FileService::isSupportedScoreFile(score.filePath)) {
                 m_thumbnailGenerator.generate(score.id, score.filePath, score.fileType);
@@ -883,7 +883,7 @@ void LibraryService::flushThumbnailUpdates()
     const auto updates = std::exchange(m_pendingThumbnailPaths, {});
     QString error;
     if (!m_repository.updateThumbnails(updates, &error)) {
-        emit errorOccurred(QStringLiteral("更新乐谱缩略图失败。"));
+        emit errorOccurred(QStringLiteral("更新乐谱缩略图失败"));
         return;
     }
     reload();
@@ -892,7 +892,7 @@ void LibraryService::flushThumbnailUpdates()
 void LibraryService::importAndStitchImages(const QStringList& filePaths)
 {
     if (filePaths.size() < 2) {
-        emit errorOccurred(QStringLiteral("拼接导入需要至少选择两张图片。"));
+        emit errorOccurred(QStringLiteral("拼接导入需要至少选择两张图片"));
         return;
     }
 
@@ -937,20 +937,20 @@ void LibraryService::importAndStitchImages(const QStringList& filePaths)
     }
 
     if (maxWidth <= 0 || totalHeight <= 0) {
-        emit errorOccurred(QStringLiteral("图片尺寸无效。"));
+        emit errorOccurred(QStringLiteral("图片尺寸无效"));
         return;
     }
 
     constexpr qint64 maximumCanvasPixels = 64LL * 1024 * 1024;
     if (totalHeight > 65536 || maxWidth > 16384
         || static_cast<qint64>(maxWidth) * totalHeight > maximumCanvasPixels) {
-        emit errorOccurred(QStringLiteral("拼接后图片尺寸过大，请减少图片数量或先缩小图片。"));
+        emit errorOccurred(QStringLiteral("拼接后图片尺寸过大，请减少图片数量或先缩小图片"));
         return;
     }
 
     QImage stitched(maxWidth, static_cast<int>(totalHeight), QImage::Format_ARGB32);
     if (stitched.isNull()) {
-        emit errorOccurred(QStringLiteral("内存不足，无法创建拼接图片。"));
+        emit errorOccurred(QStringLiteral("内存不足，无法创建拼接图片"));
         return;
     }
     stitched.fill(Qt::white);
@@ -969,7 +969,7 @@ void LibraryService::importAndStitchImages(const QStringList& filePaths)
     const QString tempPath = QStringLiteral("%1/notera_stitch_%2.png")
         .arg(tempDir, QUuid::createUuid().toString(QUuid::WithoutBraces));
     if (!stitched.save(tempPath, "PNG")) {
-        emit errorOccurred(QStringLiteral("保存拼接图片失败。"));
+        emit errorOccurred(QStringLiteral("保存拼接图片失败"));
         return;
     }
 
@@ -995,7 +995,7 @@ void LibraryService::toggleFavorite(const QString& scoreId, const bool favorite)
 {
     QString error;
     if (!m_repository.setFavorite(scoreId, favorite, &error)) {
-        emit errorOccurred(QStringLiteral("更新收藏状态失败。"));
+        emit errorOccurred(QStringLiteral("更新收藏状态失败"));
         return;
     }
     reload();
@@ -1005,7 +1005,7 @@ void LibraryService::toggleItemFavorite(const QString& itemId, const bool favori
 {
     QString error;
     if (!m_repository.setItemFavorite(itemId, favorite, &error)) {
-        emit errorOccurred(QStringLiteral("更新收藏状态失败。"));
+        emit errorOccurred(QStringLiteral("更新收藏状态失败"));
         return;
     }
     reloadFolders();
@@ -1015,7 +1015,7 @@ void LibraryService::toggleItemFavorite(const QString& itemId, const bool favori
 void LibraryService::renameScore(const QString& scoreId, const QString& title)
 {
     if (title.trimmed().isEmpty()) {
-        emit errorOccurred(QStringLiteral("乐谱名称不能为空。"));
+        emit errorOccurred(QStringLiteral("乐谱名称不能为空"));
         return;
     }
     QString error;
@@ -1025,12 +1025,12 @@ void LibraryService::renameScore(const QString& scoreId, const QString& title)
     const auto siblings = m_repository.listAtFolder(folderId, QString(), &error);
     for (const auto& s : siblings) {
         if (s.id != scoreId && QString::compare(s.title, trimmed, Qt::CaseInsensitive) == 0) {
-            emit errorOccurred(QStringLiteral("当前文件夹已存在同名乐谱。"));
+            emit errorOccurred(QStringLiteral("当前文件夹已存在同名乐谱"));
             return;
         }
     }
     if (!m_repository.rename(scoreId, trimmed, &error)) {
-        emit errorOccurred(QStringLiteral("重命名乐谱失败。"));
+        emit errorOccurred(QStringLiteral("重命名乐谱失败"));
         return;
     }
     reload();
@@ -1044,7 +1044,7 @@ void LibraryService::deleteScore(const QString& scoreId, const QString& filePath
         return;
     }
     if (!m_repository.remove(scoreId, &error)) {
-        emit errorOccurred(QStringLiteral("删除乐谱记录失败。"));
+        emit errorOccurred(QStringLiteral("删除乐谱记录失败"));
         return;
     }
     reload();
@@ -1064,14 +1064,14 @@ void LibraryService::deleteItems(const QVariantList& ids)
             if (!FileService::removeFile(filePath, &error)
                 || !FileService::removeFile(thumbPath, &error)
                 || !m_repository.remove(id, &error)) {
-                emit errorOccurred(error.isEmpty() ? QStringLiteral("删除乐谱失败。") : error);
+                emit errorOccurred(error.isEmpty() ? QStringLiteral("删除乐谱失败") : error);
                 return;
             }
             ++deletedCount;
         } else if (type == QStringLiteral("folder")) {
             const auto files = m_repository.folderScoresRecursive(id, &error);
             if (!error.isEmpty()) {
-                emit errorOccurred(QStringLiteral("读取文件夹内容失败。"));
+                emit errorOccurred(QStringLiteral("读取文件夹内容失败"));
                 return;
             }
             for (const auto& value : files) {
@@ -1083,7 +1083,7 @@ void LibraryService::deleteItems(const QVariantList& ids)
                 }
             }
             if (!m_repository.deleteFolder(id, &error)) {
-                emit errorOccurred(QStringLiteral("删除文件夹失败。"));
+                emit errorOccurred(QStringLiteral("删除文件夹失败"));
                 return;
             }
             ++deletedCount;
@@ -1117,7 +1117,7 @@ QString LibraryService::scoreFolderId(const QString& scoreId)
 {
     QString error;
     const auto folderId = m_repository.scoreFolderId(scoreId, &error);
-    if (!error.isEmpty()) emit errorOccurred(QStringLiteral("无法确定乐谱所在目录。"));
+    if (!error.isEmpty()) emit errorOccurred(QStringLiteral("无法确定乐谱所在目录"));
     return folderId;
 }
 
@@ -1126,12 +1126,12 @@ void LibraryService::setScoreFolder(const QString& scoreId, const QString& folde
     QString error;
     const auto currentFolderId = m_repository.scoreFolderId(scoreId, &error);
     if (!error.isEmpty()) {
-        emit errorOccurred(QStringLiteral("无法确定乐谱所在目录。"));
+        emit errorOccurred(QStringLiteral("无法确定乐谱所在目录"));
         return;
     }
     if (currentFolderId == folderId) return;
     if (!m_repository.setFolder(scoreId, folderId, &error)) {
-        emit errorOccurred(QStringLiteral("设置文件夹失败。"));
+        emit errorOccurred(QStringLiteral("设置文件夹失败"));
         return;
     }
     reload();
@@ -1142,7 +1142,7 @@ void LibraryService::addScoreTag(const QString& scoreId, const QString& tagId)
 {
     QString error;
     if (!m_repository.addTag(scoreId, tagId, &error)) {
-        emit errorOccurred(QStringLiteral("添加标签失败。"));
+        emit errorOccurred(QStringLiteral("添加标签失败"));
         return;
     }
     reload();
@@ -1153,7 +1153,7 @@ void LibraryService::removeScoreTag(const QString& scoreId, const QString& tagId
 {
     QString error;
     if (!m_repository.removeTag(scoreId, tagId, &error)) {
-        emit errorOccurred(QStringLiteral("移除标签失败。"));
+        emit errorOccurred(QStringLiteral("移除标签失败"));
         return;
     }
     reload();
@@ -1170,7 +1170,7 @@ bool LibraryService::scoreHasTag(const QString& scoreId, const QString& tagId)
     QString error;
     const auto tags = m_repository.scoreTags(scoreId, &error);
     if (!error.isEmpty()) {
-        emit errorOccurred(QStringLiteral("加载乐谱标签失败。"));
+        emit errorOccurred(QStringLiteral("加载乐谱标签失败"));
         return false;
     }
     return std::any_of(tags.cbegin(), tags.cend(), [&tagId](const QVariant& value) {
@@ -1194,7 +1194,7 @@ void LibraryService::setItemFolder(const QString& itemId, const QString& folderI
         ? m_repository.moveFolder(itemId, folderId, &error)
         : type == QStringLiteral("score") && m_repository.setFolder(itemId, folderId, &error);
     if (!succeeded) {
-        emit errorOccurred(error.isEmpty() ? QStringLiteral("移动项目失败。") : error);
+        emit errorOccurred(error.isEmpty() ? QStringLiteral("移动项目失败") : error);
         return;
     }
     reloadFolders();
@@ -1206,7 +1206,7 @@ void LibraryService::addItemTag(const QString& itemId, const QString& tagId)
 {
     QString error;
     if (!m_repository.addItemTag(itemId, tagId, &error)) {
-        emit errorOccurred(QStringLiteral("添加标签失败。"));
+        emit errorOccurred(QStringLiteral("添加标签失败"));
         return;
     }
     reload();
@@ -1216,7 +1216,7 @@ void LibraryService::removeItemTag(const QString& itemId, const QString& tagId)
 {
     QString error;
     if (!m_repository.removeItemTag(itemId, tagId, &error)) {
-        emit errorOccurred(QStringLiteral("移除标签失败。"));
+        emit errorOccurred(QStringLiteral("移除标签失败"));
         return;
     }
     reload();
@@ -1259,7 +1259,7 @@ QStringList uniqueItemIds(const QVariantList& values)
 QString LibraryService::moveItems(const QVariantList& itemIds, const QString& folderId)
 {
     const auto ids = uniqueItemIds(itemIds);
-    if (ids.isEmpty()) return QStringLiteral("没有可移动的项目。");
+    if (ids.isEmpty()) return QStringLiteral("没有可移动的项目");
     // 对齐 Windows：移动 = 剪切 + 粘贴，目标目录存在同名项目时走统一冲突弹窗，
     // 避免拖拽 /“移动到文件夹”菜单静默产生重复项；同时复用剪切粘贴的完整冲突流程。
     m_clipboardItems.clear();
@@ -1274,11 +1274,11 @@ QString LibraryService::moveItems(const QVariantList& itemIds, const QString& fo
 QString LibraryService::favoriteItems(const QVariantList& itemIds)
 {
     const auto ids = uniqueItemIds(itemIds);
-    if (ids.isEmpty()) return QStringLiteral("没有可收藏的项目。");
+    if (ids.isEmpty()) return QStringLiteral("没有可收藏的项目");
     QString error;
     if (!m_repository.setItemsFavorite(ids, true, &error)) {
-        emit errorOccurred(QStringLiteral("添加收藏失败。"));
-        return QStringLiteral("添加收藏失败。");
+        emit errorOccurred(QStringLiteral("添加收藏失败"));
+        return QStringLiteral("添加收藏失败");
     }
     reloadFolders();
     reload();
@@ -1289,11 +1289,11 @@ QString LibraryService::favoriteItems(const QVariantList& itemIds)
 QString LibraryService::tagItems(const QVariantList& itemIds, const QString& tagId)
 {
     const auto ids = uniqueItemIds(itemIds);
-    if (ids.isEmpty() || tagId.isEmpty()) return QStringLiteral("没有可添加标签的项目。");
+    if (ids.isEmpty() || tagId.isEmpty()) return QStringLiteral("没有可添加标签的项目");
     QString error;
     if (!m_repository.addItemsTag(ids, tagId, &error)) {
-        emit errorOccurred(QStringLiteral("添加标签失败。"));
-        return QStringLiteral("添加标签失败。");
+        emit errorOccurred(QStringLiteral("添加标签失败"));
+        return QStringLiteral("添加标签失败");
     }
     reload();
     emit noticeOccurred(QStringLiteral("已为 %1 个项目添加标签").arg(ids.size()));
@@ -1302,21 +1302,21 @@ QString LibraryService::tagItems(const QVariantList& itemIds, const QString& tag
 
 QString LibraryService::saveScoreAs(const QString& scoreId, const QUrl& destination)
 {
-    if (!destination.isValid() || !destination.isLocalFile()) return QStringLiteral("请选择本机保存位置。");
+    if (!destination.isValid() || !destination.isLocalFile()) return QStringLiteral("请选择本机保存位置");
     QString error;
     const auto sourcePath = m_repository.filePathById(scoreId, &error);
-    if (sourcePath.isEmpty() || !QFileInfo::exists(sourcePath)) return QStringLiteral("找不到乐谱源文件。");
+    if (sourcePath.isEmpty() || !QFileInfo::exists(sourcePath)) return QStringLiteral("找不到乐谱源文件");
     auto destinationPath = QDir::cleanPath(destination.toLocalFile());
     if (QFileInfo(destinationPath).suffix().isEmpty()) {
         destinationPath += QLatin1Char('.') + QFileInfo(sourcePath).suffix();
     }
     if (QFileInfo(sourcePath).canonicalFilePath() == QFileInfo(destinationPath).canonicalFilePath()) {
-        return QStringLiteral("保存位置与源文件相同。");
+        return QStringLiteral("保存位置与源文件相同");
     }
     if (QFileInfo::exists(destinationPath) && !QFile::remove(destinationPath)) {
-        return QStringLiteral("无法覆盖目标文件。");
+        return QStringLiteral("无法覆盖目标文件");
     }
-    if (!QFile::copy(sourcePath, destinationPath)) return QStringLiteral("另存乐谱失败。");
+    if (!QFile::copy(sourcePath, destinationPath)) return QStringLiteral("另存乐谱失败");
     emit noticeOccurred(QStringLiteral("乐谱已另存为"));
     return {};
 }
@@ -1324,11 +1324,11 @@ QString LibraryService::saveScoreAs(const QString& scoreId, const QUrl& destinat
 QString LibraryService::saveFolderAs(const QString& folderId, const QUrl& destinationDirectory)
 {
     if (!destinationDirectory.isValid() || !destinationDirectory.isLocalFile()) {
-        return QStringLiteral("请选择本机文件夹。");
+        return QStringLiteral("请选择本机文件夹");
     }
     QString error;
     const auto entries = m_repository.folderExportEntries(folderId, &error);
-    if (!error.isEmpty() || entries.isEmpty()) return QStringLiteral("无法读取文件夹内容。");
+    if (!error.isEmpty() || entries.isEmpty()) return QStringLiteral("无法读取文件夹内容");
     const auto destinationRoot = QDir::cleanPath(destinationDirectory.toLocalFile());
     int copied = 0;
     for (const auto& value : entries) {
@@ -1337,14 +1337,14 @@ QString LibraryService::saveFolderAs(const QString& folderId, const QUrl& destin
         QStringList safeSegments;
         for (const auto& segment : rawSegments) safeSegments.append(safeExportName(segment));
         const auto folderPath = QDir(destinationRoot).filePath(safeSegments.join(QLatin1Char('/')));
-        if (!QDir().mkpath(folderPath)) return QStringLiteral("无法创建导出文件夹。");
+        if (!QDir().mkpath(folderPath)) return QStringLiteral("无法创建导出文件夹");
         const auto sourcePath = entry.value(QStringLiteral("filePath")).toString();
         if (sourcePath.isEmpty()) continue;
         const auto suffix = QFileInfo(sourcePath).suffix();
         auto fileName = safeExportName(entry.value(QStringLiteral("title")).toString());
         if (!suffix.isEmpty()) fileName += QLatin1Char('.') + suffix;
         const auto targetPath = availableExportPath(QDir(folderPath).filePath(fileName));
-        if (!QFile::copy(sourcePath, targetPath)) return QStringLiteral("导出文件夹时复制乐谱失败。");
+        if (!QFile::copy(sourcePath, targetPath)) return QStringLiteral("导出文件夹时复制乐谱失败");
         ++copied;
     }
     emit noticeOccurred(QStringLiteral("文件夹已另存，导出 %1 份乐谱").arg(copied));
@@ -1374,12 +1374,12 @@ void LibraryService::reload()
         visibleFolders = m_repository.childFolders({}, m_searchQuery, &error);
     }
     if (!error.isEmpty()) {
-        emit errorOccurred(QStringLiteral("加载乐谱库失败。"));
+        emit errorOccurred(QStringLiteral("加载乐谱库失败"));
         return;
     }
     const auto allTags = m_repository.allScoreTags(&error);
     if (!error.isEmpty()) {
-        emit errorOccurred(QStringLiteral("加载乐谱库失败。"));
+        emit errorOccurred(QStringLiteral("加载乐谱库失败"));
         return;
     }
     for (auto& score : scores) {
@@ -1395,7 +1395,7 @@ void LibraryService::reloadFolders()
     QString error;
     m_folders.replaceAll(m_repository.folders(&error));
     if (!error.isEmpty()) {
-        emit errorOccurred(QStringLiteral("加载文件夹失败。"));
+        emit errorOccurred(QStringLiteral("加载文件夹失败"));
         return;
     }
     emit foldersChanged();
@@ -1406,7 +1406,7 @@ void LibraryService::reloadTags()
     QString error;
     m_tags.replaceAll(m_repository.tags(&error));
     if (!error.isEmpty()) {
-        emit errorOccurred(QStringLiteral("加载标签失败。"));
+        emit errorOccurred(QStringLiteral("加载标签失败"));
         return;
     }
     emit tagsChanged();
@@ -1438,7 +1438,7 @@ void LibraryService::importFile(const QString& sourcePath, const QString& titleO
         || m_filterMode.startsWith(QStringLiteral("folder:"))) ? m_currentFolderId : QString {};
     if (!m_repository.insert(score, destinationFolder, &error)) {
         (void)FileService::removeFile(storedPath, &error); // 回滚：尽力删除已复制文件
-        emit errorOccurred(QStringLiteral("将乐谱添加到乐谱库失败。"));
+        emit errorOccurred(QStringLiteral("将乐谱添加到乐谱库失败"));
         return;
     }
     if (FileService::isSupportedScoreFile(score.filePath)) {
@@ -1513,7 +1513,7 @@ QString LibraryService::copyScoreToFolder(const QString& scoreId, const QString&
 {
     QString error;
     const auto sourcePath = m_repository.filePathById(scoreId, &error);
-    if (sourcePath.isEmpty() || !QFileInfo::exists(sourcePath)) return QStringLiteral("找不到源乐谱文件。");
+    if (sourcePath.isEmpty() || !QFileInfo::exists(sourcePath)) return QStringLiteral("找不到源乐谱文件");
 
     const auto scores = m_repository.listAtFolder(targetFolderId, QString(), &error);
     QString sourceTitle;
@@ -1542,7 +1542,7 @@ QString LibraryService::copyScoreToFolder(const QString& scoreId, const QString&
                 (void)FileService::removeFile(s.filePath, &error);
                 (void)FileService::removeFile(s.thumbnailPath, &error);
                 if (!m_repository.remove(s.id, &error)) {
-                    return error.isEmpty() ? QStringLiteral("移除旧乐谱失败。") : error;
+                    return error.isEmpty() ? QStringLiteral("移除旧乐谱失败") : error;
                 }
                 deletedAny = true;
             }
@@ -1553,7 +1553,7 @@ QString LibraryService::copyScoreToFolder(const QString& scoreId, const QString&
 
     const auto newId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     const auto storedPath = FileService::copyScoreIntoLibrary(sourcePath, newId, &error);
-    if (storedPath.isEmpty()) return error.isEmpty() ? QStringLiteral("复制文件失败。") : error;
+    if (storedPath.isEmpty()) return error.isEmpty() ? QStringLiteral("复制文件失败") : error;
 
     const auto now = QDateTime::currentDateTimeUtc();
     Score score {
@@ -1568,7 +1568,7 @@ QString LibraryService::copyScoreToFolder(const QString& scoreId, const QString&
     };
     if (!m_repository.insert(score, targetFolderId, &error)) {
         (void)FileService::removeFile(storedPath, &error); // 回滚：尽力删除已复制文件
-        return QStringLiteral("创建乐谱记录失败。");
+        return QStringLiteral("创建乐谱记录失败");
     }
     if (FileService::isSupportedScoreFile(score.filePath)) {
         m_thumbnailGenerator.generate(score.id, score.filePath, score.fileType);
@@ -1582,10 +1582,10 @@ QString LibraryService::copyFolderRecursive(const QString& folderId, const QStri
     // 防护：目标为源文件夹自身或其子文件夹时禁止复制，否则复制结果会成为源文件夹的子项，
     // 触发对刚创建副本的递归复制，造成无限递归
     if (!m_repository.canMoveFolder(folderId, targetParentId, &error)) {
-        return QStringLiteral("不能将文件夹复制到其自身或其子文件夹中。");
+        return QStringLiteral("不能将文件夹复制到其自身或其子文件夹中");
     }
     const auto sourceName = m_repository.folderName(folderId, &error);
-    if (sourceName.isEmpty()) return QStringLiteral("找不到源文件夹。");
+    if (sourceName.isEmpty()) return QStringLiteral("找不到源文件夹");
 
     QString targetName = sourceName;
     if (nameExistsInFolder(sourceName, targetParentId, true)) {
@@ -1601,7 +1601,7 @@ QString LibraryService::copyFolderRecursive(const QString& folderId, const QStri
                 if (existingId == folderId) continue;
                 if (QString::compare(f.toMap().value(QStringLiteral("name")).toString(), sourceName, Qt::CaseInsensitive) != 0) continue;
                 if (!m_repository.deleteFolder(existingId, &error)) {
-                    return error.isEmpty() ? QStringLiteral("移除旧文件夹失败。") : error;
+                    return error.isEmpty() ? QStringLiteral("移除旧文件夹失败") : error;
                 }
                 deletedAny = true;
             }
@@ -1611,7 +1611,7 @@ QString LibraryService::copyFolderRecursive(const QString& folderId, const QStri
     }
 
     if (!m_repository.createFolder(targetName, targetParentId, &error)) {
-        return QStringLiteral("创建文件夹失败。");
+        return QStringLiteral("创建文件夹失败");
     }
     // createFolder 内部自己生成 UUID，创建后必须重新查询获取真实 id
     const auto updated = m_repository.childFolders(targetParentId, QString(), &error);
@@ -1622,7 +1622,7 @@ QString LibraryService::copyFolderRecursive(const QString& folderId, const QStri
             break;
         }
     }
-    if (newFolderId.isEmpty()) return QStringLiteral("获取新文件夹 ID 失败。");
+    if (newFolderId.isEmpty()) return QStringLiteral("获取新文件夹 ID 失败");
 
     const auto childScores = m_repository.listAtFolder(folderId, QString(), &error);
     for (const auto& s : childScores) {
@@ -1698,7 +1698,7 @@ void LibraryService::deleteEmptyFolderTree(const QString& folderId)
     const auto remainingSubFolders = m_repository.childFolders(folderId, QString(), &error);
     if (scores.isEmpty() && remainingSubFolders.isEmpty()) {
         if (!m_repository.deleteFolder(folderId, &error)) {
-            emit errorOccurred(QStringLiteral("清理空文件夹失败。"));
+            emit errorOccurred(QStringLiteral("清理空文件夹失败"));
         }
     }
 }
@@ -1793,7 +1793,7 @@ void LibraryService::continuePaste()
             // 目标为源文件夹自身或其子文件夹：拒绝并跳过（对齐 Windows 文件管理器，
             // 同时防止复制文件夹时对刚创建的副本递归复制造成无限递归）
             if (!m_repository.canMoveFolder(itemId, targetFolderId, &error)) {
-                emit errorOccurred(QStringLiteral("不能将文件夹移动到其自身或其子文件夹中。"));
+                emit errorOccurred(QStringLiteral("不能将文件夹移动到其自身或其子文件夹中"));
                 ++m_pasteIndex;
                 if (!m_folderConflictApplyToAll) m_pendingFolderConflictAction.clear();
                 continue;
@@ -1818,7 +1818,7 @@ void LibraryService::continuePaste()
                         for (const auto& f : children) {
                             if (QString::compare(f.toMap().value(QStringLiteral("name")).toString(), sourceName, Qt::CaseInsensitive) != 0) continue;
                             if (!m_repository.deleteFolder(f.toMap().value(QStringLiteral("id")).toString(), &error)) {
-                                emit errorOccurred(QStringLiteral("移除旧文件夹失败。"));
+                                emit errorOccurred(QStringLiteral("移除旧文件夹失败"));
                             }
                             break;
                         }
@@ -1826,7 +1826,7 @@ void LibraryService::continuePaste()
                     if (action == QStringLiteral("rename")) {
                         const auto newName = uniqueNameInFolder(sourceName, targetFolderId, true);
                         if (!m_repository.renameFolder(itemId, newName, &error)) {
-                            emit errorOccurred(QStringLiteral("重命名文件夹失败。"));
+                            emit errorOccurred(QStringLiteral("重命名文件夹失败"));
                         }
                     }
                 }
@@ -1900,7 +1900,7 @@ void LibraryService::continuePaste()
                             (void)FileService::removeFile(s.filePath, &error);
                             (void)FileService::removeFile(s.thumbnailPath, &error);
                             if (!m_repository.remove(s.id, &error)) {
-                                emit errorOccurred(QStringLiteral("移除旧乐谱失败。"));
+                                emit errorOccurred(QStringLiteral("移除旧乐谱失败"));
                             }
                             break;
                         }
@@ -1909,10 +1909,10 @@ void LibraryService::continuePaste()
                 // rename：移动后给乐谱改名
             }
             if (!m_repository.setFolder(itemId, targetFolderId, &error)) {
-                emit errorOccurred(QStringLiteral("移动乐谱失败。"));
+                emit errorOccurred(QStringLiteral("移动乐谱失败"));
             } else if (hasConflict && action == QStringLiteral("rename")) {
                 if (!m_repository.rename(itemId, uniqueNameInFolder(itemName, targetFolderId, false), &error)) {
-                    emit errorOccurred(QStringLiteral("重命名乐谱失败。"));
+                    emit errorOccurred(QStringLiteral("重命名乐谱失败"));
                 }
             }
         } else {
@@ -1964,17 +1964,17 @@ QVariantMap LibraryService::probeDatabaseBackup(const QUrl& backupFile)
     QVariantMap result;
     result[QStringLiteral("valid")] = false;
     if (!backupFile.isValid() || !backupFile.isLocalFile()) {
-        result[QStringLiteral("error")] = QStringLiteral("请选择本机备份文件。");
+        result[QStringLiteral("error")] = QStringLiteral("请选择本机备份文件");
         return result;
     }
     const auto zipPath = QDir::cleanPath(backupFile.toLocalFile());
     if (!QFileInfo::exists(zipPath)) {
-        result[QStringLiteral("error")] = QStringLiteral("备份文件不存在。");
+        result[QStringLiteral("error")] = QStringLiteral("备份文件不存在");
         return result;
     }
     QTemporaryDir tempDir;
     if (!tempDir.isValid()) {
-        result[QStringLiteral("error")] = QStringLiteral("无法创建临时目录。");
+        result[QStringLiteral("error")] = QStringLiteral("无法创建临时目录");
         return result;
     }
     QString error;
@@ -2018,13 +2018,13 @@ QVariantMap LibraryService::probeDatabaseBackup(const QUrl& backupFile)
 
 QString LibraryService::importDatabaseBackupMerged(const QUrl& backupFile)
 {
-    if (!backupFile.isValid() || !backupFile.isLocalFile()) return QStringLiteral("请选择本机备份文件。");
+    if (!backupFile.isValid() || !backupFile.isLocalFile()) return QStringLiteral("请选择本机备份文件");
     const auto zipPath = QDir::cleanPath(backupFile.toLocalFile());
-    if (!QFileInfo::exists(zipPath)) return QStringLiteral("备份文件不存在。");
+    if (!QFileInfo::exists(zipPath)) return QStringLiteral("备份文件不存在");
 
     cleanupMergeState();
     m_mergeTempDir.reset(new QTemporaryDir);
-    if (!m_mergeTempDir->isValid()) return QStringLiteral("无法创建临时目录。");
+    if (!m_mergeTempDir->isValid()) return QStringLiteral("无法创建临时目录");
     m_mergeBackupRoot = m_mergeTempDir->path();
 
     QString error;
@@ -2051,7 +2051,7 @@ QString LibraryService::importDatabaseBackupMerged(const QUrl& backupFile)
         if (!database.open()) {
             QSqlDatabase::removeDatabase(connectionName);
             cleanupMergeState();
-            return QStringLiteral("无法读取备份数据库。");
+            return QStringLiteral("无法读取备份数据库");
         }
         QSqlQuery query(database);
 
@@ -2246,7 +2246,7 @@ void LibraryService::importBackupScore(const QVariantMap& item, const QString& t
     QString error;
     const auto storedPath = FileService::copyScoreIntoLibrary(sourcePath, newId, &error);
     if (storedPath.isEmpty()) {
-        emit errorOccurred(error.isEmpty() ? QStringLiteral("导入乐谱失败。") : error);
+        emit errorOccurred(error.isEmpty() ? QStringLiteral("导入乐谱失败") : error);
         return;
     }
     const auto fileType = item.value(QStringLiteral("fileType")).toString();

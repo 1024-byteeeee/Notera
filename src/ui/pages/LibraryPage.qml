@@ -840,7 +840,7 @@ Rectangle {
                                 deleteDialog.scoreId = scoreDelegate.scoreId
                                 deleteDialog.filePath = scoreDelegate.filePath
                                 deleteDialog.thumbnailPath = scoreDelegate.thumbnailPath
-                                deleteDialog.message = "将“" + scoreDelegate.title + "”从 Notera 乐谱库中删除。此操作无法撤销。"
+                                deleteDialog.message = "将“" + scoreDelegate.title + "”从 Notera 乐谱库中删除。此操作无法撤销"
                                 deleteDialog.open()
                             }
                         }
@@ -1313,7 +1313,7 @@ Rectangle {
             }
             Label {
                 Layout.fillWidth: true
-                text: "选择“保留两者”将自动重命名为“" + createFolderConflictDialog.conflictName + " (2)”。"
+                text: "选择“保留两者”将自动重命名为“" + createFolderConflictDialog.conflictName + " (2)”"
                 color: Theme.mutedForeground
                 font.pixelSize: Theme.fontXs
                 wrapMode: Text.WordWrap
@@ -1366,7 +1366,7 @@ Rectangle {
         property string targetId: ""
         property string folderName: ""
         title: "删除文件夹？"
-        message: "将删除“" + folderName + "”及其中的所有子文件夹和乐谱。此操作无法撤销。"
+        message: "将删除“" + folderName + "”及其中的所有子文件夹和乐谱。此操作无法撤销"
         onAccepted: libraryService.deleteFolder(targetId)
     }
 
@@ -1430,7 +1430,7 @@ Rectangle {
         id: batchDeleteDialog
         property var selectedIds: []
         title: "批量删除？"
-        message: "将删除选中的 " + batchDeleteDialog.selectedIds.length + " 个项目。此操作无法撤销。"
+        message: "将删除选中的 " + batchDeleteDialog.selectedIds.length + " 个项目。此操作无法撤销"
         onAccepted: {
             libraryService.deleteItems(batchDeleteDialog.selectedIds)
             root.clearSelection()
@@ -1447,7 +1447,7 @@ Rectangle {
         onAccepted: {
             const error = libraryService.saveScoreAs(scoreId, selectedFile)
             saveAsResultDialog.title = error.length > 0 ? "另存为失败" : "另存为成功"
-            saveAsResultDialog.message = error.length > 0 ? error : "乐谱已保存到所选位置。"
+            saveAsResultDialog.message = error.length > 0 ? error : "乐谱已保存到所选位置"
             saveAsResultDialog.open()
         }
     }
@@ -1461,7 +1461,7 @@ Rectangle {
         onAccepted: {
             const error = libraryService.saveFolderAs(folderId, selectedFolder)
             saveAsResultDialog.title = error.length > 0 ? "导出失败" : "导出成功"
-            saveAsResultDialog.message = error.length > 0 ? error : "文件夹已导出到所选位置。"
+            saveAsResultDialog.message = error.length > 0 ? error : "文件夹已导出到所选位置"
             saveAsResultDialog.open()
         }
     }

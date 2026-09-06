@@ -619,12 +619,16 @@ Rectangle {
         nameFilters: ["Notera 备份 (*.notera-backup *.zip)", "所有文件 (*)"]
         currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
         onAccepted: {
-            const error = appController.exportDatabaseBackup(selectedFile)
-            backupResultDialog.title = error.length > 0 ? "导出失败" : "导出成功"
-            backupResultDialog.message = error.length > 0
-                ? error
-                : "备份已导出到所选位置。"
-            backupResultDialog.open()
+            loadingDialog.show("正在导出备份")
+            Qt.callLater(function() {
+                const error = appController.exportDatabaseBackup(selectedFile)
+                loadingDialog.hide()
+                backupResultDialog.title = error.length > 0 ? "导出失败" : "导出成功"
+                backupResultDialog.message = error.length > 0
+                    ? error
+                    : "备份已导出到所选位置"
+                backupResultDialog.open()
+            })
         }
     }
 
@@ -678,7 +682,7 @@ Rectangle {
                         if (info.createdAt) summary += "\n创建于 " + info.createdAt
                         return summary
                     }
-                    return info && info.error ? "备份信息不可用：" + info.error : "备份信息不可用。"
+                    return info && info.error ? "备份信息不可用：" + info.error : "备份信息不可用"
                 }
                 color: Theme.secondaryForeground
                 font.pixelSize: Theme.fontMd
@@ -686,7 +690,7 @@ Rectangle {
             }
             Label {
                 Layout.fillWidth: true
-                text: "合并：把备份中的乐谱、文件夹、标签并入当前库，保留现有数据；重复乐谱按内容逐项处理。\n\n替换：删除当前所有数据，用备份整体恢复并自动重启。"
+                text: "合并：把备份中的乐谱、文件夹、标签并入当前库，保留现有数据；重复乐谱按内容逐项处理\n\n替换：删除当前所有数据，用备份整体恢复并自动重启"
                 color: Theme.mutedForeground
                 font.pixelSize: Theme.fontSm
                 wrapMode: Text.WordWrap
@@ -718,13 +722,18 @@ Rectangle {
                     text: "合并到当前库"
                     primary: true
                     onClicked: {
-                        const error = libraryService.importDatabaseBackupMerged(importModeDialog.backupFile)
+                        const backupFile = importModeDialog.backupFile
                         importModeDialog.close()
-                        if (error && error.length > 0) {
-                            backupResultDialog.title = "合并失败"
-                            backupResultDialog.message = error
-                            backupResultDialog.open()
-                        }
+                        loadingDialog.show("正在导入备份")
+                        Qt.callLater(function() {
+                            const error = libraryService.importDatabaseBackupMerged(backupFile)
+                            loadingDialog.hide()
+                            if (error && error.length > 0) {
+                                backupResultDialog.title = "合并失败"
+                                backupResultDialog.message = error
+                                backupResultDialog.open()
+                            }
+                        })
                     }
                 }
             }
@@ -866,12 +875,17 @@ Rectangle {
         title: "导入数据库备份？"
         confirmText: "开始导入"
         onAccepted: {
-            const error = appController.importDatabaseBackup(backupFile)
-            if (error.length > 0) {
-                backupResultDialog.title = "导入失败"
-                backupResultDialog.message = error
-                backupResultDialog.open()
-            }
+            const backupFile = importConfirmDialog.backupFile
+            loadingDialog.show("正在导入备份")
+            Qt.callLater(function() {
+                const error = appController.importDatabaseBackup(backupFile)
+                loadingDialog.hide()
+                if (error.length > 0) {
+                    backupResultDialog.title = "导入失败"
+                    backupResultDialog.message = error
+                    backupResultDialog.open()
+                }
+            })
         }
     }
 
@@ -904,7 +918,7 @@ Rectangle {
         objectName: "clearWarningDialog"
         title: "确定清空所有数据？"
         confirmText: "继续"
-        message: "将永久删除所有乐谱文件、缩略图、文件夹、标签、收藏、阅读记录、缓存和应用设置。此操作无法撤销。"
+        message: "将永久删除所有乐谱文件、缩略图、文件夹、标签、收藏、阅读记录、缓存和应用设置。此操作无法撤销"
         onAccepted: {
             clearConfirmInput.text = ""
             clearTypedDialog.open()
@@ -933,7 +947,7 @@ Rectangle {
             spacing: 12
             Label {
                 Layout.fillWidth: true
-                text: "请手动输入“确认清空所有数据”以继续。应用会在清空后自动重启。"
+                text: "请手动输入“确认清空所有数据”以继续。应用会在清空后自动重启"
                 color: Theme.secondaryForeground
                 font.pixelSize: Theme.fontMd
                 wrapMode: Text.WordWrap
@@ -991,5 +1005,10 @@ Rectangle {
         id: migrateResultDialog
         title: "迁移结果"
         confirmText: "确定"
+    }
+
+    LoadingDialog {
+        id: loadingDialog
+        message: "正在处理"
     }
 }

@@ -474,8 +474,8 @@ Rectangle {
         property string targetId: ""
         title: deletingFolder ? "删除文件夹？" : "删除标签？"
         message: deletingFolder
-            ? "文件夹、子文件夹及其中的所有乐谱都会被删除。此操作无法撤销。"
-            : "删除标签不会删除任何乐谱。"
+            ? "文件夹、子文件夹及其中的所有乐谱都会被删除。此操作无法撤销"
+            : "删除标签不会删除任何乐谱"
         onAccepted: {
             if (deletingFolder) libraryService.deleteFolder(targetId)
             else libraryService.deleteTag(targetId)

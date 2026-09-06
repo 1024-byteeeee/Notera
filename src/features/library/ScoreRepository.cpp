@@ -285,7 +285,7 @@ bool ScoreRepository::setItemFavorite(const QString& itemId, const bool favorite
     const auto type = itemTypeById(itemId, error);
     if (type == QStringLiteral("score")) return setFavorite(itemId, favorite, error);
     if (type != QStringLiteral("folder")) {
-        *error = QStringLiteral("项目不存在。");
+        *error = QStringLiteral("项目不存在");
         return false;
     }
     QSqlQuery query(m_database);
@@ -938,7 +938,7 @@ bool ScoreRepository::canMoveFolder(const QString& folderId, const QString& pare
 bool ScoreRepository::moveFolder(const QString& folderId, const QString& parentId, QString* error) const
 {
     if (!canMoveFolder(folderId, parentId, error)) {
-        if (error->isEmpty()) *error = QStringLiteral("文件夹不能移动到自身或其子文件夹中。");
+        if (error->isEmpty()) *error = QStringLiteral("文件夹不能移动到自身或其子文件夹中");
         return false;
     }
     QSqlQuery query(m_database);
@@ -960,7 +960,7 @@ bool ScoreRepository::moveItems(const QStringList& itemIds, const QString& folde
         const auto type = itemTypeById(itemId, error);
         if (type.isEmpty()) {
             m_database.rollback();
-            if (error->isEmpty()) *error = QStringLiteral("项目不存在或目标文件夹无效。");
+            if (error->isEmpty()) *error = QStringLiteral("项目不存在或目标文件夹无效");
             return false;
         }
         const auto currentFolderId = type == QStringLiteral("score")
@@ -979,7 +979,7 @@ bool ScoreRepository::moveItems(const QStringList& itemIds, const QString& folde
         }
         if (!succeeded) {
             m_database.rollback();
-            if (error->isEmpty()) *error = QStringLiteral("项目不存在或目标文件夹无效。");
+            if (error->isEmpty()) *error = QStringLiteral("项目不存在或目标文件夹无效");
             return false;
         }
         ++*changedCount;
