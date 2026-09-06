@@ -201,6 +201,12 @@ Item {
         const savedModel = tableView.model
         tableView.model = 0
         tableView.model = savedModel
+        // 初始化期间（currentPage 尚未设置）：不做位置同步。
+        // 此时 TableView 可能尚未布局完成，cellAtPos 会返回错误行号，
+        // 导致 pageNavigator.update 把当前页错误设置（如第4页），
+        // positionViewAtRow 进而把 contentY 拉到前3页高度之和——页面偏下。
+        if (pageNavigator.currentPage < 0)
+            return
         const cell = tableView.cellAtPos(root.width / 2, root.height / 2)
         const currentItem = cell.x >= 0 ? tableView.itemAtCell(cell) : null
         if (currentItem) {
