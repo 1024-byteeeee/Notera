@@ -41,8 +41,8 @@ Item {
     }
 
     function resetView() {
-        root.renderScale = 1
-        root.pageRotation = 0
+        // 只复位滚动位置；renderScale / pageRotation 由外部绑定控制，
+        // 此处禁止赋值（赋值会断开外部绑定，导致缩放/旋转失效）。
         tableView.contentX = 0
         tableView.contentY = 0
     }

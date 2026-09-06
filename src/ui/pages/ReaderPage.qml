@@ -25,12 +25,14 @@ Rectangle {
     property int viewInitializationToken: 0
     readonly property real baseScaleUnit: {
         // zoomLevel=1.0 时 PdfMultiPageView 应使用的 renderScale：
-        // 让页面显示宽 = min(视口宽-48, 1100)（与原 documentColumn.pageWidth 基准一致）
+        // 让文档最大页显示宽 = min(视口宽-48, 1100)（与原 documentColumn.pageWidth 基准一致）。
+        // 用 maxPageWidth 而非首页宽，避免首页尺寸异常导致后续页显示过大。
         if (!root.isPdf || pdfDocument.status !== PdfDocument.Ready || pdfDocument.pageCount < 1)
             return 0
-        const ps = pdfDocument.pagePointSize(0)
-        if (ps.width <= 0 || ps.height <= 0) return 0
-        const displayWidth = root.viewRotation % 180 !== 0 ? ps.height : ps.width
+        const maxW = pdfDocument.maxPageWidth
+        const maxH = pdfDocument.maxPageHeight
+        if (maxW <= 0 || maxH <= 0) return 0
+        const displayWidth = root.viewRotation % 180 !== 0 ? maxH : maxW
         return displayWidth > 0 ? Math.min(pdfView.width - 48, 1100) / displayWidth : 0
     }
     property var folderScores: []
