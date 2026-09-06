@@ -219,10 +219,16 @@ Item {
         // 导致 contentY 被拉到几乎底部（实测 128560/129264）。必须在重置前后
         // 保存恢复 contentY。只恢复 contentY，不碰 contentX——缩放时 contentX 需
         // 按视图中心锚点调整（reader-centered-zoom 测试依赖此行为）。
+        //
+        // 关键：恢复 model 时必须用 Qt.binding() 重新建立绑定，而非直接赋值。
+        // 直接赋值 tableView.model = savedModel 会永久断开 model: root.pageCount
+        // 的属性绑定——若此刻 pageCount 尚未最终确定（如 PDF 加载中先报 8 页，
+        // 后更新为 82 页），之后 pageCount 变化时 model 不会自动更新，导致
+        // "82页PDF只能看到8页"。Qt.binding() 恢复绑定后，pageCount 变化会
+        // 自动同步到 model。
         const savedContentY = tableView.contentY
-        const savedModel = tableView.model
         tableView.model = 0
-        tableView.model = savedModel
+        tableView.model = Qt.binding(function() { return root.pageCount })
         tableView.contentY = savedContentY
         // 初始化期间（currentPage 尚未设置）：不做位置同步。
         if (pageNavigator.currentPage < 0)
