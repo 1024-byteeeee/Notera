@@ -41,6 +41,8 @@
 
 #include "app/ApplicationController.h"
 #include "features/library/LibraryService.h"
+#include "features/pdf/PdfRenderService.h"
+#include "features/pdf/PdfCacheImageProvider.h"
 #include "platform/AppDataPaths.h"
 #include "services/MetronomeService.h"
 
@@ -1577,7 +1579,15 @@ int main(int argc, char* argv[])
         if (renameSmokeFolderId.isEmpty()) return 1;
     }
 
+    // PDF 渲染服务（QPdfPageRenderer MultiThreaded + LRU 渲染缓存）。
+    // 先于 engine 创建，确保析构时 engine 先析构（contextProperty 持裸指针）。
+    Notera::PdfRenderService pdfRenderService;
+
     QQmlApplicationEngine engine;
+    engine.addImageProvider(QStringLiteral("pdfcache"),
+        new Notera::PdfCacheImageProvider(pdfRenderService.cache()));
+    engine.rootContext()->setContextProperty(QStringLiteral("pdfRender"), &pdfRenderService);
+
     engine.rootContext()->setContextProperty(QStringLiteral("appController"), &controller);
     engine.rootContext()->setContextProperty(QStringLiteral("libraryService"), &libraryService);
     engine.rootContext()->setContextProperty(QStringLiteral("metronome"), &metronome);

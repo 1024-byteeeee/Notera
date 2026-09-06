@@ -44,6 +44,12 @@ qt_add_executable(Notera
     src/features/library/ThumbnailGenerator.cpp
     src/features/library/LibraryService.h
     src/features/library/LibraryService.cpp
+    src/features/pdf/PdfRenderCache.h
+    src/features/pdf/PdfRenderCache.cpp
+    src/features/pdf/PdfRenderService.h
+    src/features/pdf/PdfRenderService.cpp
+    src/features/pdf/PdfCacheImageProvider.h
+    src/features/pdf/PdfCacheImageProvider.cpp
     src/assets/Notera.icns
 )
 
@@ -80,6 +86,7 @@ qt_add_qml_module(Notera
         src/ui/components/TagIcon.qml
         src/ui/components/Sidebar.qml
         src/ui/pdf/PdfMultiPageView.qml
+        src/ui/pdf/CachedPdfPageImage.qml
         src/ui/pages/LibraryPage.qml
         src/ui/pages/ReaderPage.qml
         src/ui/pages/SettingsPage.qml

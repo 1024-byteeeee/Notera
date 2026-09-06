@@ -61,7 +61,11 @@ Item {
         bottomMargin: root.bottomMargin
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-        onMovementStarted: root.viewMovementStarted()
+        onMovementStarted: {
+            root.viewMovementStarted()
+            prefetchTimer.stop() // 快速滚动时取消预渲染（pdf.js 技巧：不渲染不再可见的页）
+        }
+        onMovementEnded: prefetchTimer.restart()
 
         property real rotationNorm: Math.round((360 + (root.pageRotation % 360)) % 360)
         property bool rot90: rotationNorm == 90 || rotationNorm == 270
@@ -103,20 +107,15 @@ Item {
                 border.width: 1
                 property size pagePointSize: root.document ? root.document.pagePointSize(pageHolder.index) : Qt.size(1, 1)
 
-                PdfPageImage {
+                CachedPdfPageImage {
                     id: image
                     objectName: "pdfPageImageItem"
                     document: root.document
                     currentFrame: pageHolder.index
-                    asynchronous: true
-                    fillMode: Image.PreserveAspectFit
+                    renderScale: root.renderScale
+                    pageRotation: root.pageRotation
                     width: paper.pagePointSize.width * root.renderScale
                     height: paper.pagePointSize.height * root.renderScale
-                    property real renderScale: root.renderScale
-                    onRenderScaleChanged: {
-                        image.sourceSize.width = paper.pagePointSize.width * renderScale * Screen.devicePixelRatio
-                        image.sourceSize.height = 0
-                    }
                     onStatusChanged: {
                         if (pageHolder.index === root.currentPage
                             || (root.currentPage < 0 && pageHolder.index === 0)) {
@@ -147,6 +146,37 @@ Item {
             const cell = tableView.cellAtPos(root.width / 2, root.height / 2)
             if (cell.y >= 0 && cell.y !== pageNavigator.currentPage)
                 pageNavigator.update(cell.y, Qt.point(-1, -1), root.renderScale)
+            // 滚动停止后启动预渲染（当前页已稳定）
+            prefetchTimer.restart()
+        }
+    }
+
+    // 预渲染调度器（参考 Okular PixmapRequest.preload + Sumatra RequestRendering）：
+    // 当前页稳定 150ms 后，后台预渲染当前页 ±1、±2，写入缓存。
+    // 快速滚动时被 stop() 取消，避免浪费 CPU 渲染不再可见的页（pdf.js 技巧）。
+    Timer {
+        id: prefetchTimer
+        interval: 150
+        repeat: false
+        onTriggered: {
+            if (!root.document || root.document.status !== PdfDocument.Ready) return
+            const cur = root.currentPage
+            if (cur < 0) return
+            const pageCount = root.document.pageCount
+            const rot90 = Math.round(root.pageRotation) % 180 !== 0
+            // 按距离排序：近的先渲染
+            const offsets = [1, -1, 2, -2]
+            for (const off of offsets) {
+                const p = cur + off
+                if (p < 0 || p >= pageCount) continue
+                if (pdfRender.hasCache(p, root.renderScale, root.pageRotation)) continue
+                const ps = root.document.pagePointSize(p)
+                const w = rot90 ? ps.height : ps.width
+                const h = rot90 ? ps.width : ps.height
+                pdfRender.requestRender(p, root.renderScale, root.pageRotation,
+                    Qt.size(Math.max(1, Math.round(w * root.renderScale * Screen.devicePixelRatio)),
+                             Math.max(1, Math.round(h * root.renderScale * Screen.devicePixelRatio))))
+            }
         }
     }
 
@@ -170,6 +200,8 @@ Item {
                                              tableView.contentY - currentItem.y)
             pageNavigator.update(cell.y, currentLocation, renderScale)
         }
+        // 缩放后相邻页需要新分辨率，启动预渲染
+        prefetchTimer.restart()
     }
 
     PdfPageNavigator {

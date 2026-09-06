@@ -484,8 +484,15 @@ Rectangle {
                 id: pdfDocument
                 source: root.isPdf ? appController.currentFileUrl : ""
                 onPageCountChanged: root.finishInitialViewIfReady()
-                onStatusChanged: {
-                    if (status === PdfDocument.Ready) root.finishInitialViewIfReady()
+                onStatusChanged: function(status) {
+                    if (status === PdfDocument.Ready) {
+                        // 设置文档到渲染服务（QPdfPageRenderer + LRU 缓存）
+                        pdfRender.setDocument(pdfDocument)
+                        root.finishInitialViewIfReady()
+                    } else if (status === PdfDocument.Null) {
+                        // 关闭文件时清缓存
+                        pdfRender.clearCache()
+                    }
                 }
             }
 
