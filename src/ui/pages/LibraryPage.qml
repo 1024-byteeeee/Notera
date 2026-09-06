@@ -240,6 +240,18 @@ Rectangle {
         target: libraryService
         function onImportRequested() { fileDialog.open() }
     }
+    // libraryService.filterMode 是数据过滤的事实来源（enterFolder/goUp/goToLibraryRoot
+    // 在 C++ 层已自动更新并 emit filterModeChanged）。此处同步 appController.libraryFilter
+    // 视图状态（侧边栏高亮、标题等）。delegate 内因 AOT 编译作用域限制无法直接访问
+    // appController，统一由此根级 Connections 同步。
+    Connections {
+        target: libraryService
+        function onFilterModeChanged() {
+            if (appController.libraryFilter !== libraryService.filterMode) {
+                appController.libraryFilter = libraryService.filterMode
+            }
+        }
+    }
     Component.onCompleted: libraryService.filterMode = appController.libraryFilter
 
     // 系统快捷键：使用 StandardKey 自动映射 macOS(Cmd) / Windows(Ctrl)，
@@ -581,20 +593,16 @@ Rectangle {
                                 }
                                 if (scoreDelegate.itemType === "folder") {
                                     libraryService.enterFolder(scoreDelegate.itemId)
-                                    appController.libraryFilter = "folder:" + scoreDelegate.itemId
                                 } else {
                                     // 先显示加载对话框，再延迟执行 openScore（同步阻塞），
                                     // 给 UI 一帧时间渲染弹窗，避免"卡死无反馈"
                                     appShell.showLoading("正在打开乐谱")
-                                    const sid = scoreDelegate.scoreId
-                                    const stitle = scoreDelegate.title
-                                    const spath = scoreDelegate.filePath
-                                    const stype = scoreDelegate.fileType
-                                    const spages = scoreDelegate.pageCount
-                                    const sfolder = libraryService.scoreFolderId(sid)
-                                    openScoreTimer.onTriggered = function() {
-                                        appController.openScore(sid, stitle, spath, stype, spages, sfolder)
-                                    }
+                                    openScoreTimer.pendingScoreId = scoreDelegate.scoreId
+                                    openScoreTimer.pendingTitle = scoreDelegate.title
+                                    openScoreTimer.pendingFilePath = scoreDelegate.filePath
+                                    openScoreTimer.pendingFileType = scoreDelegate.fileType
+                                    openScoreTimer.pendingPageCount = scoreDelegate.pageCount
+                                    openScoreTimer.pendingFolderId = libraryService.scoreFolderId(scoreDelegate.scoreId)
                                     openScoreTimer.restart()
                                 }
                             }
@@ -878,7 +886,6 @@ Rectangle {
                             text: "打开"
                             onTriggered: {
                                 libraryService.enterFolder(scoreDelegate.itemId)
-                                appController.libraryFilter = "folder:" + scoreDelegate.itemId
                             }
                         }
                         AppMenuItem {
@@ -1691,5 +1698,15 @@ Rectangle {
         id: openScoreTimer
         interval: 50
         repeat: false
+        property var pendingScoreId: 0
+        property string pendingTitle: ""
+        property url pendingFilePath: ""
+        property string pendingFileType: ""
+        property int pendingPageCount: 0
+        property var pendingFolderId: 0
+        onTriggered: {
+            appController.openScore(pendingScoreId, pendingTitle, pendingFilePath,
+                pendingFileType, pendingPageCount, pendingFolderId)
+        }
     }
 }

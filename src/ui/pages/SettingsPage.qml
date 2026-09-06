@@ -622,16 +622,7 @@ Rectangle {
             // 先显示全局加载对话框，再延迟执行同步阻塞的导出操作，
             // 给 UI 一帧时间渲染弹窗，避免"卡死无反馈"
             appShell.showLoading("正在导出备份")
-            const targetFile = selectedFile
-            exportTimer.onTriggered = function() {
-                const error = appController.exportDatabaseBackup(targetFile)
-                appShell.hideLoading()
-                backupResultDialog.title = error.length > 0 ? "导出失败" : "导出成功"
-                backupResultDialog.message = error.length > 0
-                    ? error
-                    : "备份已导出到所选位置"
-                backupResultDialog.open()
-            }
+            exportTimer.targetFile = selectedFile
             exportTimer.restart()
         }
     }
@@ -726,19 +717,10 @@ Rectangle {
                     text: "合并到当前库"
                     primary: true
                     onClicked: {
-                        const backupFile = importModeDialog.backupFile
                         importModeDialog.close()
                         // 先显示全局加载对话框，再延迟执行同步阻塞的导入操作
                         appShell.showLoading("正在导入备份")
-                        mergeImportTimer.onTriggered = function() {
-                            const error = libraryService.importDatabaseBackupMerged(backupFile)
-                            appShell.hideLoading()
-                            if (error && error.length > 0) {
-                                backupResultDialog.title = "合并失败"
-                                backupResultDialog.message = error
-                                backupResultDialog.open()
-                            }
-                        }
+                        mergeImportTimer.backupFile = importModeDialog.backupFile
                         mergeImportTimer.restart()
                     }
                 }
@@ -881,18 +863,9 @@ Rectangle {
         title: "导入数据库备份？"
         confirmText: "开始导入"
         onAccepted: {
-            const backupFile = importConfirmDialog.backupFile
             // 先显示全局加载对话框，再延迟执行同步阻塞的导入操作
             appShell.showLoading("正在导入备份")
-            replaceImportTimer.onTriggered = function() {
-                const error = appController.importDatabaseBackup(backupFile)
-                appShell.hideLoading()
-                if (error.length > 0) {
-                    backupResultDialog.title = "导入失败"
-                    backupResultDialog.message = error
-                    backupResultDialog.open()
-                }
-            }
+            replaceImportTimer.backupFile = importConfirmDialog.backupFile
             replaceImportTimer.restart()
         }
     }
@@ -1016,7 +989,49 @@ Rectangle {
     }
 
     // 延迟执行同步阻塞操作：给全局加载对话框一帧渲染时间
-    Timer { id: exportTimer; interval: 50; repeat: false }
-    Timer { id: mergeImportTimer; interval: 50; repeat: false }
-    Timer { id: replaceImportTimer; interval: 50; repeat: false }
+    Timer {
+        id: exportTimer
+        interval: 50
+        repeat: false
+        property url targetFile: ""
+        onTriggered: {
+            const error = appController.exportDatabaseBackup(targetFile)
+            appShell.hideLoading()
+            backupResultDialog.title = error.length > 0 ? "导出失败" : "导出成功"
+            backupResultDialog.message = error.length > 0
+                ? error
+                : "备份已导出到所选位置"
+            backupResultDialog.open()
+        }
+    }
+    Timer {
+        id: mergeImportTimer
+        interval: 50
+        repeat: false
+        property url backupFile: ""
+        onTriggered: {
+            const error = libraryService.importDatabaseBackupMerged(backupFile)
+            appShell.hideLoading()
+            if (error && error.length > 0) {
+                backupResultDialog.title = "合并失败"
+                backupResultDialog.message = error
+                backupResultDialog.open()
+            }
+        }
+    }
+    Timer {
+        id: replaceImportTimer
+        interval: 50
+        repeat: false
+        property url backupFile: ""
+        onTriggered: {
+            const error = appController.importDatabaseBackup(backupFile)
+            appShell.hideLoading()
+            if (error.length > 0) {
+                backupResultDialog.title = "导入失败"
+                backupResultDialog.message = error
+                backupResultDialog.open()
+            }
+        }
+    }
 }

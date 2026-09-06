@@ -6,7 +6,7 @@ import "components"
 import "pages"
 
 Item {
-    id: root
+    id: appShell
     objectName: "appShell"
     property int transitionRunCount: 0
     readonly property int transitionDuration: Motion.normal
@@ -43,10 +43,10 @@ Item {
 
     Connections {
         target: appController
-        function onCurrentPageChanged() { root.switchPage(appController.currentPage) }
+        function onCurrentPageChanged() { appShell.switchPage(appController.currentPage) }
         function onLibraryFilterChanged() {
             libraryService.filterMode = appController.libraryFilter
-            if (appController.currentPage === "library") root.animateContent()
+            if (appController.currentPage === "library") appShell.animateContent()
         }
     }
     Connections {

@@ -66,12 +66,17 @@ Rectangle {
     function goToPrevScore() {
         if (!root.hasPrev) return
         const s = root.folderScores[root.currentScoreIndex - 1]
-        appController.openScore(s.id, s.title, s.filePath, s.fileType, s.pageCount, s.folderId)
+        // 先显示加载对话框，再延迟执行 openScore（同步阻塞），给 UI 一帧渲染时间
+        appShell.showLoading(root.isPdf ? "正在打开乐谱" : "正在加载图片")
+        readerOpenTimer.pendingScore = s
+        readerOpenTimer.restart()
     }
     function goToNextScore() {
         if (!root.hasNext) return
         const s = root.folderScores[root.currentScoreIndex + 1]
-        appController.openScore(s.id, s.title, s.filePath, s.fileType, s.pageCount, s.folderId)
+        appShell.showLoading(root.isPdf ? "正在打开乐谱" : "正在加载图片")
+        readerOpenTimer.pendingScore = s
+        readerOpenTimer.restart()
     }
     function goToPrevPage() {
         if (!root.isPdf || pdfView.currentPage <= 0) return
@@ -1059,6 +1064,19 @@ Rectangle {
             appShell.showLoading(root.isPdf ? "正在打开乐谱" : "正在加载图片")
         } else {
             appShell.hideLoading()
+        }
+    }
+
+    // 延迟打开乐谱（上一张/下一张）：给全局加载对话框一帧渲染时间
+    Timer {
+        id: readerOpenTimer
+        interval: 50
+        repeat: false
+        property var pendingScore: null
+        onTriggered: {
+            const s = pendingScore
+            if (!s) return
+            appController.openScore(s.id, s.title, s.filePath, s.fileType, s.pageCount, s.folderId)
         }
     }
 }
