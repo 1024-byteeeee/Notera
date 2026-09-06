@@ -198,13 +198,18 @@ Item {
         // 重开时 width 恢复 → renderScale 恢复正常值，但 contentW 永久停在旧值），
         // 必须临时重置 model 触发完整重布局。虚拟化下仅可见行（~2个 delegate），
         // 销毁重建成本可忽略。
+        //
+        // 注意：model=0 时 contentHeight=0，TableView 内部滚动比例变成 0/0=NaN，
+        // 恢复 model 后若 contentHeight 变非 0，TableView 把 NaN 当作底部(1)处理，
+        // 导致 contentY 被拉到几乎底部（实测 128560/129264）。必须在重置前后
+        // 保存恢复 contentY。只恢复 contentY，不碰 contentX——缩放时 contentX 需
+        // 按视图中心锚点调整（reader-centered-zoom 测试依赖此行为）。
+        const savedContentY = tableView.contentY
         const savedModel = tableView.model
         tableView.model = 0
         tableView.model = savedModel
+        tableView.contentY = savedContentY
         // 初始化期间（currentPage 尚未设置）：不做位置同步。
-        // 此时 TableView 可能尚未布局完成，cellAtPos 会返回错误行号，
-        // 导致 pageNavigator.update 把当前页错误设置（如第4页），
-        // positionViewAtRow 进而把 contentY 拉到前3页高度之和——页面偏下。
         if (pageNavigator.currentPage < 0)
             return
         const cell = tableView.cellAtPos(root.width / 2, root.height / 2)
