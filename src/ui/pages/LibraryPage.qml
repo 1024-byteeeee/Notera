@@ -1259,7 +1259,6 @@ Rectangle {
             text: "导入文件夹…"
             onTriggered: folderImportDialog.open()
         }
-        AppMenuSeparator {}
         AppMenuItem {
             symbol: "stitch"
             text: "拼接导入…"
