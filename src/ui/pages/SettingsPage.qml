@@ -619,16 +619,20 @@ Rectangle {
         nameFilters: ["Notera 备份 (*.notera-backup *.zip)", "所有文件 (*)"]
         currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
         onAccepted: {
-            loadingDialog.show("正在导出备份")
-            Qt.callLater(function() {
-                const error = appController.exportDatabaseBackup(selectedFile)
-                loadingDialog.hide()
+            // 先显示全局加载对话框，再延迟执行同步阻塞的导出操作，
+            // 给 UI 一帧时间渲染弹窗，避免"卡死无反馈"
+            appShell.showLoading("正在导出备份")
+            const targetFile = selectedFile
+            exportTimer.onTriggered = function() {
+                const error = appController.exportDatabaseBackup(targetFile)
+                appShell.hideLoading()
                 backupResultDialog.title = error.length > 0 ? "导出失败" : "导出成功"
                 backupResultDialog.message = error.length > 0
                     ? error
                     : "备份已导出到所选位置"
                 backupResultDialog.open()
-            })
+            }
+            exportTimer.restart()
         }
     }
 
@@ -724,16 +728,18 @@ Rectangle {
                     onClicked: {
                         const backupFile = importModeDialog.backupFile
                         importModeDialog.close()
-                        loadingDialog.show("正在导入备份")
-                        Qt.callLater(function() {
+                        // 先显示全局加载对话框，再延迟执行同步阻塞的导入操作
+                        appShell.showLoading("正在导入备份")
+                        mergeImportTimer.onTriggered = function() {
                             const error = libraryService.importDatabaseBackupMerged(backupFile)
-                            loadingDialog.hide()
+                            appShell.hideLoading()
                             if (error && error.length > 0) {
                                 backupResultDialog.title = "合并失败"
                                 backupResultDialog.message = error
                                 backupResultDialog.open()
                             }
-                        })
+                        }
+                        mergeImportTimer.restart()
                     }
                 }
             }
@@ -876,16 +882,18 @@ Rectangle {
         confirmText: "开始导入"
         onAccepted: {
             const backupFile = importConfirmDialog.backupFile
-            loadingDialog.show("正在导入备份")
-            Qt.callLater(function() {
+            // 先显示全局加载对话框，再延迟执行同步阻塞的导入操作
+            appShell.showLoading("正在导入备份")
+            replaceImportTimer.onTriggered = function() {
                 const error = appController.importDatabaseBackup(backupFile)
-                loadingDialog.hide()
+                appShell.hideLoading()
                 if (error.length > 0) {
                     backupResultDialog.title = "导入失败"
                     backupResultDialog.message = error
                     backupResultDialog.open()
                 }
-            })
+            }
+            replaceImportTimer.restart()
         }
     }
 
@@ -1007,8 +1015,8 @@ Rectangle {
         confirmText: "确定"
     }
 
-    LoadingDialog {
-        id: loadingDialog
-        message: "正在处理"
-    }
+    // 延迟执行同步阻塞操作：给全局加载对话框一帧渲染时间
+    Timer { id: exportTimer; interval: 50; repeat: false }
+    Timer { id: mergeImportTimer; interval: 50; repeat: false }
+    Timer { id: replaceImportTimer; interval: 50; repeat: false }
 }

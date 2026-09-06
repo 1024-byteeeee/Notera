@@ -1053,15 +1053,12 @@ Rectangle {
     // 文件加载对话框：打开文件时显示加载动画，加载完成后自动隐藏。
     // 即使秒开也保证至少显示 minDisplayDuration，避免完全无感。
     onViewInitializationPendingChanged: {
+        // 在 reader 页内切换文件（上一张/下一张）时也需要显示加载对话框；
+        // 从 library 页打开文件时由 LibraryPage 先调用 showLoading，这里重复调用是幂等的。
         if (root.viewInitializationPending) {
-            loadingDialog.show(root.isPdf ? "正在打开乐谱" : "正在加载图片")
+            appShell.showLoading(root.isPdf ? "正在打开乐谱" : "正在加载图片")
         } else {
-            loadingDialog.hide()
+            appShell.hideLoading()
         }
-    }
-
-    LoadingDialog {
-        id: loadingDialog
-        message: "正在打开乐谱"
     }
 }

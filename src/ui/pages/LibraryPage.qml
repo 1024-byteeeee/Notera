@@ -583,9 +583,19 @@ Rectangle {
                                     libraryService.enterFolder(scoreDelegate.itemId)
                                     appController.libraryFilter = "folder:" + scoreDelegate.itemId
                                 } else {
-                                    appController.openScore(scoreDelegate.scoreId, scoreDelegate.title, scoreDelegate.filePath,
-                                        scoreDelegate.fileType, scoreDelegate.pageCount,
-                                        libraryService.scoreFolderId(scoreDelegate.scoreId))
+                                    // 先显示加载对话框，再延迟执行 openScore（同步阻塞），
+                                    // 给 UI 一帧时间渲染弹窗，避免"卡死无反馈"
+                                    appShell.showLoading("正在打开乐谱")
+                                    const sid = scoreDelegate.scoreId
+                                    const stitle = scoreDelegate.title
+                                    const spath = scoreDelegate.filePath
+                                    const stype = scoreDelegate.fileType
+                                    const spages = scoreDelegate.pageCount
+                                    const sfolder = libraryService.scoreFolderId(sid)
+                                    openScoreTimer.onTriggered = function() {
+                                        appController.openScore(sid, stitle, spath, stype, spages, sfolder)
+                                    }
+                                    openScoreTimer.restart()
                                 }
                             }
                         }
@@ -1674,5 +1684,12 @@ Rectangle {
         function onFoldersChanged() {
             rootChildFolderModel.refresh()
         }
+    }
+
+    // 延迟打开乐谱：给全局加载对话框一帧渲染时间，避免同步阻塞导致弹窗不显示
+    Timer {
+        id: openScoreTimer
+        interval: 50
+        repeat: false
     }
 }
