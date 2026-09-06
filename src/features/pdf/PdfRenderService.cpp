@@ -2,6 +2,7 @@
 
 #include "features/pdf/PdfRenderCache.h"
 
+#include <QSignalBlocker>
 #include <QUrl>
 
 namespace Notera {
@@ -43,38 +44,55 @@ void PdfRenderService::setDocument(QObject* document)
     // qobject_cast<QPdfDocument*> 会失败（对象实际是 QQuickPdfDocument），
     // 且 QQuickPdfDocument::document() 是私有的无法访问。
     // 解决方案：创建自己的 QPdfDocument，从 QQuickPdfDocument 复制 source 加载。
-    // QPdfDocument::load() 是懒加载（只加载目录结构，不加载页面内容），开销小。
     QPdfDocument* pdfDoc = nullptr;
+    QString newSource; // 本次要加载的本地文件路径（空表示外部文档或无文档）
+
     if (document) {
         // 1. 尝试直接 qobject_cast（如果外部直接传入 QPdfDocument*）
         pdfDoc = qobject_cast<QPdfDocument*>(document);
-        // 2. 如果是 QQuickPdfDocument（QML 的 PdfDocument），读取 source 加载到自己的文档
-        if (!pdfDoc) {
+        if (pdfDoc) {
+            // 外部文档：指针相同则无需重置
+            if (m_document == pdfDoc)
+                return;
+        } else {
+            // 2. QQuickPdfDocument（QML 的 PdfDocument）：读取 source 加载到自己的文档
             const QVariant sourceVar = document->property("source");
             if (sourceVar.isValid() && sourceVar.canConvert<QUrl>()) {
                 const QUrl source = sourceVar.toUrl();
                 if (source.isValid() && !source.isEmpty()) {
+                    newSource = source.toLocalFile();
+                    // 同一个文件：无需重新加载，直接返回（避免触发重复渲染）
+                    if (newSource == m_currentSource && m_ownedDocument)
+                        return;
                     if (!m_ownedDocument) {
                         m_ownedDocument = new QPdfDocument(this);
                         connect(m_ownedDocument, &QPdfDocument::statusChanged,
                             this, &PdfRenderService::onOwnedDocumentStatusChanged);
                     }
-                    m_ownedDocument->load(source.toLocalFile());
+                    // 阻塞 load 过程中的 statusChanged 信号：
+                    // load() 是同步的，status 会在内部变为 Ready 并触发信号，
+                    // 若此时发射 documentChanged() 会在 m_renderer 尚未 setDocument
+                    // 时就驱动 QML 发起渲染请求，导致请求丢失 / m_inFlight 卡住。
+                    const QSignalBlocker blocker(m_ownedDocument);
+                    m_ownedDocument->load(newSource);
                     pdfDoc = m_ownedDocument;
                 }
             }
         }
     }
-    if (m_document == pdfDoc)
-        return;
-    cancelAll();
+
+    // 真正切换了文档（或关闭文档）：完整重置
+    cancelAll();   // 清空请求队列并重置 m_inFlight（防止旧文档残留请求卡住渲染）
     m_cache->clear();
     m_document = pdfDoc;
-    m_renderer->setDocument(pdfDoc);
-    // 如果文档已经 Ready，立即发出 documentChanged()；否则等 onOwnedDocumentStatusChanged
-    if (m_document && m_document->status() == QPdfDocument::Status::Ready) {
-        emit documentChanged();
+    m_currentSource = newSource;
+    if (m_document) {
+        m_renderer->setDocument(m_document);
+        // 文档已 Ready（同步 load 的正常情况）：立即通知 QML 刷新
+        if (m_document->status() == QPdfDocument::Status::Ready)
+            emit documentChanged();
     }
+    // 若文档尚未 Ready（异步加载场景），等 onOwnedDocumentStatusChanged 通知
 }
 
 quint64 PdfRenderService::requestRender(int page, qreal scale, int rotation,

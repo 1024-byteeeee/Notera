@@ -104,6 +104,7 @@ private:
     PdfRenderCache* m_cache{nullptr};
     QPdfDocument* m_document{nullptr};       // 当前用于渲染的文档（可能是 m_ownedDocument 或外部传入）
     QPdfDocument* m_ownedDocument{nullptr};  // 自己创建的文档（从 QQuickPdfDocument 复制 source）
+    QString m_currentSource;                 // 当前已加载文档的本地文件路径（用于判断是否真的切换了文档）
 
     QHash<quint64, Request> m_requests;   // 所有请求（在飞 + 排队）
     QList<quint64> m_highQueue;            // 高优先级排队请求 ID（FIFO）
