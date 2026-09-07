@@ -594,17 +594,13 @@ Rectangle {
                                 if (scoreDelegate.itemType === "folder") {
                                     libraryService.enterFolder(scoreDelegate.itemId)
                                 } else {
-                                    // 先显示加载弹窗，延迟 50ms 再 openScore：给弹窗一帧渲染时间，
-                                    // 确保点击瞬间弹窗可见（大 PDF 加载期间弹窗持续显示）；
-                                    // 内容加载完成（文件展示）后由 ReaderPage 立即关闭弹窗。
+                                    // 打开文件：显示加载弹窗，真实反映加载过程——
+                                    // 加载快弹窗一闪而过（甚至来不及渲染），加载慢弹窗持续显示；
+                                    // 内容加载完成（文件展示）后由 ReaderPage 立即关闭。
                                     appShell.showLoading("正在打开乐谱")
-                                    openScoreTimer.pendingScoreId = scoreDelegate.scoreId
-                                    openScoreTimer.pendingTitle = scoreDelegate.title
-                                    openScoreTimer.pendingFilePath = scoreDelegate.filePath
-                                    openScoreTimer.pendingFileType = scoreDelegate.fileType
-                                    openScoreTimer.pendingPageCount = scoreDelegate.pageCount
-                                    openScoreTimer.pendingFolderId = libraryService.scoreFolderId(scoreDelegate.scoreId)
-                                    openScoreTimer.restart()
+                                    appController.openScore(scoreDelegate.scoreId, scoreDelegate.title,
+                                        scoreDelegate.filePath, scoreDelegate.fileType, scoreDelegate.pageCount,
+                                        libraryService.scoreFolderId(scoreDelegate.scoreId))
                                 }
                             }
                         }
@@ -1691,25 +1687,6 @@ Rectangle {
         }
         function onFoldersChanged() {
             rootChildFolderModel.refresh()
-        }
-    }
-
-    // 延迟打开乐谱：先让加载弹窗渲染并可见约 300ms（可感知的"正在打开"反馈），
-    // 再执行 openScore；内容加载完成（文件展示）后由 ReaderPage 立即关闭弹窗，
-    // 因此秒开文件也只是"弹窗一闪而过"，不会在文件显示后残留。
-    Timer {
-        id: openScoreTimer
-        interval: 300
-        repeat: false
-        property var pendingScoreId: 0
-        property string pendingTitle: ""
-        property url pendingFilePath: ""
-        property string pendingFileType: ""
-        property int pendingPageCount: 0
-        property var pendingFolderId: 0
-        onTriggered: {
-            appController.openScore(pendingScoreId, pendingTitle, pendingFilePath,
-                pendingFileType, pendingPageCount, pendingFolderId)
         }
     }
 }

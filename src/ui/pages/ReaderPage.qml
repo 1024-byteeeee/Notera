@@ -66,18 +66,15 @@ Rectangle {
     function goToPrevScore() {
         if (!root.hasPrev) return
         const s = root.folderScores[root.currentScoreIndex - 1]
-        // 先显示加载弹窗，延迟 50ms 再 openScore：给弹窗一帧渲染时间；
-        // 加载完成（文件展示）后立即关闭
+        // 切换时显示加载弹窗，真实反映加载过程；完成后立即关闭
         appShell.showLoading(root.isPdf ? "正在打开乐谱" : "正在加载图片")
-        readerOpenTimer.pendingScore = s
-        readerOpenTimer.restart()
+        appController.openScore(s.id, s.title, s.filePath, s.fileType, s.pageCount, s.folderId)
     }
     function goToNextScore() {
         if (!root.hasNext) return
         const s = root.folderScores[root.currentScoreIndex + 1]
         appShell.showLoading(root.isPdf ? "正在打开乐谱" : "正在加载图片")
-        readerOpenTimer.pendingScore = s
-        readerOpenTimer.restart()
+        appController.openScore(s.id, s.title, s.filePath, s.fileType, s.pageCount, s.folderId)
     }
     function goToPrevPage() {
         if (!root.isPdf || pdfView.currentPage <= 0) return
@@ -1057,27 +1054,13 @@ Rectangle {
     }
 
     // 打开文件：加载期间显示弹窗；内容加载完成（文件已展示）后立即关闭，
-    // 不等待 minDisplayDuration，避免"文件显示后弹窗还在转"。
-    // （导入/导出的加载弹窗在 SettingsPage 保留，仍走最小显示时长）
+    // 不做最小展示时长表演——真实反映加载过程。
+    // （导入/导出的加载弹窗在 SettingsPage 同样立即关闭）
     onViewInitializationPendingChanged: {
         if (root.viewInitializationPending) {
             appShell.showLoading(root.isPdf ? "正在打开乐谱" : "正在加载图片")
         } else {
-            appShell.hideLoading(true)
-        }
-    }
-
-    // 延迟打开乐谱（上一张/下一张）：先让加载弹窗渲染并可见约 300ms，
-    // 确保点击瞬间弹窗可感知；文件展示后由 onViewInitializationPendingChanged 立即关闭
-    Timer {
-        id: readerOpenTimer
-        interval: 300
-        repeat: false
-        property var pendingScore: null
-        onTriggered: {
-            const s = pendingScore
-            if (!s) return
-            appController.openScore(s.id, s.title, s.filePath, s.fileType, s.pageCount, s.folderId)
+            appShell.hideLoading()
         }
     }
 }
