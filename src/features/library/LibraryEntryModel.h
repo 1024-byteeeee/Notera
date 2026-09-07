@@ -35,6 +35,9 @@ public:
 
     void replaceAll(const QVariantList& folders, const QList<Score>& scores);
 
+    // 局部更新单个乐谱条目的标签（只发 dataChanged，不重建模型，保留视图滚动位置）
+    bool updateEntryTags(const QString& itemId, const QStringList& tags);
+
 signals:
     void countChanged();
 

@@ -1371,7 +1371,7 @@ void LibraryService::addItemTag(const QString& itemId, const QString& tagId)
         emit errorOccurred(QStringLiteral("添加标签失败"));
         return;
     }
-    reload();
+    updateEntryTagsLocally(itemId);
 }
 
 void LibraryService::removeItemTag(const QString& itemId, const QString& tagId)
@@ -1381,7 +1381,26 @@ void LibraryService::removeItemTag(const QString& itemId, const QString& tagId)
         emit errorOccurred(QStringLiteral("移除标签失败"));
         return;
     }
-    reload();
+    // 在"标签"过滤视图下移除当前过滤标签时，该条目应从列表消失，必须整表刷新；
+    // 其余场景只局部更新 tags，保留视图滚动位置。
+    if (m_filterMode == QStringLiteral("tag:") + tagId) {
+        reload();
+    } else {
+        updateEntryTagsLocally(itemId);
+    }
+}
+
+void LibraryService::updateEntryTagsLocally(const QString& itemId)
+{
+    QString error;
+    QStringList tags;
+    const auto values = m_repository.itemTags(itemId, &error);
+    if (error.isEmpty()) {
+        for (const auto& value : values) {
+            tags.append(value.toMap().value(QStringLiteral("name")).toString());
+        }
+    }
+    m_entries.updateEntryTags(itemId, tags);
 }
 
 QVariantList LibraryService::itemTags(const QString& itemId)
@@ -1457,7 +1476,7 @@ QString LibraryService::tagItems(const QVariantList& itemIds, const QString& tag
         emit errorOccurred(QStringLiteral("添加标签失败"));
         return QStringLiteral("添加标签失败");
     }
-    reload();
+    for (const auto& id : ids) updateEntryTagsLocally(id);
     emit noticeOccurred(QStringLiteral("已为 %1 个项目添加标签").arg(ids.size()));
     return {};
 }

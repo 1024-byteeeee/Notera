@@ -76,3 +76,17 @@ void LibraryEntryModel::replaceAll(const QVariantList& folders, const QList<Scor
     endResetModel();
     if (previousCount != m_entries.size()) emit countChanged();
 }
+
+bool LibraryEntryModel::updateEntryTags(const QString& itemId, const QStringList& tags)
+{
+    for (int row = 0; row < m_entries.size(); ++row) {
+        if (m_entries.at(row).itemType != QStringLiteral("score")) continue;
+        if (m_entries.at(row).itemId != itemId) continue;
+        if (m_entries.at(row).tags == tags) return true;
+        m_entries[row].tags = tags;
+        const auto index = createIndex(row, 0);
+        emit dataChanged(index, index, {TagsRole});
+        return true;
+    }
+    return false;
+}

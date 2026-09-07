@@ -145,6 +145,8 @@ private:
     void reload();
     void reloadFolders();
     void reloadTags();
+    // 标签增删后局部刷新对应乐谱条目的 tags，避免整表重建导致视图滚动位置回顶
+    void updateEntryTagsLocally(const QString& itemId);
     void importFile(const QString& sourcePath, const QString& titleOverride = {});
     void continueImport();
     void startImportTask(const QString& sourcePath, const QString& title, const QString& folderId);
