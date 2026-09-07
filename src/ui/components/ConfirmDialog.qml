@@ -9,6 +9,8 @@ Dialog {
     property string message: ""
     property string confirmText: "删除"
     property bool danger: true
+    // 提示类弹窗：只保留一个金色确认按钮（无取消）
+    property bool showCancel: true
 
     parent: Overlay.overlay
     x: parent ? Math.round((parent.width - width) / 2) : 0
@@ -59,8 +61,8 @@ Dialog {
             anchors.rightMargin: 22
             anchors.verticalCenter: parent.verticalCenter
             spacing: 10
-            AppButton { text: "取消"; onClicked: dialog.reject() }
-            AppButton { text: dialog.confirmText; danger: dialog.danger; onClicked: dialog.accept() }
+            AppButton { text: "取消"; visible: dialog.showCancel; onClicked: dialog.reject() }
+            AppButton { text: dialog.confirmText; danger: dialog.danger; primary: !dialog.danger; onClicked: dialog.accept() }
         }
     }
 
