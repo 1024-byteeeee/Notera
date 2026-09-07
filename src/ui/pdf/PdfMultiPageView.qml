@@ -31,6 +31,8 @@ Item {
     property real bottomMargin: 24
 
     signal viewMovementStarted()
+    // Ctrl/Cmd + 滚轮：外部（ReaderPage）据此以指针位置为中心精细缩放
+    signal ctrlWheelZoomRequested(real deltaY, real viewportX, real viewportY)
 
     readonly property int pageCount: root.document ? root.document.pageCount : 0
 
@@ -78,6 +80,20 @@ Item {
         property real rotationNorm: Math.round((360 + (root.pageRotation % 360)) % 360)
         property bool rot90: rotationNorm == 90 || rotationNorm == 270
         onRot90Changed: forceLayout()
+
+        // Ctrl（或 macOS Command）+ 滚轮：不滚动，转交外部做精细缩放。
+        // WheelHandler 附加在 Flickable 上，优先于 Flickable 默认滚轮。
+        WheelHandler {
+            target: null
+            onWheel: function(event) {
+                const ctrl = (event.modifiers & Qt.ControlModifier) !== 0
+                const cmd = (event.modifiers & Qt.MetaModifier) !== 0
+                if (!ctrl && !cmd) return
+                root.ctrlWheelZoomRequested(event.angleDelta.y,
+                    event.point.position.x, event.point.position.y)
+                event.accepted = true
+            }
+        }
         property size firstPagePointSize: root.document && root.document.status === PdfDocument.Ready
             ? root.document.pagePointSize(0) : Qt.size(1, 1)
         columnWidthProvider: function(col) {

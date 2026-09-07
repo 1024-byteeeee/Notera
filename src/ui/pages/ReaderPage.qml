@@ -613,6 +613,31 @@ Rectangle {
                 }
 
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+                // Ctrl（或 macOS Command）+ 滚轮：图片视图精细缩放
+                WheelHandler {
+                    target: null
+                    onWheel: function(event) {
+                        const ctrl = (event.modifiers & Qt.ControlModifier) !== 0
+                        const cmd = (event.modifiers & Qt.MetaModifier) !== 0
+                        if (!ctrl && !cmd) return
+                        const step = event.angleDelta.y > 0 ? 0.05 : -0.05
+                        root.markUserInteraction()
+                        root.zoomAroundViewport(root.zoomLevel + step,
+                            event.point.position.x, event.point.position.y)
+                        event.accepted = true
+                    }
+                }
+            }
+
+            // PDF 视图的 Ctrl/Cmd + 滚轮（PdfMultiPageView 内嵌拦截）→ 精细缩放
+            Connections {
+                target: pdfView
+                function onCtrlWheelZoomRequested(deltaY, viewportX, viewportY) {
+                    const step = deltaY > 0 ? 0.05 : -0.05
+                    root.markUserInteraction()
+                    root.zoomAroundViewport(root.zoomLevel + step, viewportX, viewportY)
+                }
             }
 
             Label {

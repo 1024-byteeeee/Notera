@@ -113,7 +113,6 @@ Rectangle {
             return
         }
         if (delegate.itemType === "folder") {
-            grid.preserveContentY = -1
             libraryService.enterFolder(delegate.itemId)
         } else {
             // 打开文件：显示加载弹窗，真实反映加载过程——
@@ -253,7 +252,6 @@ Rectangle {
     Connections {
         target: appController
         function onLibraryFilterChanged() {
-            grid.preserveContentY = -1
             libraryService.filterMode = appController.libraryFilter
         }
     }
@@ -319,7 +317,6 @@ Rectangle {
                 text: "上一级"
                 symbol: "back"
                 onClicked: {
-                    grid.preserveContentY = -1
                     libraryService.goUp()
                 }
             }
@@ -367,7 +364,6 @@ Rectangle {
                         selectByMouse: true
                         text: libraryService.searchQuery
                         onTextChanged: {
-                            grid.preserveContentY = -1
                             libraryService.searchQuery = text
                         }
                         background: Item { }
@@ -414,25 +410,45 @@ Rectangle {
                 cellHeight: 326
                 model: libraryService.entries
 
-                // 整表重建（移动/删除/导入/新建等成员变化）后保持滚动位置：
-                // resetStarted 记录当前 contentY，resetFinished 恢复；导航类操作
-                // （切视图/进文件夹/上一级/搜索）前置 preserveContentY = -1 禁用恢复。
-                property real preserveContentY: -1
+                // 视图级滚动位置记忆：key = filterMode + "|" + searchQuery。
+                // 用户滚动时防抖记录当前视图位置；整表重建（resetFinished）后恢复
+                // 当前视图上次停留的位置。进文件夹/返回上一级/切视图/搜索会改变 key：
+                // 新视图无记录则从顶部开始，切回原视图自动恢复上次位置，因此
+                // “不管从哪个页面回到哪个页面”都保持在原滚动位置。
+                property var viewScrollPositions: ({})
+                property bool suppressPositionRecord: false
+                property bool __positionDirty: false
+                function currentViewKey() {
+                    return (libraryService.filterMode || "all") + "|" + (libraryService.searchQuery || "")
+                }
+                function restoreCurrentViewPosition() {
+                    const key = grid.currentViewKey()
+                    if (!(key in grid.viewScrollPositions)) return
+                    const y = grid.viewScrollPositions[key]
+                    Qt.callLater(function() {
+                        grid.contentY = Math.max(0, Math.min(y,
+                            Math.max(0, grid.contentHeight - grid.height)))
+                    })
+                }
+                onContentYChanged: {
+                    if (grid.suppressPositionRecord) return
+                    // 防抖：同帧多次滚动合并为一次记录
+                    if (grid.__positionDirty) return
+                    grid.__positionDirty = true
+                    Qt.callLater(function() {
+                        grid.__positionDirty = false
+                        grid.viewScrollPositions[grid.currentViewKey()] = grid.contentY
+                    })
+                }
                 Connections {
                     target: libraryService.entries
                     function onResetStarted() {
-                        // 仅在已发生真实滚动（contentY > 0）时记录，避免启动/首次加载
-                        // 布局竞态把非零的瞬时 contentY 当成用户位置
-                        if (grid.preserveContentY < 0 && grid.contentY > 0) grid.preserveContentY = grid.contentY
+                        // 模型重建期间 contentY 会被重置，禁止写入位置记录
+                        grid.suppressPositionRecord = true
                     }
                     function onResetFinished() {
-                        if (grid.preserveContentY < 0) return
-                        const y = grid.preserveContentY
-                        grid.preserveContentY = -1
-                        Qt.callLater(function() {
-                            grid.contentY = Math.max(0, Math.min(y,
-                                Math.max(0, grid.contentHeight - grid.height)))
-                        })
+                        grid.suppressPositionRecord = false
+                        grid.restoreCurrentViewPosition()
                     }
                 }
 
@@ -617,8 +633,9 @@ Rectangle {
 
                             Timer {
                                 id: longPressTimer
-                                // 长按拖拽触发阈值：300ms（点击与拖拽的平衡点，快速点击不受影响）
-                                interval: 300
+                                // 长按拖拽触发阈值：可在设置页“通用 → 长按拖拽时长”配置
+                                // （150~1000ms，默认 300ms）。下限 150ms 防止与快速点击混淆。
+                                interval: Math.max(150, appController.longPressDragMs)
                                 onTriggered: {
                                     cardMouseArea.dragArmed = true
                                 }

@@ -21,6 +21,7 @@ class ApplicationController final : public QObject
     Q_PROPERTY(int currentScorePageCount READ currentScorePageCount NOTIFY currentScoreChanged)
     Q_PROPERTY(double autoScrollSpeed READ autoScrollSpeed WRITE setAutoScrollSpeed NOTIFY autoScrollSpeedChanged)
     Q_PROPERTY(double defaultScrollSpeed READ defaultScrollSpeed WRITE setDefaultScrollSpeed NOTIFY defaultScrollSpeedChanged)
+    Q_PROPERTY(int longPressDragMs READ longPressDragMs WRITE setLongPressDragMs NOTIFY longPressDragMsChanged)
     Q_PROPERTY(QString dataDirectory READ dataDirectory NOTIFY dataDirectoryChanged)
     Q_PROPERTY(QString pendingDataDirectory READ pendingDataDirectory NOTIFY dataDirectoryChanged)
 
@@ -48,6 +49,8 @@ public:
     void setAutoScrollSpeed(double speed);
     [[nodiscard]] double defaultScrollSpeed() const;
     void setDefaultScrollSpeed(double speed);
+    [[nodiscard]] int longPressDragMs() const;
+    void setLongPressDragMs(int ms);
     [[nodiscard]] QString dataDirectory() const;
     [[nodiscard]] QString pendingDataDirectory() const;
     static bool applyPendingDataMigration(QString* error);
@@ -76,6 +79,7 @@ signals:
     void scoreOpened(QString scoreId);
     void autoScrollSpeedChanged();
     void defaultScrollSpeedChanged();
+    void longPressDragMsChanged();
     void dataDirectoryChanged();
     void restartRequested();
     // 异步导入导出完成信号（success=false 时 error 为可展示的中文错误信息）
@@ -102,4 +106,5 @@ private:
     int m_currentScorePageCount {0};
     double m_autoScrollSpeed {15.0};
     double m_defaultScrollSpeed {15.0};
+    int m_longPressDragMs {300};
 };

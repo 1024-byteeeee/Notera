@@ -39,6 +39,10 @@ ApplicationController::ApplicationController(QObject* parent)
         m_defaultScrollSpeed = 15.0;
     }
     m_autoScrollSpeed = m_defaultScrollSpeed;
+    m_longPressDragMs = settings.value(QStringLiteral("gestures/longPressDragMs"), 300).toInt();
+    if (m_longPressDragMs < 150 || m_longPressDragMs > 1000) {
+        m_longPressDragMs = 300;
+    }
 }
 
 int ApplicationController::themeMode() const
@@ -155,6 +159,22 @@ void ApplicationController::setDefaultScrollSpeed(const double speed)
     m_defaultScrollSpeed = boundedSpeed;
     QSettings().setValue(QStringLiteral("reader/defaultScrollSpeed"), boundedSpeed);
     emit defaultScrollSpeedChanged();
+}
+
+int ApplicationController::longPressDragMs() const
+{
+    return m_longPressDragMs;
+}
+
+void ApplicationController::setLongPressDragMs(const int ms)
+{
+    const int boundedMs = std::clamp(ms, 150, 1000);
+    if (m_longPressDragMs == boundedMs) {
+        return;
+    }
+    m_longPressDragMs = boundedMs;
+    QSettings().setValue(QStringLiteral("gestures/longPressDragMs"), boundedMs);
+    emit longPressDragMsChanged();
 }
 
 void ApplicationController::openScore(const QString& scoreId, const QString& title, const QString& filePath,

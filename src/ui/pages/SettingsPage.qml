@@ -391,6 +391,81 @@ Rectangle {
                             anchors.fill: parent
                             anchors.leftMargin: 18
                             anchors.rightMargin: 18
+                            spacing: 18
+
+                            ColumnLayout {
+                                spacing: 3
+                                Label {
+                                    text: "长按拖拽时长"
+                                    color: Theme.foreground
+                                    font.pixelSize: Theme.fontMd
+                                    font.weight: Font.Medium
+                                }
+                                Label {
+                                    text: "在乐谱库中长按拖拽文件或文件夹的触发时间"
+                                    color: Theme.mutedForeground
+                                    font.pixelSize: Theme.fontXs
+                                }
+                            }
+
+                            Slider {
+                                id: longPressSlider
+                                Layout.preferredWidth: 180
+                                from: 150
+                                to: 1000
+                                stepSize: 50
+                                value: appController.longPressDragMs
+                                onMoved: appController.longPressDragMs = value
+
+                                background: Rectangle {
+                                    x: longPressSlider.leftPadding
+                                    y: longPressSlider.topPadding + longPressSlider.availableHeight / 2 - height / 2
+                                    width: longPressSlider.availableWidth
+                                    height: 4
+                                    radius: 2
+                                    color: Theme.buttonBackground
+                                    Rectangle {
+                                        width: longPressSlider.visualPosition * parent.width
+                                        height: parent.height
+                                        radius: 2
+                                        color: Theme.accent
+                                    }
+                                }
+                                handle: Rectangle {
+                                    x: longPressSlider.leftPadding + longPressSlider.visualPosition * (longPressSlider.availableWidth - width)
+                                    y: longPressSlider.topPadding + longPressSlider.availableHeight / 2 - height / 2
+                                    implicitWidth: 18
+                                    implicitHeight: 18
+                                    radius: 9
+                                    color: Theme.surface
+                                    border.width: 2
+                                    border.color: Theme.accent
+                                }
+                            }
+
+                            Label {
+                                Layout.preferredWidth: 60
+                                text: appController.longPressDragMs + " ms"
+                                color: Theme.accent
+                                font.pixelSize: Theme.fontSm
+                                font.weight: Font.DemiBold
+                                horizontalAlignment: Text.AlignRight
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 72
+                        radius: Theme.radiusMd
+                        color: Theme.elevatedSurface
+                        border.width: 1
+                        border.color: Theme.border
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 18
+                            anchors.rightMargin: 18
                             spacing: 12
 
                             ColumnLayout {
