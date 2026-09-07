@@ -40,14 +40,16 @@ Dialog {
         }
     }
 
-    // 打开时：按文件名排序重建列表，文件名输入框填入默认名
+    // 打开时：按显示名排序重建列表（批量/右键传 {path,name} 用乐谱标题，
+    // 拼接导入传路径字符串则用文件名），文件名输入框填入默认名
     onOpened: {
         fileModel.clear()
         var sorted = []
         for (var i = 0; i < dialog.paths.length; ++i) {
-            var p = dialog.paths[i].toString()
-            var parts = p.split("/")
-            var name = parts[parts.length - 1]
+            var raw = dialog.paths[i]
+            var isMap = (typeof raw === "object" && raw !== null && "path" in raw)
+            var p = isMap ? raw.path.toString() : raw.toString()
+            var name = isMap && raw.name ? raw.name.toString() : p.split("/").pop()
             sorted.push({ path: p, name: name })
         }
         sorted.sort(function(a, b) { return a.name.localeCompare(b.name, "zh") })

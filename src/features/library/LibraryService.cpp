@@ -890,14 +890,14 @@ void LibraryService::flushThumbnailUpdates()
     reload();
 }
 
-QVariantList LibraryService::stitchablePaths() const
+QVariantList LibraryService::stitchableScores() const
 {
-    return m_stitchablePaths;
+    return m_stitchableScores;
 }
 
 void LibraryService::refreshStitchablePaths()
 {
-    QVariantList paths;
+    QVariantList entries;
     const auto ids = m_selection.selectedIds();
     for (const auto& idVariant : ids) {
         const QString id = idVariant.toString();
@@ -918,10 +918,14 @@ void LibraryService::refreshStitchablePaths()
         if (filePath.isEmpty() || !FileService::isPreviewableImage(filePath)) {
             continue;
         }
-        paths.append(QUrl::fromLocalFile(filePath).toString());
+        QVariantMap item;
+        item.insert(QStringLiteral("path"), QUrl::fromLocalFile(filePath).toString());
+        item.insert(QStringLiteral("name"),
+            m_entries.data(index, LibraryEntryModel::TitleRole).toString());
+        entries.append(item);
     }
-    if (paths != m_stitchablePaths) {
-        m_stitchablePaths = paths;
+    if (entries != m_stitchableScores) {
+        m_stitchableScores = entries;
         emit stitchableChanged();
     }
 }

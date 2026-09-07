@@ -759,9 +759,9 @@ Rectangle {
                         AppMenuItem {
                             symbol: "stitch"
                             text: "拼接…"
-                            visible: libraryService.stitchablePaths.length >= 2
+                            visible: libraryService.stitchableScores.length >= 2
                             onTriggered: {
-                                stitchImagesDialog.paths = libraryService.stitchablePaths
+                                stitchImagesDialog.paths = libraryService.stitchableScores
                                 stitchImagesDialog.open()
                             }
                         }
@@ -1205,9 +1205,9 @@ Rectangle {
                 AppButton {
                     text: "拼接"
                     Layout.preferredWidth: 64
-                    enabled: libraryService.stitchablePaths.length >= 2
+                    enabled: libraryService.stitchableScores.length >= 2
                     onClicked: {
-                        stitchImagesDialog.paths = libraryService.stitchablePaths
+                        stitchImagesDialog.paths = libraryService.stitchableScores
                         stitchImagesDialog.open()
                     }
                 }
@@ -1438,11 +1438,22 @@ Rectangle {
             for (var i = 0; i < selectedFiles.length; i++) {
                 paths.push(selectedFiles[i].toString())
             }
-            if (paths.length >= 2) {
-                stitchImagesDialog.paths = paths
-                stitchImagesDialog.open()
+            if (paths.length < 2) {
+                stitchImportHintDialog.open()
+                return
             }
+            stitchImagesDialog.paths = paths
+            stitchImagesDialog.open()
         }
+    }
+
+    // 拼接导入只选了一个文件时的提示
+    ConfirmDialog {
+        id: stitchImportHintDialog
+        title: "拼接导入"
+        message: "拼接导入必须选择两个及以上图片文件"
+        confirmText: "确定"
+        danger: false
     }
 
     // 拼接对话框：指定方向 / 顺序 / 文件名，确认后拼接并导入当前文件夹

@@ -31,9 +31,10 @@ class LibraryService final : public QObject
     Q_PROPERTY(bool canGoUp READ canGoUp NOTIFY currentFolderChanged)
     Q_PROPERTY(QVariantList clipboardItems READ clipboardItems NOTIFY clipboardChanged)
     Q_PROPERTY(QString clipboardMode READ clipboardMode NOTIFY clipboardChanged)
-    // 当前选中项中可拼接（score 且为图片文件）的本地文件路径列表（QUrl 字符串），
-    // 供右键菜单/批量操作栏判断"拼接"入口是否可用。
-    Q_PROPERTY(QVariantList stitchablePaths READ stitchablePaths NOTIFY stitchableChanged)
+    // 当前选中项中可拼接（score 且为图片文件）的条目列表，
+    // 元素为 { path: 本地文件路径(QUrl 字符串), name: 乐谱标题 }，
+    // 供右键菜单/批量操作栏判断"拼接"入口是否可用并展示标题。
+    Q_PROPERTY(QVariantList stitchableScores READ stitchableScores NOTIFY stitchableChanged)
 
 public:
     explicit LibraryService(QObject* parent = nullptr);
@@ -53,7 +54,7 @@ public:
     [[nodiscard]] bool canGoUp() const;
     [[nodiscard]] QVariantList clipboardItems() const;
     [[nodiscard]] QString clipboardMode() const;
-    [[nodiscard]] QVariantList stitchablePaths() const;
+    [[nodiscard]] QVariantList stitchableScores() const;
 
     Q_INVOKABLE void importLocalFile(const QUrl& url);
     Q_INVOKABLE void importFiles(const QVariantList& paths);
@@ -185,7 +186,7 @@ private:
     QString m_currentFolderBreadcrumb {QStringLiteral("乐谱库")};
     QVariantList m_clipboardItems;
     QString m_clipboardMode {QStringLiteral("none")};
-    QVariantList m_stitchablePaths;
+    QVariantList m_stitchableScores;
     QVariantList m_pasteQueue;
     int m_pasteIndex {0};
     QString m_pasteTargetFolderId;

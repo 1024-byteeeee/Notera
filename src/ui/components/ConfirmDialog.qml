@@ -8,6 +8,7 @@ Dialog {
 
     property string message: ""
     property string confirmText: "删除"
+    property bool danger: true
 
     parent: Overlay.overlay
     x: parent ? Math.round((parent.width - width) / 2) : 0
@@ -59,7 +60,7 @@ Dialog {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 10
             AppButton { text: "取消"; onClicked: dialog.reject() }
-            AppButton { text: dialog.confirmText; danger: true; onClicked: dialog.accept() }
+            AppButton { text: dialog.confirmText; danger: dialog.danger; onClicked: dialog.accept() }
         }
     }
 
