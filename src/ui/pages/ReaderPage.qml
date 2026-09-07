@@ -66,15 +66,18 @@ Rectangle {
     function goToPrevScore() {
         if (!root.hasPrev) return
         const s = root.folderScores[root.currentScoreIndex - 1]
-        // 切换时显示加载弹窗；内容加载完成（文件展示）后立即关闭
+        // 先显示加载弹窗，延迟 50ms 再 openScore：给弹窗一帧渲染时间；
+        // 加载完成（文件展示）后立即关闭
         appShell.showLoading(root.isPdf ? "正在打开乐谱" : "正在加载图片")
-        appController.openScore(s.id, s.title, s.filePath, s.fileType, s.pageCount, s.folderId)
+        readerOpenTimer.pendingScore = s
+        readerOpenTimer.restart()
     }
     function goToNextScore() {
         if (!root.hasNext) return
         const s = root.folderScores[root.currentScoreIndex + 1]
         appShell.showLoading(root.isPdf ? "正在打开乐谱" : "正在加载图片")
-        appController.openScore(s.id, s.title, s.filePath, s.fileType, s.pageCount, s.folderId)
+        readerOpenTimer.pendingScore = s
+        readerOpenTimer.restart()
     }
     function goToPrevPage() {
         if (!root.isPdf || pdfView.currentPage <= 0) return
@@ -1061,6 +1064,20 @@ Rectangle {
             appShell.showLoading(root.isPdf ? "正在打开乐谱" : "正在加载图片")
         } else {
             appShell.hideLoading(true)
+        }
+    }
+
+    // 延迟打开乐谱（上一张/下一张）：先让加载弹窗渲染并可见约 300ms，
+    // 确保点击瞬间弹窗可感知；文件展示后由 onViewInitializationPendingChanged 立即关闭
+    Timer {
+        id: readerOpenTimer
+        interval: 300
+        repeat: false
+        property var pendingScore: null
+        onTriggered: {
+            const s = pendingScore
+            if (!s) return
+            appController.openScore(s.id, s.title, s.filePath, s.fileType, s.pageCount, s.folderId)
         }
     }
 }
