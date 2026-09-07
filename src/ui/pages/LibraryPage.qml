@@ -594,16 +594,12 @@ Rectangle {
                                 if (scoreDelegate.itemType === "folder") {
                                     libraryService.enterFolder(scoreDelegate.itemId)
                                 } else {
-                                    // 先显示加载对话框，再延迟执行 openScore（同步阻塞），
-                                    // 给 UI 一帧时间渲染弹窗，避免"卡死无反馈"
+                                    // 打开文件：先显示加载弹窗；内容加载完成（文件展示）后由
+                                    // ReaderPage 调用 hideLoading(true) 立即关闭，不残留弹窗。
                                     appShell.showLoading("正在打开乐谱")
-                                    openScoreTimer.pendingScoreId = scoreDelegate.scoreId
-                                    openScoreTimer.pendingTitle = scoreDelegate.title
-                                    openScoreTimer.pendingFilePath = scoreDelegate.filePath
-                                    openScoreTimer.pendingFileType = scoreDelegate.fileType
-                                    openScoreTimer.pendingPageCount = scoreDelegate.pageCount
-                                    openScoreTimer.pendingFolderId = libraryService.scoreFolderId(scoreDelegate.scoreId)
-                                    openScoreTimer.restart()
+                                    appController.openScore(scoreDelegate.scoreId, scoreDelegate.title,
+                                        scoreDelegate.filePath, scoreDelegate.fileType, scoreDelegate.pageCount,
+                                        libraryService.scoreFolderId(scoreDelegate.scoreId))
                                 }
                             }
                         }
@@ -1690,23 +1686,6 @@ Rectangle {
         }
         function onFoldersChanged() {
             rootChildFolderModel.refresh()
-        }
-    }
-
-    // 延迟打开乐谱：给全局加载对话框一帧渲染时间，避免同步阻塞导致弹窗不显示
-    Timer {
-        id: openScoreTimer
-        interval: 50
-        repeat: false
-        property var pendingScoreId: 0
-        property string pendingTitle: ""
-        property url pendingFilePath: ""
-        property string pendingFileType: ""
-        property int pendingPageCount: 0
-        property var pendingFolderId: 0
-        onTriggered: {
-            appController.openScore(pendingScoreId, pendingTitle, pendingFilePath,
-                pendingFileType, pendingPageCount, pendingFolderId)
         }
     }
 }

@@ -74,7 +74,15 @@ Item {
         root.visible = true
     }
 
-    function hide() {
+    function hide(immediate) {
+        if (immediate === true) {
+            // 立即关闭：用于"文件已展示，弹窗马上消失"的场景，
+            // 跳过 minDisplayDuration，避免文件显示后弹窗还在转。
+            root._hidePending = false
+            hideTimer.stop()
+            root.visible = false
+            return
+        }
         const elapsed = Date.now() - root._openTimestamp
         if (elapsed >= root.minDisplayDuration) {
             root._hidePending = false

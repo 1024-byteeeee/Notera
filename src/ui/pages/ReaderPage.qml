@@ -66,17 +66,15 @@ Rectangle {
     function goToPrevScore() {
         if (!root.hasPrev) return
         const s = root.folderScores[root.currentScoreIndex - 1]
-        // 先显示加载对话框，再延迟执行 openScore（同步阻塞），给 UI 一帧渲染时间
+        // 切换时显示加载弹窗；内容加载完成（文件展示）后立即关闭
         appShell.showLoading(root.isPdf ? "正在打开乐谱" : "正在加载图片")
-        readerOpenTimer.pendingScore = s
-        readerOpenTimer.restart()
+        appController.openScore(s.id, s.title, s.filePath, s.fileType, s.pageCount, s.folderId)
     }
     function goToNextScore() {
         if (!root.hasNext) return
         const s = root.folderScores[root.currentScoreIndex + 1]
         appShell.showLoading(root.isPdf ? "正在打开乐谱" : "正在加载图片")
-        readerOpenTimer.pendingScore = s
-        readerOpenTimer.restart()
+        appController.openScore(s.id, s.title, s.filePath, s.fileType, s.pageCount, s.folderId)
     }
     function goToPrevPage() {
         if (!root.isPdf || pdfView.currentPage <= 0) return
@@ -1055,28 +1053,14 @@ Rectangle {
         onTriggered: metronomePanel.flashBeat = -1
     }
 
-    // 文件加载对话框：打开文件时显示加载动画，加载完成后自动隐藏。
-    // 即使秒开也保证至少显示 minDisplayDuration，避免完全无感。
+    // 打开文件：加载期间显示弹窗；内容加载完成（文件已展示）后立即关闭，
+    // 不等待 minDisplayDuration，避免"文件显示后弹窗还在转"。
+    // （导入/导出的加载弹窗在 SettingsPage 保留，仍走最小显示时长）
     onViewInitializationPendingChanged: {
-        // 在 reader 页内切换文件（上一张/下一张）时也需要显示加载对话框；
-        // 从 library 页打开文件时由 LibraryPage 先调用 showLoading，这里重复调用是幂等的。
         if (root.viewInitializationPending) {
             appShell.showLoading(root.isPdf ? "正在打开乐谱" : "正在加载图片")
         } else {
-            appShell.hideLoading()
-        }
-    }
-
-    // 延迟打开乐谱（上一张/下一张）：给全局加载对话框一帧渲染时间
-    Timer {
-        id: readerOpenTimer
-        interval: 50
-        repeat: false
-        property var pendingScore: null
-        onTriggered: {
-            const s = pendingScore
-            if (!s) return
-            appController.openScore(s.id, s.title, s.filePath, s.fileType, s.pageCount, s.folderId)
+            appShell.hideLoading(true)
         }
     }
 }

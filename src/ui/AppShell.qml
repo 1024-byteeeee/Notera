@@ -39,7 +39,9 @@ Item {
     // 全局加载对话框：文件打开、数据库导入/导出等耗时操作使用。
     // 调用 showLoading() 后必须用 Timer 延迟执行阻塞操作，给 UI 一帧时间渲染弹窗。
     function showLoading(message) { loadingDialog.show(message) }
-    function hideLoading() { loadingDialog.hide() }
+    // immediate=true 时立即关闭（打开文件场景：文件展示后弹窗马上消失）；
+    // 默认走 minDisplayDuration 最小显示时长（导入导出场景）
+    function hideLoading(immediate) { loadingDialog.hide(immediate) }
 
     Connections {
         target: appController
