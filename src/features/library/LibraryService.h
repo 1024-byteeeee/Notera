@@ -31,6 +31,9 @@ class LibraryService final : public QObject
     Q_PROPERTY(bool canGoUp READ canGoUp NOTIFY currentFolderChanged)
     Q_PROPERTY(QVariantList clipboardItems READ clipboardItems NOTIFY clipboardChanged)
     Q_PROPERTY(QString clipboardMode READ clipboardMode NOTIFY clipboardChanged)
+    // 当前选中项中可拼接（score 且为图片文件）的本地文件路径列表（QUrl 字符串），
+    // 供右键菜单/批量操作栏判断"拼接"入口是否可用。
+    Q_PROPERTY(QVariantList stitchablePaths READ stitchablePaths NOTIFY stitchableChanged)
 
 public:
     explicit LibraryService(QObject* parent = nullptr);
@@ -50,11 +53,15 @@ public:
     [[nodiscard]] bool canGoUp() const;
     [[nodiscard]] QVariantList clipboardItems() const;
     [[nodiscard]] QString clipboardMode() const;
+    [[nodiscard]] QVariantList stitchablePaths() const;
 
     Q_INVOKABLE void importLocalFile(const QUrl& url);
     Q_INVOKABLE void importFiles(const QVariantList& paths);
     Q_INVOKABLE void importFolder(const QVariant& folderPath);
     Q_INVOKABLE void importAndStitchImages(const QStringList& filePaths);
+    // 按指定顺序/方向拼接图片并作为乐谱导入当前文件夹，文件名用 outputName
+    Q_INVOKABLE void stitchImages(const QVariantList& orderedPaths, const QString& direction,
+        const QString& outputName);
     Q_INVOKABLE void toggleFavorite(const QString& scoreId, bool favorite);
     Q_INVOKABLE void toggleItemFavorite(const QString& itemId, bool favorite);
     Q_INVOKABLE void renameScore(const QString& scoreId, const QString& title);
@@ -120,6 +127,7 @@ signals:
     void importFinished(int processedCount);
     void mergeConflict(QString sourceName, QString targetName, int index, int total);
     void mergeFinished(int processedCount);
+    void stitchableChanged();
 
 private:
     struct ImportTaskResult {
@@ -157,6 +165,7 @@ private:
     void cleanupMergeState();
     void importBackupScore(const QVariantMap& item, const QString& targetFolderId);
     static QString sha256OfFile(const QString& path);
+    void refreshStitchablePaths();
 
     DatabaseService m_databaseService;
     ScoreRepository m_repository;
@@ -176,6 +185,7 @@ private:
     QString m_currentFolderBreadcrumb {QStringLiteral("乐谱库")};
     QVariantList m_clipboardItems;
     QString m_clipboardMode {QStringLiteral("none")};
+    QVariantList m_stitchablePaths;
     QVariantList m_pasteQueue;
     int m_pasteIndex {0};
     QString m_pasteTargetFolderId;

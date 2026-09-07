@@ -171,6 +171,7 @@ LibraryService::LibraryService(QObject* parent)
     connect(&m_thumbnailGenerator, &ThumbnailGenerator::failed, this, [this](const QString&, const QString& message) {
         emit errorOccurred(message);
     });
+    connect(&m_selection, &LibrarySelectionModel::selectionChanged, this, &LibraryService::refreshStitchablePaths);
     reloadFolders();
     reloadTags();
     reload();
@@ -887,6 +888,163 @@ void LibraryService::flushThumbnailUpdates()
         return;
     }
     reload();
+}
+
+QVariantList LibraryService::stitchablePaths() const
+{
+    return m_stitchablePaths;
+}
+
+void LibraryService::refreshStitchablePaths()
+{
+    QVariantList paths;
+    const auto ids = m_selection.selectedIds();
+    for (const auto& idVariant : ids) {
+        const QString id = idVariant.toString();
+        int row = -1;
+        const auto entryIds = m_entries.itemIds();
+        for (int i = 0; i < entryIds.size(); ++i) {
+            if (entryIds.at(i).toString() == id) {
+                row = i;
+                break;
+            }
+        }
+        if (row < 0) continue;
+        const auto index = m_entries.index(row, 0);
+        if (m_entries.data(index, LibraryEntryModel::ItemTypeRole).toString() != QStringLiteral("score")) {
+            continue;
+        }
+        const QString filePath = m_entries.data(index, LibraryEntryModel::FilePathRole).toString();
+        if (filePath.isEmpty() || !FileService::isPreviewableImage(filePath)) {
+            continue;
+        }
+        paths.append(QUrl::fromLocalFile(filePath).toString());
+    }
+    if (paths != m_stitchablePaths) {
+        m_stitchablePaths = paths;
+        emit stitchableChanged();
+    }
+}
+
+void LibraryService::stitchImages(const QVariantList& orderedPaths, const QString& direction,
+    const QString& outputName)
+{
+    if (orderedPaths.size() < 2) {
+        emit errorOccurred(QStringLiteral("拼接需要至少选择两张图片"));
+        return;
+    }
+
+    QStringList paths;
+    for (const auto& value : orderedPaths) {
+        const QString localPath = resolveImportPath(value);
+        if (localPath.isEmpty()) {
+            emit errorOccurred(QStringLiteral("无法读取图片文件：%1").arg(value.toString()));
+            return;
+        }
+        paths.append(localPath);
+    }
+
+    QList<QImage> images;
+    for (const auto& localPath : paths) {
+        QImageReader reader(localPath);
+        reader.setAutoTransform(true);
+        QImage img = reader.read();
+        if (img.isNull()) {
+            emit errorOccurred(QStringLiteral("无法加载图片 %1：%2")
+                .arg(QFileInfo(localPath).fileName(), reader.errorString()));
+            return;
+        }
+        images.append(img);
+    }
+
+    // 拼接方向：vertical=纵向（上下叠，宽度取最大、水平居中）；
+    // horizontal=横向（左右拼，高度取最大、垂直居中）
+    const bool horizontal = (direction == QLatin1String("horizontal"));
+    qint64 canvasWidth = 0;
+    qint64 canvasHeight = 0;
+    if (horizontal) {
+        qint64 totalWidth = 0;
+        int maxHeight = 0;
+        for (const auto& img : images) {
+            totalWidth += img.width();
+            maxHeight = qMax(maxHeight, img.height());
+        }
+        canvasWidth = totalWidth;
+        canvasHeight = maxHeight;
+    } else {
+        int maxWidth = 0;
+        qint64 totalHeight = 0;
+        for (const auto& img : images) {
+            maxWidth = qMax(maxWidth, img.width());
+            totalHeight += img.height();
+        }
+        canvasWidth = maxWidth;
+        canvasHeight = totalHeight;
+    }
+
+    if (canvasWidth <= 0 || canvasHeight <= 0) {
+        emit errorOccurred(QStringLiteral("图片尺寸无效"));
+        return;
+    }
+
+    constexpr qint64 maximumCanvasPixels = 64LL * 1024 * 1024;
+    if (canvasHeight > 65536 || canvasWidth > 16384
+        || canvasWidth * canvasHeight > maximumCanvasPixels) {
+        emit errorOccurred(QStringLiteral("拼接后图片尺寸过大，请减少图片数量或先缩小图片"));
+        return;
+    }
+
+    QImage stitched(static_cast<int>(canvasWidth), static_cast<int>(canvasHeight), QImage::Format_ARGB32);
+    if (stitched.isNull()) {
+        emit errorOccurred(QStringLiteral("内存不足，无法创建拼接图片"));
+        return;
+    }
+    stitched.fill(Qt::white);
+
+    QPainter painter(&stitched);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    if (horizontal) {
+        int x = 0;
+        for (const auto& img : images) {
+            const int y = (static_cast<int>(canvasHeight) - img.height()) / 2;
+            painter.drawImage(x, y, img);
+            x += img.width();
+        }
+    } else {
+        int y = 0;
+        for (const auto& img : images) {
+            const int x = (static_cast<int>(canvasWidth) - img.width()) / 2;
+            painter.drawImage(x, y, img);
+            y += img.height();
+        }
+    }
+    painter.end();
+
+    const QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    const QString tempPath = QStringLiteral("%1/notera_stitch_%2.png")
+        .arg(tempDir, QUuid::createUuid().toString(QUuid::WithoutBraces));
+    if (!stitched.save(tempPath, "PNG")) {
+        emit errorOccurred(QStringLiteral("保存拼接图片失败"));
+        return;
+    }
+
+    // 导入当前文件夹；同名时走统一导入冲突流程（替换 / 保留两者 / 跳过 / 取消）
+    const QString title = outputName.trimmed().isEmpty()
+        ? QStringLiteral("拼接图片 %1张").arg(images.size()) : outputName.trimmed();
+    const auto folderId = (m_filterMode == QStringLiteral("all")
+        || m_filterMode.startsWith(QStringLiteral("folder:"))) ? m_currentFolderId : QString {};
+    if (nameExistsInFolder(title, folderId, false)) {
+        m_importQueue = { tempPath };
+        m_importQueueTitles = { title };
+        m_importTempFiles = { tempPath };
+        m_importIndex = 0;
+        m_importConflictAction.clear();
+        m_importApplyToAll = false;
+        continueImport();
+    } else {
+        importFile(tempPath, title);
+        QFile::remove(tempPath);
+    }
 }
 
 void LibraryService::importAndStitchImages(const QStringList& filePaths)

@@ -756,6 +756,15 @@ Rectangle {
                                 libraryService.cutItems(ids)
                             }
                         }
+                        AppMenuItem {
+                            symbol: "stitch"
+                            text: "拼接…"
+                            visible: libraryService.stitchablePaths.length >= 2
+                            onTriggered: {
+                                stitchImagesDialog.paths = libraryService.stitchablePaths
+                                stitchImagesDialog.open()
+                            }
+                        }
                         AppMenuSeparator { }
 
                         AppMenu {
@@ -1194,6 +1203,16 @@ Rectangle {
                 }
 
                 AppButton {
+                    text: "拼接"
+                    Layout.preferredWidth: 64
+                    enabled: libraryService.stitchablePaths.length >= 2
+                    onClicked: {
+                        stitchImagesDialog.paths = libraryService.stitchablePaths
+                        stitchImagesDialog.open()
+                    }
+                }
+
+                AppButton {
                     text: "粘贴"
                     Layout.preferredWidth: 64
                     enabled: libraryService.clipboardItems.length > 0
@@ -1251,7 +1270,7 @@ Rectangle {
             symbol: "stitch"
             text: "拼接导入…"
             objectName: "stitchImportMenuItem"
-            onTriggered: stitchDialog.open()
+            onTriggered: stitchFileDialog.open()
         }
     }
 
@@ -1410,8 +1429,8 @@ Rectangle {
     }
 
     FileDialog {
-        id: stitchDialog
-        title: "选择多张图片拼接导入（按选择顺序垂直拼接）"
+        id: stitchFileDialog
+        title: "选择多张图片拼接导入"
         fileMode: FileDialog.OpenFiles
         nameFilters: ["图片文件 (*.jpg *.jpeg *.png *.bmp *.gif *.webp *.tif *.tiff)", "所有文件 (*)"]
         onAccepted: {
@@ -1419,7 +1438,19 @@ Rectangle {
             for (var i = 0; i < selectedFiles.length; i++) {
                 paths.push(selectedFiles[i].toString())
             }
-            libraryService.importAndStitchImages(paths)
+            if (paths.length >= 2) {
+                stitchImagesDialog.paths = paths
+                stitchImagesDialog.open()
+            }
+        }
+    }
+
+    // 拼接对话框：指定方向 / 顺序 / 文件名，确认后拼接并导入当前文件夹
+    StitchDialog {
+        id: stitchImagesDialog
+        title: "拼接图片"
+        onSubmitted: function(orderedPaths, direction, outputName) {
+            libraryService.stitchImages(orderedPaths, direction, outputName)
         }
     }
 
