@@ -107,6 +107,23 @@ Rectangle {
             dragPreview.y = -10000
         })
     }
+    function handleCardClick(delegate) {
+        if (root.selectedCount > 0) {
+            libraryService.selection.toggle(delegate.itemId)
+            return
+        }
+        if (delegate.itemType === "folder") {
+            libraryService.enterFolder(delegate.itemId)
+        } else {
+            // 打开文件：显示加载弹窗，真实反映加载过程——
+            // 加载快弹窗一闪而过（甚至来不及渲染），加载慢弹窗持续显示；
+            // 内容加载完成（文件展示）后由 ReaderPage 立即关闭。
+            appShell.showLoading("正在打开乐谱")
+            appController.openScore(delegate.scoreId, delegate.title,
+                delegate.filePath, delegate.fileType, delegate.pageCount,
+                libraryService.scoreFolderId(delegate.scoreId))
+        }
+    }
     function canMoveAll(ids, folderId) {
         if (!ids || ids.length === 0) return false
         for (let i = 0; i < ids.length; ++i) {
@@ -549,7 +566,9 @@ Rectangle {
 
                         HoverHandler {
                             id: cardHover
-                            cursorShape: Qt.PointingHandCursor
+                            // 长按进入拖拽移动后鼠标指针切换为抓取手势
+                            cursorShape: (cardMouseArea.dragArmed || cardMouseArea.dragged)
+                                ? Qt.ClosedHandCursor : Qt.PointingHandCursor
                         }
                         MouseArea {
                             id: cardMouseArea
@@ -557,9 +576,20 @@ Rectangle {
                             objectName: scoreDelegate.itemType === "score" ? "scoreCardMouse" : "folderCardMouse"
                             acceptedButtons: Qt.LeftButton
                             preventStealing: true
-                            drag.target: dragPreview
-                            drag.threshold: Qt.styleHints.startDragDistance
-                            property bool preparedDrag: false
+                            // 拖拽移动改为长按触发：按下后按住不放（系统长按时长）进入拖拽模式，
+                            // 之后移动才激活拖拽；普通快速点击/拖动保持原有打开/选择语义。
+                            property bool dragArmed: false
+                            property bool dragged: false
+                            property bool moved: false
+                            property point pressPos: Qt.point(0, 0)
+
+                            Timer {
+                                id: longPressTimer
+                                interval: Math.max(Qt.styleHints.mousePressAndHoldInterval, 400)
+                                onTriggered: {
+                                    cardMouseArea.dragArmed = true
+                                }
+                            }
 
                             onPressed: function(mouse) {
                                 if (root.selectedCount > 0 && root.isSelected(scoreDelegate.itemId)) {
@@ -572,36 +602,51 @@ Rectangle {
                                 const point = card.mapToItem(root, mouse.x, mouse.y)
                                 dragPreview.x = point.x - dragPreview.Drag.hotSpot.x
                                 dragPreview.y = point.y - dragPreview.Drag.hotSpot.y
+                                dragArmed = false
+                                dragged = false
+                                moved = false
+                                pressPos = Qt.point(mouse.x, mouse.y)
+                                longPressTimer.restart()
                             }
-                            onPositionChanged: {
-                                if (!drag.active || preparedDrag) return
-                                preparedDrag = true
-                                root.dragInProgress = true
-                            }
-                            onReleased: {
-                                preparedDrag = false
-                                root.finishInternalDrag()
-                            }
-                            onCanceled: {
-                                preparedDrag = false
-                                root.finishInternalDrag()
-                            }
-                            onClicked: {
-                                if (root.selectedCount > 0) {
-                                    libraryService.selection.toggle(scoreDelegate.itemId)
+                            onPositionChanged: function(mouse) {
+                                if (dragged) {
+                                    const point = card.mapToItem(root, mouse.x, mouse.y)
+                                    dragPreview.x = point.x - dragPreview.Drag.hotSpot.x
+                                    dragPreview.y = point.y - dragPreview.Drag.hotSpot.y
                                     return
                                 }
-                                if (scoreDelegate.itemType === "folder") {
-                                    libraryService.enterFolder(scoreDelegate.itemId)
-                                } else {
-                                    // 打开文件：显示加载弹窗，真实反映加载过程——
-                                    // 加载快弹窗一闪而过（甚至来不及渲染），加载慢弹窗持续显示；
-                                    // 内容加载完成（文件展示）后由 ReaderPage 立即关闭。
-                                    appShell.showLoading("正在打开乐谱")
-                                    appController.openScore(scoreDelegate.scoreId, scoreDelegate.title,
-                                        scoreDelegate.filePath, scoreDelegate.fileType, scoreDelegate.pageCount,
-                                        libraryService.scoreFolderId(scoreDelegate.scoreId))
+                                if (dragArmed) {
+                                    // 长按完成，开始拖动即进入拖拽
+                                    dragged = true
+                                    root.dragInProgress = true
+                                    return
                                 }
+                                const dx = mouse.x - pressPos.x
+                                const dy = mouse.y - pressPos.y
+                                if (dx * dx + dy * dy > Qt.styleHints.startDragDistance * Qt.styleHints.startDragDistance) {
+                                    // 未长按就移动超过阈值：取消长按，按普通点击处理
+                                    moved = true
+                                    longPressTimer.stop()
+                                }
+                            }
+                            onReleased: {
+                                longPressTimer.stop()
+                                if (dragged) {
+                                    root.finishInternalDrag()
+                                } else if (!dragArmed && !moved) {
+                                    // 快速按下-释放：保持原有点击语义
+                                    root.handleCardClick(scoreDelegate)
+                                }
+                                dragArmed = false
+                                dragged = false
+                                moved = false
+                            }
+                            onCanceled: {
+                                longPressTimer.stop()
+                                if (dragged) root.finishInternalDrag()
+                                dragArmed = false
+                                dragged = false
+                                moved = false
                             }
                         }
                         TapHandler {
