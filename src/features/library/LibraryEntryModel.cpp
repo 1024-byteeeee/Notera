@@ -71,9 +71,11 @@ void LibraryEntryModel::replaceAll(const QVariantList& folders, const QList<Scor
     }
 
     const auto previousCount = m_entries.size();
+    emit resetStarted();
     beginResetModel();
     m_entries = std::move(entries);
     endResetModel();
+    emit resetFinished();
     if (previousCount != m_entries.size()) emit countChanged();
 }
 
@@ -86,6 +88,45 @@ bool LibraryEntryModel::updateEntryTags(const QString& itemId, const QStringList
         m_entries[row].tags = tags;
         const auto index = createIndex(row, 0);
         emit dataChanged(index, index, {TagsRole});
+        return true;
+    }
+    return false;
+}
+
+bool LibraryEntryModel::updateEntryTitle(const QString& itemId, const QString& title)
+{
+    for (int row = 0; row < m_entries.size(); ++row) {
+        if (m_entries.at(row).itemId != itemId) continue;
+        if (m_entries.at(row).title == title) return true;
+        m_entries[row].title = title;
+        const auto index = createIndex(row, 0);
+        emit dataChanged(index, index, {TitleRole});
+        return true;
+    }
+    return false;
+}
+
+bool LibraryEntryModel::updateEntryFavorite(const QString& itemId, bool favorite)
+{
+    for (int row = 0; row < m_entries.size(); ++row) {
+        if (m_entries.at(row).itemId != itemId) continue;
+        if (m_entries.at(row).favorite == favorite) return true;
+        m_entries[row].favorite = favorite;
+        const auto index = createIndex(row, 0);
+        emit dataChanged(index, index, {FavoriteRole});
+        return true;
+    }
+    return false;
+}
+
+bool LibraryEntryModel::updateEntryThumbnail(const QString& itemId, const QString& thumbnailPath)
+{
+    for (int row = 0; row < m_entries.size(); ++row) {
+        if (m_entries.at(row).itemId != itemId) continue;
+        if (m_entries.at(row).thumbnailPath == thumbnailPath) return true;
+        m_entries[row].thumbnailPath = thumbnailPath;
+        const auto index = createIndex(row, 0);
+        emit dataChanged(index, index, {ThumbnailPathRole});
         return true;
     }
     return false;

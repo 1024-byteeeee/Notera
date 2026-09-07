@@ -145,8 +145,14 @@ private:
     void reload();
     void reloadFolders();
     void reloadTags();
-    // 标签增删后局部刷新对应乐谱条目的 tags，避免整表重建导致视图滚动位置回顶
+    // 标签增删后局部刷新对应条目的 tags，避免整表重建导致视图滚动位置回顶
     void updateEntryTagsLocally(const QString& itemId);
+    // 重命名后局部刷新条目标题
+    void updateEntryTitleLocally(const QString& itemId, const QString& title);
+    // 收藏切换后局部刷新条目收藏状态
+    void updateEntryFavoriteLocally(const QString& itemId, bool favorite);
+    // 缩略图刷新后局部更新多个条目的缩略图路径
+    void updateEntryThumbnailsLocally(const QHash<QString, QString>& updates);
     void importFile(const QString& sourcePath, const QString& titleOverride = {});
     void continueImport();
     void startImportTask(const QString& sourcePath, const QString& title, const QString& folderId);

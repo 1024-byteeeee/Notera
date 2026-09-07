@@ -415,7 +415,7 @@ void LibraryService::renameFolder(const QString& folderId, const QString& name)
         m_currentFolderBreadcrumb = m_repository.folderBreadcrumb(folderId, &error);
         emit currentFolderChanged();
     }
-    reload();
+    updateEntryTitleLocally(folderId, trimmed);
     emit noticeOccurred(QStringLiteral("已重命名为 %1").arg(trimmed));
 }
 
@@ -887,7 +887,7 @@ void LibraryService::flushThumbnailUpdates()
         emit errorOccurred(QStringLiteral("更新乐谱缩略图失败"));
         return;
     }
-    reload();
+    updateEntryThumbnailsLocally(updates);
 }
 
 QVariantList LibraryService::stitchableScores() const
@@ -1171,7 +1171,12 @@ void LibraryService::toggleItemFavorite(const QString& itemId, const bool favori
         return;
     }
     reloadFolders();
-    reload();
+    // 收藏视图下取消收藏后条目应从列表消失，必须整表刷新；其余视图只局部刷新收藏状态
+    if (m_filterMode == QStringLiteral("favorites")) {
+        reload();
+    } else {
+        updateEntryFavoriteLocally(itemId, favorite);
+    }
 }
 
 void LibraryService::renameScore(const QString& scoreId, const QString& title)
@@ -1195,7 +1200,7 @@ void LibraryService::renameScore(const QString& scoreId, const QString& title)
         emit errorOccurred(QStringLiteral("重命名乐谱失败"));
         return;
     }
-    reload();
+    updateEntryTitleLocally(scoreId, trimmed);
 }
 
 void LibraryService::deleteScore(const QString& scoreId, const QString& filePath, const QString& thumbnailPath)
@@ -1401,6 +1406,23 @@ void LibraryService::updateEntryTagsLocally(const QString& itemId)
         }
     }
     m_entries.updateEntryTags(itemId, tags);
+}
+
+void LibraryService::updateEntryTitleLocally(const QString& itemId, const QString& title)
+{
+    m_entries.updateEntryTitle(itemId, title);
+}
+
+void LibraryService::updateEntryFavoriteLocally(const QString& itemId, bool favorite)
+{
+    m_entries.updateEntryFavorite(itemId, favorite);
+}
+
+void LibraryService::updateEntryThumbnailsLocally(const QHash<QString, QString>& updates)
+{
+    for (auto it = updates.constBegin(); it != updates.constEnd(); ++it) {
+        m_entries.updateEntryThumbnail(it.key(), it.value());
+    }
 }
 
 QVariantList LibraryService::itemTags(const QString& itemId)

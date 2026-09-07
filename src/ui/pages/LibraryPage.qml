@@ -113,6 +113,7 @@ Rectangle {
             return
         }
         if (delegate.itemType === "folder") {
+            grid.preserveContentY = -1
             libraryService.enterFolder(delegate.itemId)
         } else {
             // 打开文件：显示加载弹窗，真实反映加载过程——
@@ -251,7 +252,10 @@ Rectangle {
 
     Connections {
         target: appController
-        function onLibraryFilterChanged() { libraryService.filterMode = appController.libraryFilter }
+        function onLibraryFilterChanged() {
+            grid.preserveContentY = -1
+            libraryService.filterMode = appController.libraryFilter
+        }
     }
     Connections {
         target: libraryService
@@ -314,7 +318,10 @@ Rectangle {
                 Layout.preferredWidth: 78
                 text: "上一级"
                 symbol: "back"
-                onClicked: libraryService.goUp()
+                onClicked: {
+                    grid.preserveContentY = -1
+                    libraryService.goUp()
+                }
             }
 
             ColumnLayout {
@@ -359,7 +366,10 @@ Rectangle {
                         font.pixelSize: Theme.fontMd
                         selectByMouse: true
                         text: libraryService.searchQuery
-                        onTextChanged: libraryService.searchQuery = text
+                        onTextChanged: {
+                            grid.preserveContentY = -1
+                            libraryService.searchQuery = text
+                        }
                         background: Item { }
                     }
                 }
@@ -403,6 +413,28 @@ Rectangle {
                 }
                 cellHeight: 326
                 model: libraryService.entries
+
+                // 整表重建（移动/删除/导入/新建等成员变化）后保持滚动位置：
+                // resetStarted 记录当前 contentY，resetFinished 恢复；导航类操作
+                // （切视图/进文件夹/上一级/搜索）前置 preserveContentY = -1 禁用恢复。
+                property real preserveContentY: -1
+                Connections {
+                    target: libraryService.entries
+                    function onResetStarted() {
+                        // 仅在已发生真实滚动（contentY > 0）时记录，避免启动/首次加载
+                        // 布局竞态把非零的瞬时 contentY 当成用户位置
+                        if (grid.preserveContentY < 0 && grid.contentY > 0) grid.preserveContentY = grid.contentY
+                    }
+                    function onResetFinished() {
+                        if (grid.preserveContentY < 0) return
+                        const y = grid.preserveContentY
+                        grid.preserveContentY = -1
+                        Qt.callLater(function() {
+                            grid.contentY = Math.max(0, Math.min(y,
+                                Math.max(0, grid.contentHeight - grid.height)))
+                        })
+                    }
+                }
 
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
@@ -585,7 +617,8 @@ Rectangle {
 
                             Timer {
                                 id: longPressTimer
-                                interval: Math.max(Qt.styleHints.mousePressAndHoldInterval, 400)
+                                // 长按拖拽触发阈值：300ms（点击与拖拽的平衡点，快速点击不受影响）
+                                interval: 300
                                 onTriggered: {
                                     cardMouseArea.dragArmed = true
                                 }
