@@ -586,7 +586,8 @@ Rectangle {
                 boundsBehavior: Flickable.StopAtBounds
                 onMovementStarted: root.markUserInteraction()
                 contentWidth: imageViewport.width
-                contentHeight: imageViewport.height
+                // 内容高必须含顶部偏移与底部留白，否则滚到底时图片底部会被裁掉
+                contentHeight: imageViewport.height + imageViewport.y + 24
 
                 Item {
                     id: imageViewport

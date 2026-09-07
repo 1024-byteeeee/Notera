@@ -333,9 +333,11 @@ Rectangle {
                                 }
                             }
 
+                            Item { Layout.fillWidth: true }
+
                             Slider {
                                 id: speedSlider
-                                Layout.preferredWidth: 180
+                                Layout.preferredWidth: 150
                                 from: 1
                                 to: 256
                                 stepSize: 1
@@ -368,13 +370,73 @@ Rectangle {
                                 }
                             }
 
-                            Label {
-                                Layout.preferredWidth: 60
-                                text: Math.round(appController.defaultScrollSpeed) + " px/s"
-                                color: Theme.accent
+                            // 手动输入：与滑块双向同步（滑块拖动 / 直接输入 / 箭头微调）
+                            SpinBox {
+                                id: speedSpin
+                                Layout.preferredWidth: 92
+                                from: 1
+                                to: 256
+                                stepSize: 1
+                                editable: true
+                                value: Math.round(appController.defaultScrollSpeed)
                                 font.pixelSize: Theme.fontSm
-                                font.weight: Font.DemiBold
-                                horizontalAlignment: Text.AlignRight
+                                onValueModified: appController.defaultScrollSpeed = value
+
+                                background: Rectangle {
+                                    implicitWidth: 92
+                                    implicitHeight: 30
+                                    radius: Theme.radiusMd
+                                    color: Theme.sunkenSurface
+                                    border.width: 1
+                                    border.color: speedSpin.activeFocus ? Theme.accent : Theme.border
+                                }
+                                contentItem: TextInput {
+                                    z: 2
+                                    text: speedSpin.textFromValue(speedSpin.value, speedSpin.locale)
+                                    font: speedSpin.font
+                                    color: Theme.foreground
+                                    readOnly: !speedSpin.editable
+                                    validator: speedSpin.validator
+                                    inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                    verticalAlignment: Qt.AlignVCenter
+                                    horizontalAlignment: Qt.AlignHCenter
+                                }
+                                up.indicator: Rectangle {
+                                    x: speedSpin.mirrored ? 0 : speedSpin.width - width
+                                    height: speedSpin.up.pressed ? speedSpin.height / 2 - 1 : speedSpin.height / 2
+                                    width: 22
+                                    y: 0
+                                    radius: 4
+                                    color: speedSpin.up.pressed ? Theme.buttonBackground : "transparent"
+                                    Label {
+                                        anchors.centerIn: parent
+                                        text: "▲"
+                                        color: Theme.mutedForeground
+                                        font.pixelSize: Theme.fontXs
+                                    }
+                                }
+                                down.indicator: Rectangle {
+                                    x: speedSpin.mirrored ? 0 : speedSpin.width - width
+                                    y: speedSpin.height / 2 + 1
+                                    width: 22
+                                    height: speedSpin.down.pressed ? speedSpin.height / 2 - 1 : speedSpin.height / 2
+                                    radius: 4
+                                    color: speedSpin.down.pressed ? Theme.buttonBackground : "transparent"
+                                    Label {
+                                        anchors.centerIn: parent
+                                        text: "▼"
+                                        color: Theme.mutedForeground
+                                        font.pixelSize: Theme.fontXs
+                                    }
+                                }
+                            }
+
+                            Label {
+                                Layout.preferredWidth: 40
+                                text: "px/s"
+                                color: Theme.mutedForeground
+                                font.pixelSize: Theme.fontSm
+                                horizontalAlignment: Text.AlignLeft
                             }
                         }
                     }
@@ -408,12 +470,14 @@ Rectangle {
                                 }
                             }
 
+                            Item { Layout.fillWidth: true }
+
                             Slider {
                                 id: longPressSlider
-                                Layout.preferredWidth: 180
+                                Layout.preferredWidth: 150
                                 from: 150
                                 to: 1000
-                                stepSize: 50
+                                stepSize: 1
                                 value: appController.longPressDragMs
                                 onMoved: appController.longPressDragMs = value
 
@@ -443,13 +507,73 @@ Rectangle {
                                 }
                             }
 
-                            Label {
-                                Layout.preferredWidth: 60
-                                text: appController.longPressDragMs + " ms"
-                                color: Theme.accent
+                            // 手动输入：与滑块双向同步（滑块拖动 / 直接输入 / 箭头微调）
+                            SpinBox {
+                                id: longPressSpin
+                                Layout.preferredWidth: 92
+                                from: 150
+                                to: 1000
+                                stepSize: 1
+                                editable: true
+                                value: appController.longPressDragMs
                                 font.pixelSize: Theme.fontSm
-                                font.weight: Font.DemiBold
-                                horizontalAlignment: Text.AlignRight
+                                onValueModified: appController.longPressDragMs = value
+
+                                background: Rectangle {
+                                    implicitWidth: 92
+                                    implicitHeight: 30
+                                    radius: Theme.radiusMd
+                                    color: Theme.sunkenSurface
+                                    border.width: 1
+                                    border.color: longPressSpin.activeFocus ? Theme.accent : Theme.border
+                                }
+                                contentItem: TextInput {
+                                    z: 2
+                                    text: longPressSpin.textFromValue(longPressSpin.value, longPressSpin.locale)
+                                    font: longPressSpin.font
+                                    color: Theme.foreground
+                                    readOnly: !longPressSpin.editable
+                                    validator: longPressSpin.validator
+                                    inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                    verticalAlignment: Qt.AlignVCenter
+                                    horizontalAlignment: Qt.AlignHCenter
+                                }
+                                up.indicator: Rectangle {
+                                    x: longPressSpin.mirrored ? 0 : longPressSpin.width - width
+                                    height: longPressSpin.up.pressed ? longPressSpin.height / 2 - 1 : longPressSpin.height / 2
+                                    width: 22
+                                    y: 0
+                                    radius: 4
+                                    color: longPressSpin.up.pressed ? Theme.buttonBackground : "transparent"
+                                    Label {
+                                        anchors.centerIn: parent
+                                        text: "▲"
+                                        color: Theme.mutedForeground
+                                        font.pixelSize: Theme.fontXs
+                                    }
+                                }
+                                down.indicator: Rectangle {
+                                    x: longPressSpin.mirrored ? 0 : longPressSpin.width - width
+                                    y: longPressSpin.height / 2 + 1
+                                    width: 22
+                                    height: longPressSpin.down.pressed ? longPressSpin.height / 2 - 1 : longPressSpin.height / 2
+                                    radius: 4
+                                    color: longPressSpin.down.pressed ? Theme.buttonBackground : "transparent"
+                                    Label {
+                                        anchors.centerIn: parent
+                                        text: "▼"
+                                        color: Theme.mutedForeground
+                                        font.pixelSize: Theme.fontXs
+                                    }
+                                }
+                            }
+
+                            Label {
+                                Layout.preferredWidth: 40
+                                text: "ms"
+                                color: Theme.mutedForeground
+                                font.pixelSize: Theme.fontSm
+                                horizontalAlignment: Text.AlignLeft
                             }
                         }
                     }

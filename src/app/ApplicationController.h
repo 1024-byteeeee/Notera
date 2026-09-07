@@ -106,5 +106,5 @@ private:
     int m_currentScorePageCount {0};
     double m_autoScrollSpeed {15.0};
     double m_defaultScrollSpeed {15.0};
-    int m_longPressDragMs {300};
+    int m_longPressDragMs {168};
 };

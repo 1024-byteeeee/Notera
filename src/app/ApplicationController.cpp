@@ -39,9 +39,9 @@ ApplicationController::ApplicationController(QObject* parent)
         m_defaultScrollSpeed = 15.0;
     }
     m_autoScrollSpeed = m_defaultScrollSpeed;
-    m_longPressDragMs = settings.value(QStringLiteral("gestures/longPressDragMs"), 300).toInt();
+    m_longPressDragMs = settings.value(QStringLiteral("gestures/longPressDragMs"), 168).toInt();
     if (m_longPressDragMs < 150 || m_longPressDragMs > 1000) {
-        m_longPressDragMs = 300;
+        m_longPressDragMs = 168;
     }
 }
 
