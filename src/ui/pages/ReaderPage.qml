@@ -614,31 +614,33 @@ Rectangle {
                 }
 
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+            }
 
-                // Ctrl（或 macOS Command）+ 滚轮：图片视图精细缩放。
-                // 用透明 MouseArea 处理 onWheel，propagateComposedEvents 保证
-                // 非 Ctrl 时滚轮事件穿透给 Flickable 做默认滚动。
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    propagateComposedEvents: true
-                    // 只拦截滚轮，其余事件全部穿透给 Flickable（拖拽滚动、图片点击等）
-                    onPressed: mouse.accepted = false
-                    onReleased: mouse.accepted = false
-                    onPositionChanged: mouse.accepted = false
-                    onWheel: function(wheel) {
-                        const ctrl = (wheel.modifiers & Qt.ControlModifier) !== 0
-                        const cmd = (wheel.modifiers & Qt.MetaModifier) !== 0
-                        if (!ctrl && !cmd) {
-                            wheel.accepted = false
-                            return
-                        }
-                        const step = wheel.angleDelta.y > 0 ? 0.05 : -0.05
-                        root.markUserInteraction()
-                        root.zoomAroundViewport(root.zoomLevel + step,
-                            wheel.point.position.x, wheel.point.position.y)
-                        wheel.accepted = true
+            // Ctrl/Cmd + 滚轮精细缩放覆盖层：必须放在 Flickable 外层作为 sibling，
+            // 因为 Flickable 内置滚轮 PointerHandler 会先于内部 MouseArea 拦截事件。
+            // 覆盖层 z 高于 Flickable，先收到滚轮；非 Ctrl 时 accepted=false 穿透给 Flickable 滚动。
+            MouseArea {
+                visible: root.isImage
+                anchors.fill: parent
+                z: 10
+                hoverEnabled: true
+                propagateComposedEvents: true
+                // 只拦截滚轮，其余事件全部穿透给 Flickable（拖拽滚动、图片点击等）
+                onPressed: mouse.accepted = false
+                onReleased: mouse.accepted = false
+                onPositionChanged: mouse.accepted = false
+                onWheel: function(wheel) {
+                    const ctrl = (wheel.modifiers & Qt.ControlModifier) !== 0
+                    const cmd = (wheel.modifiers & Qt.MetaModifier) !== 0
+                    if (!ctrl && !cmd) {
+                        wheel.accepted = false
+                        return
                     }
+                    const step = wheel.angleDelta.y > 0 ? 0.05 : -0.05
+                    root.markUserInteraction()
+                    root.zoomAroundViewport(root.zoomLevel + step,
+                        wheel.point.position.x, wheel.point.position.y)
+                    wheel.accepted = true
                 }
             }
 
