@@ -27,6 +27,8 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QFile>
+#include <QLocalServer>
+#include <QLocalSocket>
 #include <QSettings>
 #include <QSqlDatabase>
 #include <QSqlError>
@@ -60,6 +62,73 @@ struct RestartGuard {
             QProcess::startDetached(program, arguments, workingDirectory);
         }
     }
+};
+
+// 单实例守卫：第二个进程启动时连接到主实例的 LocalServer，
+// 发送 ACTIVATE 后退出；主实例收到后把窗口提到前台。
+// smoke test 豁免（测试可能并行运行多个实例）。
+class SingleInstanceGuard
+{
+public:
+    using ActivateCallback = std::function<void()>;
+
+    explicit SingleInstanceGuard(ActivateCallback callback = nullptr)
+        : m_callback(std::move(callback))
+    {
+        const QString serverName = QCoreApplication::applicationName()
+            + QStringLiteral("-SingleInstance");
+
+        auto* socket = new QLocalSocket();
+        socket->connectToServer(serverName, QIODevice::WriteOnly);
+        if (socket->waitForConnected(300)) {
+            socket->write("ACTIVATE\n");
+            socket->flush();
+            socket->waitForBytesWritten(300);
+            m_isSecondary = true;
+            delete socket;
+            return;
+        }
+        delete socket;
+
+        // 主实例：清理可能残留的 socket 文件并监听
+        QLocalServer::removeServer(serverName);
+        m_server = new QLocalServer();
+        if (m_server->listen(serverName)) {
+            QObject::connect(m_server, &QLocalServer::newConnection, [this]() {
+                auto* client = m_server->nextPendingConnection();
+                if (!client) return;
+                QObject::connect(client, &QLocalSocket::readyRead, [this, client]() {
+                    if (client->readAll().contains("ACTIVATE") && m_callback) {
+                        m_callback();
+                    }
+                    client->disconnectFromServer();
+                    client->deleteLater();
+                });
+                // 兜底：1s 后强制清理客户端连接
+                QTimer::singleShot(1000, client, &QLocalSocket::deleteLater);
+            });
+        }
+        m_isSecondary = false;
+    }
+
+    ~SingleInstanceGuard()
+    {
+        if (m_server) {
+            m_server->close();
+            delete m_server;
+        }
+    }
+
+    SingleInstanceGuard(const SingleInstanceGuard&) = delete;
+    SingleInstanceGuard& operator=(const SingleInstanceGuard&) = delete;
+
+    bool isSecondary() const { return m_isSecondary; }
+    void setActivateCallback(ActivateCallback callback) { m_callback = std::move(callback); }
+
+private:
+    QLocalServer* m_server = nullptr;
+    bool m_isSecondary = false;
+    ActivateCallback m_callback;
 };
 
 QQuickItem* findVisualItem(QQuickItem* parent, const QString& objectName)
@@ -259,6 +328,16 @@ int main(int argc, char* argv[])
         QStandardPaths::setTestModeEnabled(true);
         app.setApplicationName(QStringLiteral("NoteraTest"));
     }
+
+    // 单实例：非 smoke test 模式下，若已有实例运行则激活其窗口并退出
+    std::unique_ptr<SingleInstanceGuard> singleInstance;
+    if (!isSmokeTest) {
+        singleInstance = std::make_unique<SingleInstanceGuard>();
+        if (singleInstance->isSecondary()) {
+            return 0;
+        }
+    }
+
     QQuickStyle::setStyle(QStringLiteral("Basic"));
 
     std::unique_ptr<QTemporaryDir> migrationSmokeRoot;
@@ -1595,6 +1674,19 @@ int main(int argc, char* argv[])
 
     if (engine.rootObjects().isEmpty()) {
         return 1;
+    }
+
+    // 单实例主实例：收到第二个进程的激活请求时，把主窗口提到前台
+    if (singleInstance) {
+        singleInstance->setActivateCallback([&engine]() {
+            for (QObject* const obj : engine.rootObjects()) {
+                if (auto* const window = qobject_cast<QQuickWindow*>(obj)) {
+                    window->show();
+                    window->raise();
+                    window->requestActivate();
+                }
+            }
+        });
     }
 
     if (arguments.contains(QStringLiteral("--folder-rename-smoke-test"))) {
