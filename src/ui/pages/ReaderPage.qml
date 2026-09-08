@@ -620,6 +620,7 @@ Rectangle {
                 // 非 Ctrl 时滚轮事件穿透给 Flickable 做默认滚动。
                 MouseArea {
                     anchors.fill: parent
+                    hoverEnabled: true
                     propagateComposedEvents: true
                     // 只拦截滚轮，其余事件全部穿透给 Flickable（拖拽滚动、图片点击等）
                     onPressed: mouse.accepted = false
