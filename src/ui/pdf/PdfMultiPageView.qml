@@ -70,6 +70,28 @@ Item {
         bottomMargin: root.bottomMargin
         clip: true
         boundsBehavior: Flickable.StopAtBounds
+        // Ctrl（或 macOS Command）+ 滚轮：不滚动，转交外部做精细缩放。
+        // 用透明 MouseArea 处理 onWheel，propagateComposedEvents 保证
+        // 非 Ctrl 时滚轮事件穿透给 Flickable 做默认滚动。
+        MouseArea {
+            anchors.fill: parent
+            propagateComposedEvents: true
+            // 只拦截滚轮，其余事件全部穿透给 Flickable（拖拽滚动、delegate 点击等）
+            onPressed: mouse.accepted = false
+            onReleased: mouse.accepted = false
+            onPositionChanged: mouse.accepted = false
+            onWheel: function(wheel) {
+                const ctrl = (wheel.modifiers & Qt.ControlModifier) !== 0
+                const cmd = (wheel.modifiers & Qt.MetaModifier) !== 0
+                if (!ctrl && !cmd) {
+                    wheel.accepted = false
+                    return
+                }
+                root.ctrlWheelZoomRequested(wheel.angleDelta.y,
+                    wheel.point.position.x, wheel.point.position.y)
+                wheel.accepted = true
+            }
+        }
         onMovementStarted: {
             root.viewMovementStarted()
             prefetchTimer.stop() // 快速滚动时取消预渲染调度
@@ -81,19 +103,6 @@ Item {
         property bool rot90: rotationNorm == 90 || rotationNorm == 270
         onRot90Changed: forceLayout()
 
-        // Ctrl（或 macOS Command）+ 滚轮：不滚动，转交外部做精细缩放。
-        // WheelHandler 附加在 Flickable 上，优先于 Flickable 默认滚轮。
-        WheelHandler {
-            target: null
-            onWheel: function(event) {
-                const ctrl = (event.modifiers & Qt.ControlModifier) !== 0
-                const cmd = (event.modifiers & Qt.MetaModifier) !== 0
-                if (!ctrl && !cmd) return
-                root.ctrlWheelZoomRequested(event.angleDelta.y,
-                    event.point.position.x, event.point.position.y)
-                event.accepted = true
-            }
-        }
         property size firstPagePointSize: root.document && root.document.status === PdfDocument.Ready
             ? root.document.pagePointSize(0) : Qt.size(1, 1)
         columnWidthProvider: function(col) {
