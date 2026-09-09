@@ -614,33 +614,30 @@ Rectangle {
                 }
 
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
-            }
 
-            // Ctrl/Cmd + 滚轮精细缩放覆盖层：必须放在 Flickable 外层作为 sibling，
-            // 因为 Flickable 内置滚轮 PointerHandler 会先于内部 MouseArea 拦截事件。
-            // 覆盖层 z 高于 Flickable，先收到滚轮；非 Ctrl 时 accepted=false 穿透给 Flickable 滚动。
-            MouseArea {
-                visible: root.isImage
-                anchors.fill: parent
-                z: 10
-                hoverEnabled: true
-                propagateComposedEvents: true
-                // 只拦截滚轮，其余事件全部穿透给 Flickable（拖拽滚动、图片点击等）
-                onPressed: mouse.accepted = false
-                onReleased: mouse.accepted = false
-                onPositionChanged: mouse.accepted = false
-                onWheel: function(wheel) {
-                    const ctrl = (wheel.modifiers & Qt.ControlModifier) !== 0
-                    const cmd = (wheel.modifiers & Qt.MetaModifier) !== 0
-                    if (!ctrl && !cmd) {
-                        wheel.accepted = false
-                        return
+                // Ctrl/Cmd + 滚轮精细缩放：WheelHandler 必须挂在 Flickable 内部。
+                // Qt 6.8 分发逻辑对每个 item 先检查其 PointerHandler、再调该 item 的 wheelEvent；
+                // 挂在父级会被 imageFlick 的滚动处理先拦截（接受后停止向上传递）。
+                // acceptedModifiers 的 OR 组合要求"全部"按下，因此 Ctrl 与 Meta 拆成两个 handler。
+                WheelHandler {
+                    target: null
+                    objectName: "zoomWheelCtrl"
+                    acceptedModifiers: Qt.ControlModifier
+                    onWheel: function(wheel) {
+                        const step = wheel.angleDelta.y > 0 ? 0.05 : -0.05
+                        root.markUserInteraction()
+                        root.zoomAroundViewport(root.zoomLevel + step, wheel.x, wheel.y)
                     }
-                    const step = wheel.angleDelta.y > 0 ? 0.05 : -0.05
-                    root.markUserInteraction()
-                    root.zoomAroundViewport(root.zoomLevel + step,
-                        wheel.point.position.x, wheel.point.position.y)
-                    wheel.accepted = true
+                }
+                WheelHandler {
+                    target: null
+                    objectName: "zoomWheelMeta"
+                    acceptedModifiers: Qt.MetaModifier
+                    onWheel: function(wheel) {
+                        const step = wheel.angleDelta.y > 0 ? 0.05 : -0.05
+                        root.markUserInteraction()
+                        root.zoomAroundViewport(root.zoomLevel + step, wheel.x, wheel.y)
+                    }
                 }
             }
 

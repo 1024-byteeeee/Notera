@@ -154,35 +154,31 @@ Item {
         ScrollBar.vertical: ScrollBar { id: vscroll }
         ScrollBar.horizontal: ScrollBar { }
 
+        // Ctrl/Cmd + 滚轮精细缩放：WheelHandler 必须挂在 TableView 内部。
+        // Qt 6.8 分发逻辑对每个 item 先检查其 PointerHandler、再调该 item 的 wheelEvent；
+        // 挂在 root 会被 tableView 的滚动处理先拦截（接受后停止向上传递）。
+        // acceptedModifiers 的 OR 组合要求"全部"按下，因此 Ctrl 与 Meta 拆成两个 handler。
+        WheelHandler {
+            target: null
+            objectName: "pdfWheelCtrl"
+            acceptedModifiers: Qt.ControlModifier
+            onWheel: function(wheel) {
+                root.ctrlWheelZoomRequested(wheel.angleDelta.y, wheel.x, wheel.y)
+            }
+        }
+        WheelHandler {
+            target: null
+            objectName: "pdfWheelMeta"
+            acceptedModifiers: Qt.MetaModifier
+            onWheel: function(wheel) {
+                root.ctrlWheelZoomRequested(wheel.angleDelta.y, wheel.x, wheel.y)
+            }
+        }
+
         // 滚动时跟随当前页（节流）：自动滚动/滚轮/拖拽均经过 contentY
         onContentYChanged: {
             if (pageNavigator.currentPage >= 0 && !syncTimer.running)
                 syncTimer.start()
-        }
-    }
-
-    // Ctrl/Cmd + 滚轮精细缩放覆盖层：必须放在 TableView 外层作为 sibling，
-    // 因为 TableView(Flickable) 内置滚轮 PointerHandler 会先于内部 MouseArea 拦截事件。
-    // 覆盖层 z 高于 TableView，先收到滚轮；非 Ctrl 时 accepted=false 穿透给 TableView 滚动。
-    MouseArea {
-        anchors.fill: parent
-        z: 10
-        hoverEnabled: true
-        propagateComposedEvents: true
-        // 只拦截滚轮，其余事件全部穿透给 TableView（拖拽滚动、delegate 点击等）
-        onPressed: mouse.accepted = false
-        onReleased: mouse.accepted = false
-        onPositionChanged: mouse.accepted = false
-        onWheel: function(wheel) {
-            const ctrl = (wheel.modifiers & Qt.ControlModifier) !== 0
-            const cmd = (wheel.modifiers & Qt.MetaModifier) !== 0
-            if (!ctrl && !cmd) {
-                wheel.accepted = false
-                return
-            }
-            root.ctrlWheelZoomRequested(wheel.angleDelta.y,
-                wheel.point.position.x, wheel.point.position.y)
-            wheel.accepted = true
         }
     }
 
