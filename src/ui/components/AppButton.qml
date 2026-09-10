@@ -10,8 +10,7 @@ Button {
     property bool danger: false
     property string symbol: ""
     readonly property int hoverTransitionDuration: 0
-    readonly property real visualContentCenterX: contentContainer.x + contentRow.x + contentRow.childrenRect.x
-        + contentRow.childrenRect.width / 2
+    readonly property real visualContentCenterX: contentContainer.x + contentRow.x + contentRow.childrenRect.x + contentRow.childrenRect.width / 2
 
     implicitWidth: Math.max(96, contentRow.implicitWidth + 30)
     implicitHeight: 38
@@ -24,7 +23,12 @@ Button {
         implicitWidth: contentRow.implicitWidth
         implicitHeight: contentRow.implicitHeight
         scale: control.down && control.enabled ? 0.97 : 1
-        Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Easing.OutCubic } }
+        Behavior on scale {
+            NumberAnimation {
+                duration: Motion.fast
+                easing.type: Easing.OutCubic
+            }
+        }
 
         Row {
             id: contentRow
@@ -52,13 +56,15 @@ Button {
     background: Rectangle {
         radius: Theme.radiusMd
         color: {
-            if (!control.enabled) return Theme.buttonDisabled
-            if (control.down) return control.primary ? Theme.accentHover : (control.danger ? Theme.dangerSoft : Theme.buttonHover)
-            if (control.hovered) return control.primary ? Theme.accentHover : (control.danger ? Theme.dangerSoft : Theme.buttonHover)
-            return control.primary ? Theme.accent : (control.danger ? Theme.dangerSoft : Theme.buttonBackground)
+            if (!control.enabled)
+                return Theme.buttonDisabled;
+            if (control.down)
+                return control.primary ? Theme.accentHover : (control.danger ? Theme.dangerSoft : Theme.buttonHover);
+            if (control.hovered)
+                return control.primary ? Theme.accentHover : (control.danger ? Theme.dangerSoft : Theme.buttonHover);
+            return control.primary ? Theme.accent : (control.danger ? Theme.dangerSoft : Theme.buttonBackground);
         }
         border.width: control.primary ? 0 : 1
         border.color: control.danger ? Theme.danger : Theme.buttonBorder
-
     }
 }

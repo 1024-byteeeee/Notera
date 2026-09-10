@@ -18,7 +18,6 @@ Rectangle {
     property real rubberAutoScrollSpeed: 0
     property bool rubberAccumulateSelection: false
 
-
     property bool rubberScrolled: false
     property real rubberLastContentX: 0
     property real rubberLastContentY: 0
@@ -29,11 +28,11 @@ Rectangle {
         repeat: true
         running: root.rubberAutoScrollSpeed !== 0
         onTriggered: {
-            const maxY = Math.max(0, grid.contentHeight - grid.height)
-            grid.contentY = Math.max(0, Math.min(maxY, grid.contentY + root.rubberAutoScrollSpeed))
-            root.rubberAccumulateSelection = true
-            root.updateRubberSelection()
-            root.rubberAccumulateSelection = false
+            const maxY = Math.max(0, grid.contentHeight - grid.height);
+            grid.contentY = Math.max(0, Math.min(maxY, grid.contentY + root.rubberAutoScrollSpeed));
+            root.rubberAccumulateSelection = true;
+            root.updateRubberSelection();
+            root.rubberAccumulateSelection = false;
         }
     }
 
@@ -88,193 +87,206 @@ Rectangle {
     }
 
     function dragIds(drag) {
-        return drag.source && drag.source.dragIds ? drag.source.dragIds : []
+        return drag.source && drag.source.dragIds ? drag.source.dragIds : [];
     }
     function localFileUrl(path) {
-        if (!path || path.length === 0) return ""
-        const normalized = path.replace(/\\/g, "/")
-        return normalized.startsWith("/") ? "file://" + normalized : "file:///" + normalized
+        if (!path || path.length === 0)
+            return "";
+        const normalized = path.replace(/\\/g, "/");
+        return normalized.startsWith("/") ? "file://" + normalized : "file:///" + normalized;
     }
     function finishInternalDrag() {
         if (root.dragInProgress) {
-            try { dragPreview.Drag.drop() } catch (e) {}
+            try {
+                dragPreview.Drag.drop();
+            } catch (e) {}
         }
-        root.dragInProgress = false
-        Qt.callLater(function() {
-            root.dragItemIds = []
-            dragPreview.dragIds = []
-            dragPreview.x = -10000
-            dragPreview.y = -10000
-        })
+        root.dragInProgress = false;
+        Qt.callLater(function () {
+            root.dragItemIds = [];
+            dragPreview.dragIds = [];
+            dragPreview.x = -10000;
+            dragPreview.y = -10000;
+        });
     }
     function handleCardClick(delegate) {
         if (root.selectedCount > 0) {
-            libraryService.selection.toggle(delegate.itemId)
-            return
+            libraryService.selection.toggle(delegate.itemId);
+            return;
         }
         if (delegate.itemType === "folder") {
-            libraryService.enterFolder(delegate.itemId)
+            libraryService.enterFolder(delegate.itemId);
         } else {
-
-
-
-            appShell.showLoading("正在打开乐谱")
-            appController.openScore(delegate.scoreId, delegate.title,
-                delegate.filePath, delegate.fileType, delegate.pageCount,
-                libraryService.scoreFolderId(delegate.scoreId))
+            appShell.showLoading("正在打开乐谱");
+            appController.openScore(delegate.scoreId, delegate.title, delegate.filePath, delegate.fileType, delegate.pageCount, libraryService.scoreFolderId(delegate.scoreId));
         }
     }
     function canMoveAll(ids, folderId) {
-        if (!ids || ids.length === 0) return false
+        if (!ids || ids.length === 0)
+            return false;
         for (let i = 0; i < ids.length; ++i) {
-            if (!libraryService.canMoveItemToFolder(ids[i], folderId)) return false
+            if (!libraryService.canMoveItemToFolder(ids[i], folderId))
+                return false;
         }
-        return true
+        return true;
     }
 
-    function selectAll() { libraryService.selection.replace(libraryService.entries.itemIds()) }
-    function clearSelection() { libraryService.selection.clear() }
+    function selectAll() {
+        libraryService.selection.replace(libraryService.entries.itemIds());
+    }
+    function clearSelection() {
+        libraryService.selection.clear();
+    }
     function isSelected(id) {
-        const selectionRevision = root.selectedCount
-        return selectionRevision >= 0 && libraryService.selection.contains(id)
+        const selectionRevision = root.selectedCount;
+        return selectionRevision >= 0 && libraryService.selection.contains(id);
     }
     function isCutItem(id) {
-        if (libraryService.clipboardMode !== "cut") return false
-        const items = libraryService.clipboardItems
+        if (libraryService.clipboardMode !== "cut")
+            return false;
+        const items = libraryService.clipboardItems;
         for (let i = 0; i < items.length; i++) {
-            if (items[i] === id) return true
+            if (items[i] === id)
+                return true;
         }
-        return false
+        return false;
     }
-
 
     function textInputActive() {
-        const focusItem = root.Window.activeFocusItem
-        return focusItem && (focusItem instanceof TextInput || focusItem instanceof TextEdit)
+        const focusItem = root.Window.activeFocusItem;
+        return focusItem && (focusItem instanceof TextInput || focusItem instanceof TextEdit);
     }
     function dialogOpen() {
-        return conflictDialog.opened || createFolderConflictDialog.opened
+        return conflictDialog.opened || createFolderConflictDialog.opened;
     }
     function performCopy() {
-        if (root.selectedCount <= 0) return
-        libraryService.copyItems(libraryService.selection.selectedIds)
+        if (root.selectedCount <= 0)
+            return;
+        libraryService.copyItems(libraryService.selection.selectedIds);
     }
     function performCut() {
-        if (root.selectedCount <= 0) return
-        libraryService.cutItems(libraryService.selection.selectedIds)
+        if (root.selectedCount <= 0)
+            return;
+        libraryService.cutItems(libraryService.selection.selectedIds);
     }
     function performPaste() {
-        if (libraryService.clipboardItems.length <= 0) return
-        libraryService.pasteItems()
+        if (libraryService.clipboardItems.length <= 0)
+            return;
+        libraryService.pasteItems();
     }
     function performDelete() {
-        if (root.selectedCount <= 0) return
-        batchDeleteDialog.selectedIds = libraryService.selection.selectedIds
-        batchDeleteDialog.open()
+        if (root.selectedCount <= 0)
+            return;
+        batchDeleteDialog.selectedIds = libraryService.selection.selectedIds;
+        batchDeleteDialog.open();
     }
-    function performSelectAll() { root.selectAll() }
+    function performSelectAll() {
+        root.selectAll();
+    }
 
     function updateRubberSelection() {
-
-
-
-        if (!root.rubberScrolled
-            && (grid.contentX !== root.rubberLastContentX || grid.contentY !== root.rubberLastContentY)) {
-            root.rubberScrolled = true
+        if (!root.rubberScrolled && (grid.contentX !== root.rubberLastContentX || grid.contentY !== root.rubberLastContentY)) {
+            root.rubberScrolled = true;
         }
-        root.rubberLastContentX = grid.contentX
-        root.rubberLastContentY = grid.contentY
-        const ids = []
-        const selectionRect = Qt.rect(selectionBox.x, selectionBox.y, selectionBox.width, selectionBox.height)
+        root.rubberLastContentX = grid.contentX;
+        root.rubberLastContentY = grid.contentY;
+        const ids = [];
+        const selectionRect = Qt.rect(selectionBox.x, selectionBox.y, selectionBox.width, selectionBox.height);
         for (let i = 0; i < grid.count; i++) {
-            const item = grid.itemAtIndex(i)
-            if (!item) continue
-            const topLeft = item.card.mapToItem(librarySurface, 0, 0)
-            const itemRect = Qt.rect(topLeft.x, topLeft.y, item.card.width, item.card.height)
-            const intersects = itemRect.x < selectionRect.x + selectionRect.width
-                && itemRect.x + itemRect.width > selectionRect.x
-                && itemRect.y < selectionRect.y + selectionRect.height
-                && itemRect.y + itemRect.height > selectionRect.y
-            if (intersects) ids.push(item.itemId)
+            const item = grid.itemAtIndex(i);
+            if (!item)
+                continue;
+            const topLeft = item.card.mapToItem(librarySurface, 0, 0);
+            const itemRect = Qt.rect(topLeft.x, topLeft.y, item.card.width, item.card.height);
+            const intersects = itemRect.x < selectionRect.x + selectionRect.width && itemRect.x + itemRect.width > selectionRect.x && itemRect.y < selectionRect.y + selectionRect.height && itemRect.y + itemRect.height > selectionRect.y;
+            if (intersects)
+                ids.push(item.itemId);
         }
         if (root.rubberAccumulateSelection || root.rubberScrolled) {
-
-
-            const existing = libraryService.selection.selectedIds
-            const merged = []
-            const seen = {}
-            for (const id of existing) { if (!seen[id]) { seen[id] = true; merged.push(id) } }
-            for (const id of ids) { if (!seen[id]) { seen[id] = true; merged.push(id) } }
-            libraryService.selection.replace(merged)
+            const existing = libraryService.selection.selectedIds;
+            const merged = [];
+            const seen = {};
+            for (const id of existing) {
+                if (!seen[id]) {
+                    seen[id] = true;
+                    merged.push(id);
+                }
+            }
+            for (const id of ids) {
+                if (!seen[id]) {
+                    seen[id] = true;
+                    merged.push(id);
+                }
+            }
+            libraryService.selection.replace(merged);
         } else {
-            libraryService.selection.replace(ids)
+            libraryService.selection.replace(ids);
         }
     }
 
     function updateRubberAutoScroll(y) {
-        const edgeSize = 48
-        const speed = 6
+        const edgeSize = 48;
+        const speed = 6;
         if (y < edgeSize) {
-            root.rubberAutoScrollSpeed = -speed
+            root.rubberAutoScrollSpeed = -speed;
         } else if (y > librarySurface.height - edgeSize) {
-            root.rubberAutoScrollSpeed = speed
+            root.rubberAutoScrollSpeed = speed;
         } else {
-            root.rubberAutoScrollSpeed = 0
+            root.rubberAutoScrollSpeed = 0;
         }
     }
 
     readonly property string filterTitle: {
-        const filter = appController.libraryFilter
-        if (filter === "all" || filter.startsWith("folder:")) return libraryService.currentFolderName
-        if (filter === "recent") return "最近使用"
-        if (filter === "favorites") return "收藏"
-        if (filter.startsWith("tag:")) return "标签"
-        return "乐谱库"
+        const filter = appController.libraryFilter;
+        if (filter === "all" || filter.startsWith("folder:"))
+            return libraryService.currentFolderName;
+        if (filter === "recent")
+            return "最近使用";
+        if (filter === "favorites")
+            return "收藏";
+        if (filter.startsWith("tag:"))
+            return "标签";
+        return "乐谱库";
     }
 
     readonly property string emptyTitle: {
-        if (libraryService.searchQuery.length > 0) return "没有符合条件的项目"
-        const filter = appController.libraryFilter
-        if (filter === "favorites") return "当前没有收藏内容"
-        if (filter === "recent") return "当前没有最近使用的项目"
-        if (filter.startsWith("tag:")) return "当前标签下没有项目"
-        if (filter.startsWith("folder:")) return "当前文件夹为空"
-        return libraryService.tags.count === 0 ? "乐谱库为空" : "乐谱库为空"
+        if (libraryService.searchQuery.length > 0)
+            return "没有符合条件的项目";
+        const filter = appController.libraryFilter;
+        if (filter === "favorites")
+            return "当前没有收藏内容";
+        if (filter === "recent")
+            return "当前没有最近使用的项目";
+        if (filter.startsWith("tag:"))
+            return "当前标签下没有项目";
+        if (filter.startsWith("folder:"))
+            return "当前文件夹为空";
+        return libraryService.tags.count === 0 ? "乐谱库为空" : "乐谱库为空";
     }
-    readonly property string emptyDescription: libraryService.searchQuery.length > 0
-        ? "换个关键词试试"
-        : appController.libraryFilter === "favorites" ? "收藏的文件夹和乐谱会显示在这里"
-        : appController.libraryFilter === "recent" ? "打开过的文件夹和乐谱会显示在这里"
-        : appController.libraryFilter.startsWith("tag:") ? "为文件夹或乐谱添加此标签后会显示在这里"
-        : appController.libraryFilter.startsWith("folder:") ? "可在这里新建文件夹或导入乐谱"
-        : "导入 PDF 或图片，开始建立你的乐谱库"
+    readonly property string emptyDescription: libraryService.searchQuery.length > 0 ? "换个关键词试试" : appController.libraryFilter === "favorites" ? "收藏的文件夹和乐谱会显示在这里" : appController.libraryFilter === "recent" ? "打开过的文件夹和乐谱会显示在这里" : appController.libraryFilter.startsWith("tag:") ? "为文件夹或乐谱添加此标签后会显示在这里" : appController.libraryFilter.startsWith("folder:") ? "可在这里新建文件夹或导入乐谱" : "导入 PDF 或图片，开始建立你的乐谱库"
 
     Connections {
         target: appController
         function onLibraryFilterChanged() {
-            libraryService.filterMode = appController.libraryFilter
+            libraryService.filterMode = appController.libraryFilter;
         }
     }
     Connections {
         target: libraryService
-        function onImportRequested() { fileDialog.open() }
+        function onImportRequested() {
+            fileDialog.open();
+        }
     }
-
-
-
 
     Connections {
         target: libraryService
         function onFilterModeChanged() {
             if (appController.libraryFilter !== libraryService.filterMode) {
-                appController.libraryFilter = libraryService.filterMode
+                appController.libraryFilter = libraryService.filterMode;
             }
         }
     }
     Component.onCompleted: libraryService.filterMode = appController.libraryFilter
-
-
-
 
     Shortcut {
         sequences: [StandardKey.Copy]
@@ -317,7 +329,7 @@ Rectangle {
                 text: "上一级"
                 symbol: "back"
                 onClicked: {
-                    libraryService.goUp()
+                    libraryService.goUp();
                 }
             }
 
@@ -330,15 +342,15 @@ Rectangle {
                     font.weight: Font.Bold
                 }
                 Label {
-                    text: (appController.libraryFilter === "all" || appController.libraryFilter.startsWith("folder:"))
-                        ? libraryService.currentFolderBreadcrumb + "  ·  " + libraryService.entries.count + " 个项目"
-                        : (libraryService.entries.count > 0 ? libraryService.entries.count + " 个项目" : root.emptyTitle)
+                    text: (appController.libraryFilter === "all" || appController.libraryFilter.startsWith("folder:")) ? libraryService.currentFolderBreadcrumb + "  ·  " + libraryService.entries.count + " 个项目" : (libraryService.entries.count > 0 ? libraryService.entries.count + " 个项目" : root.emptyTitle)
                     color: Theme.mutedForeground
                     font.pixelSize: Theme.fontSm
                 }
             }
 
-            Item { Layout.fillWidth: true }
+            Item {
+                Layout.fillWidth: true
+            }
 
             Rectangle {
                 Layout.preferredWidth: 240
@@ -353,7 +365,12 @@ Rectangle {
                     anchors.leftMargin: 12
                     anchors.rightMargin: 8
                     spacing: 8
-                    AppIcon { width: 16; height: 16; iconName: "search"; iconColor: Theme.mutedForeground }
+                    AppIcon {
+                        width: 16
+                        height: 16
+                        iconName: "search"
+                        iconColor: Theme.mutedForeground
+                    }
                     TextField {
                         id: searchField
                         Layout.fillWidth: true
@@ -364,9 +381,9 @@ Rectangle {
                         selectByMouse: true
                         text: libraryService.searchQuery
                         onTextChanged: {
-                            libraryService.searchQuery = text
+                            libraryService.searchQuery = text;
                         }
-                        background: Item { }
+                        background: Item {}
                     }
                 }
             }
@@ -380,7 +397,6 @@ Rectangle {
                 primary: true
                 onClicked: importMenu.popup(importButton, 0, importButton.height)
             }
-
         }
 
         Rectangle {
@@ -404,65 +420,59 @@ Rectangle {
                 boundsBehavior: Flickable.StopAtBounds
                 interactive: !gridRubberBand.active
                 cellWidth: {
-                    const columns = Math.max(1, Math.floor(width / 218))
-                    return Math.floor(width / columns)
+                    const columns = Math.max(1, Math.floor(width / 218));
+                    return Math.floor(width / columns);
                 }
                 cellHeight: 326
                 model: libraryService.entries
-
-
-
-
-
 
                 property var viewScrollPositions: ({})
                 property bool suppressPositionRecord: false
                 property bool __positionDirty: false
                 function currentViewKey() {
-                    return (libraryService.filterMode || "all") + "|" + (libraryService.searchQuery || "")
+                    return (libraryService.filterMode || "all") + "|" + (libraryService.searchQuery || "");
                 }
                 function restoreCurrentViewPosition() {
-                    const key = grid.currentViewKey()
-                    if (!(key in grid.viewScrollPositions)) return
-                    const y = grid.viewScrollPositions[key]
-                    Qt.callLater(function() {
-                        grid.contentY = Math.max(0, Math.min(y,
-                            Math.max(0, grid.contentHeight - grid.height)))
-                    })
+                    const key = grid.currentViewKey();
+                    if (!(key in grid.viewScrollPositions))
+                        return;
+                    const y = grid.viewScrollPositions[key];
+                    Qt.callLater(function () {
+                        grid.contentY = Math.max(0, Math.min(y, Math.max(0, grid.contentHeight - grid.height)));
+                    });
                 }
                 onContentYChanged: {
-                    if (grid.suppressPositionRecord) return
-
-                    if (grid.__positionDirty) return
-                    grid.__positionDirty = true
-                    Qt.callLater(function() {
-                        grid.__positionDirty = false
-                        grid.viewScrollPositions[grid.currentViewKey()] = grid.contentY
-                    })
+                    if (grid.suppressPositionRecord)
+                        return;
+                    if (grid.__positionDirty)
+                        return;
+                    grid.__positionDirty = true;
+                    Qt.callLater(function () {
+                        grid.__positionDirty = false;
+                        grid.viewScrollPositions[grid.currentViewKey()] = grid.contentY;
+                    });
                 }
                 Connections {
                     target: libraryService.entries
                     function onResetStarted() {
-
-                        grid.suppressPositionRecord = true
+                        grid.suppressPositionRecord = true;
                     }
                     function onResetFinished() {
-                        grid.suppressPositionRecord = false
-                        grid.restoreCurrentViewPosition()
+                        grid.suppressPositionRecord = false;
+                        grid.restoreCurrentViewPosition();
                     }
                 }
 
-                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                ScrollBar.vertical: ScrollBar {
+                    policy: ScrollBar.AsNeeded
+                }
 
                 WheelHandler {
 
-
-
-                    onWheel: function(event) {
-                        const delta = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y
-                        grid.contentY = Math.max(0, Math.min(grid.contentY - delta,
-                            Math.max(0, grid.contentHeight - grid.height)))
-                        event.accepted = true
+                    onWheel: function (event) {
+                        const delta = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y;
+                        grid.contentY = Math.max(0, Math.min(grid.contentY - delta, Math.max(0, grid.contentHeight - grid.height)));
+                        event.accepted = true;
                     }
                 }
 
@@ -489,19 +499,15 @@ Rectangle {
                     readonly property int folderSubmenuItemCount: menuLoader.item ? menuLoader.item.folderSubmenuRef.count : 0
                     readonly property int tagSubmenuItemCount: menuLoader.item ? menuLoader.item.tagSubmenuRef.count : 0
                     readonly property int normalMenuArrowCount: menuLoader.item ? menuLoader.item.favoriteMenuItemRef.visibleArrowCount : -1
-                    readonly property int folderSubmenuArrowCount: menuLoader.item && menuLoader.item.openedOnce && menuLoader.item.count > 6
-                        && menuLoader.item.itemAt(6) ? menuLoader.item.itemAt(6).visibleArrowCount : -1
-                    readonly property real folderSubmenuArrowWidth: menuLoader.item && menuLoader.item.openedOnce && menuLoader.item.count > 6
-                        && menuLoader.item.itemAt(6) ? menuLoader.item.itemAt(6).arrowVisualWidth : -1
-                    readonly property real folderSubmenuArrowRightInset: menuLoader.item && menuLoader.item.openedOnce && menuLoader.item.count > 6
-                        && menuLoader.item.itemAt(6) ? menuLoader.item.itemAt(6).arrowRightInset : -1
-                    readonly property bool tagMenuHasDefaultCheckIndicator: menuLoader.item && menuLoader.item.tagSubmenuRef.count > 0
-                        && menuLoader.item.tagSubmenuRef.itemAt(0).indicator.visible
-                        && menuLoader.item.tagSubmenuRef.itemAt(0).indicator.implicitWidth > 0
+                    readonly property int folderSubmenuArrowCount: menuLoader.item && menuLoader.item.openedOnce && menuLoader.item.count > 6 && menuLoader.item.itemAt(6) ? menuLoader.item.itemAt(6).visibleArrowCount : -1
+                    readonly property real folderSubmenuArrowWidth: menuLoader.item && menuLoader.item.openedOnce && menuLoader.item.count > 6 && menuLoader.item.itemAt(6) ? menuLoader.item.itemAt(6).arrowVisualWidth : -1
+                    readonly property real folderSubmenuArrowRightInset: menuLoader.item && menuLoader.item.openedOnce && menuLoader.item.count > 6 && menuLoader.item.itemAt(6) ? menuLoader.item.itemAt(6).arrowRightInset : -1
+                    readonly property bool tagMenuHasDefaultCheckIndicator: menuLoader.item && menuLoader.item.tagSubmenuRef.count > 0 && menuLoader.item.tagSubmenuRef.itemAt(0).indicator.visible && menuLoader.item.tagSubmenuRef.itemAt(0).indicator.implicitWidth > 0
                     readonly property alias card: card
 
                     function closeContextMenu() {
-                        if (menuLoader.item) menuLoader.item.close()
+                        if (menuLoader.item)
+                            menuLoader.item.close();
                     }
 
                     width: grid.cellWidth
@@ -517,14 +523,27 @@ Rectangle {
                         anchors.topMargin: 6
                         radius: Theme.radiusMd
                         opacity: root.isCutItem(scoreDelegate.itemId) ? 0.4 : 1.0
-                        Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                        Behavior on opacity {
+                            NumberAnimation {
+                                duration: 150
+                                easing.type: Easing.OutCubic
+                            }
+                        }
                         color: folderDrop.containsDrag ? Theme.accentSoft : (root.isSelected(scoreDelegate.itemId) ? Theme.accentSoft : (cardHover.hovered ? Theme.cardHover : Theme.cardBackground))
-                        Behavior on color { ColorAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: 150
+                                easing.type: Easing.OutCubic
+                            }
+                        }
                         border.width: folderDrop.containsDrag ? 2 : (root.isSelected(scoreDelegate.itemId) ? 2 : 1)
-                        border.color: folderDrop.containsDrag ? Theme.accent
-                            : root.isSelected(scoreDelegate.itemId) ? Theme.accent : (cardHover.hovered ? Theme.strongBorder : Theme.cardBorder)
-                        Behavior on border.color { ColorAnimation { duration: 150; easing.type: Easing.OutCubic } }
-
+                        border.color: folderDrop.containsDrag ? Theme.accent : root.isSelected(scoreDelegate.itemId) ? Theme.accent : (cardHover.hovered ? Theme.strongBorder : Theme.cardBorder)
+                        Behavior on border.color {
+                            ColorAnimation {
+                                duration: 150
+                                easing.type: Easing.OutCubic
+                            }
+                        }
 
                         ColumnLayout {
                             anchors.fill: parent
@@ -590,8 +609,17 @@ Rectangle {
                                         Row {
                                             anchors.centerIn: parent
                                             spacing: 4
-                                            TagIcon { width: 11; height: 11; iconColor: Theme.accent }
-                                            Label { id: tagText; text: scoreDelegate.tags[index]; color: Theme.secondaryForeground; font.pixelSize: Theme.fontXs }
+                                            TagIcon {
+                                                width: 11
+                                                height: 11
+                                                iconColor: Theme.accent
+                                            }
+                                            Label {
+                                                id: tagText
+                                                text: scoreDelegate.tags[index]
+                                                color: Theme.secondaryForeground
+                                                font.pixelSize: Theme.fontXs
+                                            }
                                         }
                                     }
                                 }
@@ -601,7 +629,9 @@ Rectangle {
                                     color: Theme.mutedForeground
                                     font.pixelSize: Theme.fontXs
                                 }
-                                Item { Layout.fillWidth: true }
+                                Item {
+                                    Layout.fillWidth: true
+                                }
                             }
                             Label {
                                 Layout.fillWidth: true
@@ -615,8 +645,7 @@ Rectangle {
                         HoverHandler {
                             id: cardHover
 
-                            cursorShape: (cardMouseArea.dragArmed || cardMouseArea.dragged)
-                                ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                            cursorShape: (cardMouseArea.dragArmed || cardMouseArea.dragged) ? Qt.ClosedHandCursor : Qt.PointingHandCursor
                         }
                         MouseArea {
                             id: cardMouseArea
@@ -624,7 +653,6 @@ Rectangle {
                             objectName: scoreDelegate.itemType === "score" ? "scoreCardMouse" : "folderCardMouse"
                             acceptedButtons: Qt.LeftButton
                             preventStealing: true
-
 
                             property bool dragArmed: false
                             property bool dragged: false
@@ -634,82 +662,78 @@ Rectangle {
                             Timer {
                                 id: longPressTimer
 
-
                                 interval: Math.max(150, appController.longPressDragMs)
                                 onTriggered: {
-                                    cardMouseArea.dragArmed = true
+                                    cardMouseArea.dragArmed = true;
                                 }
                             }
 
-                            onPressed: function(mouse) {
+                            onPressed: function (mouse) {
                                 if (root.selectedCount > 0 && root.isSelected(scoreDelegate.itemId)) {
-                                    root.dragItemIds = libraryService.selection.selectedIds
+                                    root.dragItemIds = libraryService.selection.selectedIds;
                                 } else {
-                                    root.dragItemIds = [scoreDelegate.itemId]
+                                    root.dragItemIds = [scoreDelegate.itemId];
                                 }
-                                root.dragThumbnailPath = scoreDelegate.thumbnailPath
-                                dragPreview.dragIds = root.dragItemIds
-                                const point = card.mapToItem(root, mouse.x, mouse.y)
-                                dragPreview.x = point.x - dragPreview.Drag.hotSpot.x
-                                dragPreview.y = point.y - dragPreview.Drag.hotSpot.y
-                                dragArmed = false
-                                dragged = false
-                                moved = false
-                                pressPos = Qt.point(mouse.x, mouse.y)
-                                longPressTimer.restart()
+                                root.dragThumbnailPath = scoreDelegate.thumbnailPath;
+                                dragPreview.dragIds = root.dragItemIds;
+                                const point = card.mapToItem(root, mouse.x, mouse.y);
+                                dragPreview.x = point.x - dragPreview.Drag.hotSpot.x;
+                                dragPreview.y = point.y - dragPreview.Drag.hotSpot.y;
+                                dragArmed = false;
+                                dragged = false;
+                                moved = false;
+                                pressPos = Qt.point(mouse.x, mouse.y);
+                                longPressTimer.restart();
                             }
-                            onPositionChanged: function(mouse) {
+                            onPositionChanged: function (mouse) {
                                 if (dragged) {
-                                    const point = card.mapToItem(root, mouse.x, mouse.y)
-                                    dragPreview.x = point.x - dragPreview.Drag.hotSpot.x
-                                    dragPreview.y = point.y - dragPreview.Drag.hotSpot.y
-                                    return
+                                    const point = card.mapToItem(root, mouse.x, mouse.y);
+                                    dragPreview.x = point.x - dragPreview.Drag.hotSpot.x;
+                                    dragPreview.y = point.y - dragPreview.Drag.hotSpot.y;
+                                    return;
                                 }
                                 if (dragArmed) {
-
-                                    dragged = true
-                                    root.dragInProgress = true
-                                    return
+                                    dragged = true;
+                                    root.dragInProgress = true;
+                                    return;
                                 }
-                                const dx = mouse.x - pressPos.x
-                                const dy = mouse.y - pressPos.y
+                                const dx = mouse.x - pressPos.x;
+                                const dy = mouse.y - pressPos.y;
                                 if (dx * dx + dy * dy > Qt.styleHints.startDragDistance * Qt.styleHints.startDragDistance) {
-
-                                    moved = true
-                                    longPressTimer.stop()
+                                    moved = true;
+                                    longPressTimer.stop();
                                 }
                             }
                             onReleased: {
-                                longPressTimer.stop()
+                                longPressTimer.stop();
                                 if (dragged) {
-                                    root.finishInternalDrag()
+                                    root.finishInternalDrag();
                                 } else if (!dragArmed && !moved) {
-
-                                    root.handleCardClick(scoreDelegate)
+                                    root.handleCardClick(scoreDelegate);
                                 }
-                                dragArmed = false
-                                dragged = false
-                                moved = false
+                                dragArmed = false;
+                                dragged = false;
+                                moved = false;
                             }
                             onCanceled: {
-                                longPressTimer.stop()
-                                if (dragged) root.finishInternalDrag()
-                                dragArmed = false
-                                dragged = false
-                                moved = false
+                                longPressTimer.stop();
+                                if (dragged)
+                                    root.finishInternalDrag();
+                                dragArmed = false;
+                                dragged = false;
+                                moved = false;
                             }
                         }
                         TapHandler {
                             acceptedButtons: Qt.RightButton
                             gesturePolicy: TapHandler.ReleaseWithinBounds
                             onTapped: {
-
                                 if (scoreDelegate.itemType === "folder") {
-                                    folderMenuLoader.active = true
-                                    folderMenuLoader.item.popup()
+                                    folderMenuLoader.active = true;
+                                    folderMenuLoader.item.popup();
                                 } else {
-                                    menuLoader.active = true
-                                    menuLoader.item.popup()
+                                    menuLoader.active = true;
+                                    menuLoader.item.popup();
                                 }
                             }
                         }
@@ -719,18 +743,18 @@ Rectangle {
                             anchors.fill: parent
                             z: 5
                             enabled: scoreDelegate.itemType === "folder"
-                            onEntered: function(drag) {
-                                const accepted = root.canMoveAll(root.dragIds(drag), scoreDelegate.itemId)
-                                drag.accepted = accepted
+                            onEntered: function (drag) {
+                                const accepted = root.canMoveAll(root.dragIds(drag), scoreDelegate.itemId);
+                                drag.accepted = accepted;
                             }
-                            onDropped: function(drop) {
-                                if (!root.canMoveAll(root.dragIds(drop), scoreDelegate.itemId)) return
-                                libraryService.moveItems(root.dragIds(drop), scoreDelegate.itemId)
-                                drop.acceptProposedAction()
+                            onDropped: function (drop) {
+                                if (!root.canMoveAll(root.dragIds(drop), scoreDelegate.itemId))
+                                    return;
+                                libraryService.moveItems(root.dragIds(drop), scoreDelegate.itemId);
+                                drop.acceptProposedAction();
                             }
                         }
                     }
-
 
                     Rectangle {
                         id: checkBox
@@ -752,7 +776,9 @@ Rectangle {
                             iconName: root.isSelected(scoreDelegate.itemId) ? "check" : ""
                             iconColor: "white"
                         }
-                        HoverHandler { cursorShape: Qt.PointingHandCursor }
+                        HoverHandler {
+                            cursorShape: Qt.PointingHandCursor
+                        }
                         TapHandler {
                             acceptedButtons: Qt.LeftButton
                             gesturePolicy: TapHandler.ReleaseWithinBounds
@@ -780,7 +806,12 @@ Rectangle {
                             iconName: scoreDelegate.favorite ? "star-filled" : "star"
                             iconColor: scoreDelegate.favorite ? Theme.accent : Theme.mutedForeground
                             scale: favoriteBtn.hovered ? 1.12 : 1
-                            Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Easing.OutCubic } }
+                            Behavior on scale {
+                                NumberAnimation {
+                                    duration: Motion.fast
+                                    easing.type: Easing.OutCubic
+                                }
+                            }
                         }
                         HoverHandler {
                             id: favoriteHover
@@ -807,162 +838,153 @@ Rectangle {
                                 symbol: scoreDelegate.favorite ? "star-filled" : "star"
                                 text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
                                 onTriggered: {
-                                    const ids = libraryService.selection.count > 0
-                                        ? libraryService.selection.selectedIds
-                                        : [scoreDelegate.itemId]
-                                    libraryService.favoriteItems(ids)
+                                    const ids = libraryService.selection.count > 0 ? libraryService.selection.selectedIds : [scoreDelegate.itemId];
+                                    libraryService.favoriteItems(ids);
                                 }
                             }
-                        AppMenuItem {
-                            symbol: "edit"
-                            text: "重命名"
-                            onTriggered: {
-                                renameDialog.scoreId = scoreDelegate.scoreId
-                                renameDialog.value = scoreDelegate.title
-                                renameDialog.open()
-                            }
-                        }
-                        AppMenuItem {
-                            symbol: "export"
-                            text: "另存为"
-                            onTriggered: {
-                                saveAsDialog.scoreId = scoreDelegate.scoreId
-                                saveAsDialog.defaultName = scoreDelegate.filePath.split("/").pop()
-                                saveAsDialog.open()
-                            }
-                        }
-                        AppMenuItem {
-                            symbol: "copy"
-                            text: "复制"
-                            onTriggered: {
-                                const ids = libraryService.selection.count > 0
-                                    ? libraryService.selection.selectedIds
-                                    : [scoreDelegate.itemId]
-                                libraryService.copyItems(ids)
-                            }
-                        }
-                        AppMenuItem {
-                            symbol: "cut"
-                            text: "剪切"
-                            onTriggered: {
-                                const ids = libraryService.selection.count > 0
-                                    ? libraryService.selection.selectedIds
-                                    : [scoreDelegate.itemId]
-                                libraryService.cutItems(ids)
-                            }
-                        }
-                        AppMenuItem {
-                            symbol: "stitch"
-                            text: "拼接…"
-                            enabled: libraryService.stitchableScores.length >= 2
-                            onTriggered: {
-                                stitchImagesDialog.paths = libraryService.stitchableScores
-                                stitchImagesDialog.open()
-                            }
-                        }
-                        AppMenuSeparator { }
-
-                        AppMenu {
-                            id: folderSubmenu
-                            title: "移动到文件夹"
-                            symbol: "folder"
-                            enabled: rootChildFolderModel.count > 0
                             AppMenuItem {
-                                symbol: "folder-up"
-                                text: "无（移出文件夹）"
+                                symbol: "edit"
+                                text: "重命名"
                                 onTriggered: {
-                                    const ids = libraryService.selection.count > 0
-                                        ? libraryService.selection.selectedIds
-                                        : [scoreDelegate.itemId]
-                                    libraryService.moveItems(ids, "")
+                                    renameDialog.scoreId = scoreDelegate.scoreId;
+                                    renameDialog.value = scoreDelegate.title;
+                                    renameDialog.open();
                                 }
                             }
-                            AppMenuSeparator { }
-                            Instantiator {
-                                id: childFolderInstantiator
-                                model: rootChildFolderModel
-                                delegate: AppMenuItem {
-                                    required property string itemId
-                                    required property string name
-                                    text: name
-                                    symbol: "folder"
+                            AppMenuItem {
+                                symbol: "export"
+                                text: "另存为"
+                                onTriggered: {
+                                    saveAsDialog.scoreId = scoreDelegate.scoreId;
+                                    saveAsDialog.defaultName = scoreDelegate.filePath.split("/").pop();
+                                    saveAsDialog.open();
+                                }
+                            }
+                            AppMenuItem {
+                                symbol: "copy"
+                                text: "复制"
+                                onTriggered: {
+                                    const ids = libraryService.selection.count > 0 ? libraryService.selection.selectedIds : [scoreDelegate.itemId];
+                                    libraryService.copyItems(ids);
+                                }
+                            }
+                            AppMenuItem {
+                                symbol: "cut"
+                                text: "剪切"
+                                onTriggered: {
+                                    const ids = libraryService.selection.count > 0 ? libraryService.selection.selectedIds : [scoreDelegate.itemId];
+                                    libraryService.cutItems(ids);
+                                }
+                            }
+                            AppMenuItem {
+                                symbol: "stitch"
+                                text: "拼接…"
+                                enabled: libraryService.stitchableScores.length >= 2
+                                onTriggered: {
+                                    stitchImagesDialog.paths = libraryService.stitchableScores;
+                                    stitchImagesDialog.open();
+                                }
+                            }
+                            AppMenuSeparator {}
+
+                            AppMenu {
+                                id: folderSubmenu
+                                title: "移动到文件夹"
+                                symbol: "folder"
+                                enabled: rootChildFolderModel.count > 0
+                                AppMenuItem {
+                                    symbol: "folder-up"
+                                    text: "无（移出文件夹）"
                                     onTriggered: {
-                                        const ids = libraryService.selection.count > 0
-                                            ? libraryService.selection.selectedIds
-                                            : [scoreDelegate.itemId]
-                                        libraryService.moveItems(ids, itemId)
+                                        const ids = libraryService.selection.count > 0 ? libraryService.selection.selectedIds : [scoreDelegate.itemId];
+                                        libraryService.moveItems(ids, "");
                                     }
                                 }
-                                onObjectAdded: function(index, object) {
-                                    folderSubmenu.insertItem(index + 2, object)
-                                }
-                                onObjectRemoved: function(index, object) {
-                                    folderSubmenu.removeItem(object)
+                                AppMenuSeparator {}
+                                Instantiator {
+                                    id: childFolderInstantiator
+                                    model: rootChildFolderModel
+                                    delegate: AppMenuItem {
+                                        required property string itemId
+                                        required property string name
+                                        text: name
+                                        symbol: "folder"
+                                        onTriggered: {
+                                            const ids = libraryService.selection.count > 0 ? libraryService.selection.selectedIds : [scoreDelegate.itemId];
+                                            libraryService.moveItems(ids, itemId);
+                                        }
+                                    }
+                                    onObjectAdded: function (index, object) {
+                                        folderSubmenu.insertItem(index + 2, object);
+                                    }
+                                    onObjectRemoved: function (index, object) {
+                                        folderSubmenu.removeItem(object);
+                                    }
                                 }
                             }
-                        }
 
-                        AppMenu {
-                            id: tagSubmenu
-                            title: "标签"
-                            tagIcon: true
-                            enabled: libraryService.tags.count > 0
-                            Instantiator {
-                                model: libraryService.tags
-                                delegate: AppMenuItem {
-                                    required property string itemId
-                                    required property string name
-                                    text: name
-                                    tagIcon: true
-                                    checkable: true
-                                    checked: libraryService.itemHasTag(scoreDelegate.itemId, itemId)
-                                    onTriggered: {
-                                        const ids = libraryService.selection.count > 0
-                                            ? libraryService.selection.selectedIds
-                                            : [scoreDelegate.itemId]
-                                        if (ids.length > 1) {
-                                            let allTagged = true
-                                            for (let i = 0; i < ids.length; ++i) {
-                                                if (!libraryService.itemHasTag(ids[i], itemId)) { allTagged = false; break }
+                            AppMenu {
+                                id: tagSubmenu
+                                title: "标签"
+                                tagIcon: true
+                                enabled: libraryService.tags.count > 0
+                                Instantiator {
+                                    model: libraryService.tags
+                                    delegate: AppMenuItem {
+                                        required property string itemId
+                                        required property string name
+                                        text: name
+                                        tagIcon: true
+                                        checkable: true
+                                        checked: libraryService.itemHasTag(scoreDelegate.itemId, itemId)
+                                        onTriggered: {
+                                            const ids = libraryService.selection.count > 0 ? libraryService.selection.selectedIds : [scoreDelegate.itemId];
+                                            if (ids.length > 1) {
+                                                let allTagged = true;
+                                                for (let i = 0; i < ids.length; ++i) {
+                                                    if (!libraryService.itemHasTag(ids[i], itemId)) {
+                                                        allTagged = false;
+                                                        break;
+                                                    }
+                                                }
+                                                if (allTagged) {
+                                                    for (let i = 0; i < ids.length; ++i)
+                                                        libraryService.removeItemTag(ids[i], itemId);
+                                                } else {
+                                                    libraryService.tagItems(ids, itemId);
+                                                }
+                                                return;
                                             }
-                                            if (allTagged) {
-                                                for (let i = 0; i < ids.length; ++i) libraryService.removeItemTag(ids[i], itemId)
+
+                                            if (libraryService.itemHasTag(scoreDelegate.itemId, itemId)) {
+                                                libraryService.removeItemTag(scoreDelegate.itemId, itemId);
                                             } else {
-                                                libraryService.tagItems(ids, itemId)
+                                                libraryService.addItemTag(scoreDelegate.itemId, itemId);
                                             }
-                                            return
-                                        }
-
-
-                                        if (libraryService.itemHasTag(scoreDelegate.itemId, itemId)) {
-                                            libraryService.removeItemTag(scoreDelegate.itemId, itemId)
-                                        } else {
-                                            libraryService.addItemTag(scoreDelegate.itemId, itemId)
                                         }
                                     }
-                                }
-                                onObjectAdded: function(index, object) {
-                                    tagSubmenu.insertItem(index, object)
-                                }
-                                onObjectRemoved: function(index, object) {
-                                    tagSubmenu.removeItem(object)
+                                    onObjectAdded: function (index, object) {
+                                        tagSubmenu.insertItem(index, object);
+                                    }
+                                    onObjectRemoved: function (index, object) {
+                                        tagSubmenu.removeItem(object);
+                                    }
                                 }
                             }
-                        }
 
-                        AppMenuSeparator { }
-                        AppMenuItem {
-                            symbol: "trash"
-                            text: "删除乐谱"
-                            danger: true
-                            onTriggered: {
-                                deleteDialog.scoreId = scoreDelegate.scoreId
-                                deleteDialog.filePath = scoreDelegate.filePath
-                                deleteDialog.thumbnailPath = scoreDelegate.thumbnailPath
-                                deleteDialog.message = "将“" + scoreDelegate.title + "”从 Notera 乐谱库中删除。此操作无法撤销"
-                                deleteDialog.open()
+                            AppMenuSeparator {}
+                            AppMenuItem {
+                                symbol: "trash"
+                                text: "删除乐谱"
+                                danger: true
+                                onTriggered: {
+                                    deleteDialog.scoreId = scoreDelegate.scoreId;
+                                    deleteDialog.filePath = scoreDelegate.filePath;
+                                    deleteDialog.thumbnailPath = scoreDelegate.thumbnailPath;
+                                    deleteDialog.message = "将“" + scoreDelegate.title + "”从 Notera 乐谱库中删除。此操作无法撤销";
+                                    deleteDialog.open();
+                                }
                             }
-                        }
                         }
                     }
 
@@ -976,152 +998,151 @@ Rectangle {
                                 symbol: scoreDelegate.favorite ? "star-filled" : "star"
                                 text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
                                 onTriggered: {
-                                    const ids = libraryService.selection.count > 0
-                                        ? libraryService.selection.selectedIds
-                                        : [scoreDelegate.itemId]
-                                    libraryService.favoriteItems(ids)
+                                    const ids = libraryService.selection.count > 0 ? libraryService.selection.selectedIds : [scoreDelegate.itemId];
+                                    libraryService.favoriteItems(ids);
                                 }
                             }
-                        AppMenuItem {
-                            symbol: "open"
-                            text: "打开"
-                            onTriggered: {
-                                libraryService.enterFolder(scoreDelegate.itemId)
-                            }
-                        }
-                        AppMenuItem {
-                            symbol: "edit"
-                            text: "重命名"
-                            onTriggered: {
-                                renameFolderDialog.targetId = scoreDelegate.itemId
-                                renameFolderDialog.value = scoreDelegate.title
-                                renameFolderDialog.open()
-                            }
-                        }
-                        AppMenuItem {
-                            symbol: "export"
-                            text: "另存为"
-                            onTriggered: {
-                                saveFolderAsDialog.folderId = scoreDelegate.itemId
-                                saveFolderAsDialog.folderName = scoreDelegate.title
-                                saveFolderAsDialog.open()
-                            }
-                        }
-                        AppMenuItem {
-                            symbol: "copy"
-                            text: "复制"
-                            onTriggered: {
-                                const ids = libraryService.selection.count > 0
-                                    ? libraryService.selection.selectedIds
-                                    : [scoreDelegate.itemId]
-                                libraryService.copyItems(ids)
-                            }
-                        }
-                        AppMenuItem {
-                            symbol: "cut"
-                            text: "剪切"
-                            onTriggered: {
-                                const ids = libraryService.selection.count > 0
-                                    ? libraryService.selection.selectedIds
-                                    : [scoreDelegate.itemId]
-                                libraryService.cutItems(ids)
-                            }
-                        }
-                        AppMenuSeparator { }
-                        AppMenu {
-                            id: folderMoveSubmenu
-                            title: "移动到文件夹"
-                            symbol: "folder"
-                            enabled: rootChildFolderModel.count > 0
                             AppMenuItem {
-                                symbol: "folder-up"
-                                text: "无（移出文件夹）"
+                                symbol: "open"
+                                text: "打开"
                                 onTriggered: {
-                                    const ids = libraryService.selection.count > 0
-                                        ? libraryService.selection.selectedIds
-                                        : [scoreDelegate.itemId]
-                                    libraryService.moveItems(ids, "")
+                                    libraryService.enterFolder(scoreDelegate.itemId);
                                 }
                             }
-                            AppMenuSeparator { }
-                            Instantiator {
-                                model: rootChildFolderModel
-                                delegate: AppMenuItem {
-                                    required property string itemId
-                                    required property string name
-                                    text: name
-                                    symbol: "folder"
+                            AppMenuItem {
+                                symbol: "edit"
+                                text: "重命名"
+                                onTriggered: {
+                                    renameFolderDialog.targetId = scoreDelegate.itemId;
+                                    renameFolderDialog.value = scoreDelegate.title;
+                                    renameFolderDialog.open();
+                                }
+                            }
+                            AppMenuItem {
+                                symbol: "export"
+                                text: "另存为"
+                                onTriggered: {
+                                    saveFolderAsDialog.folderId = scoreDelegate.itemId;
+                                    saveFolderAsDialog.folderName = scoreDelegate.title;
+                                    saveFolderAsDialog.open();
+                                }
+                            }
+                            AppMenuItem {
+                                symbol: "copy"
+                                text: "复制"
+                                onTriggered: {
+                                    const ids = libraryService.selection.count > 0 ? libraryService.selection.selectedIds : [scoreDelegate.itemId];
+                                    libraryService.copyItems(ids);
+                                }
+                            }
+                            AppMenuItem {
+                                symbol: "cut"
+                                text: "剪切"
+                                onTriggered: {
+                                    const ids = libraryService.selection.count > 0 ? libraryService.selection.selectedIds : [scoreDelegate.itemId];
+                                    libraryService.cutItems(ids);
+                                }
+                            }
+                            AppMenuSeparator {}
+                            AppMenu {
+                                id: folderMoveSubmenu
+                                title: "移动到文件夹"
+                                symbol: "folder"
+                                enabled: rootChildFolderModel.count > 0
+                                AppMenuItem {
+                                    symbol: "folder-up"
+                                    text: "无（移出文件夹）"
                                     onTriggered: {
-                                        const ids = libraryService.selection.count > 0
-                                            ? libraryService.selection.selectedIds
-                                            : [scoreDelegate.itemId]
-                                        libraryService.moveItems(ids, itemId)
+                                        const ids = libraryService.selection.count > 0 ? libraryService.selection.selectedIds : [scoreDelegate.itemId];
+                                        libraryService.moveItems(ids, "");
                                     }
                                 }
-                                onObjectAdded: function(index, object) { folderMoveSubmenu.insertItem(index + 2, object) }
-                                onObjectRemoved: function(index, object) { folderMoveSubmenu.removeItem(object) }
+                                AppMenuSeparator {}
+                                Instantiator {
+                                    model: rootChildFolderModel
+                                    delegate: AppMenuItem {
+                                        required property string itemId
+                                        required property string name
+                                        text: name
+                                        symbol: "folder"
+                                        onTriggered: {
+                                            const ids = libraryService.selection.count > 0 ? libraryService.selection.selectedIds : [scoreDelegate.itemId];
+                                            libraryService.moveItems(ids, itemId);
+                                        }
+                                    }
+                                    onObjectAdded: function (index, object) {
+                                        folderMoveSubmenu.insertItem(index + 2, object);
+                                    }
+                                    onObjectRemoved: function (index, object) {
+                                        folderMoveSubmenu.removeItem(object);
+                                    }
+                                }
                             }
-                        }
-                        AppMenu {
-                            id: folderTagSubmenu
-                            objectName: "folderTagSubmenu"
-                            title: "标签"
-                            tagIcon: true
-                            enabled: libraryService.tags.count > 0
-                            Instantiator {
-                                model: libraryService.tags
-                                delegate: AppMenuItem {
-                                    required property string itemId
-                                    required property string name
-                                    text: name
-                                    tagIcon: true
-                                    checkable: true
-                                    checked: libraryService.itemHasTag(scoreDelegate.itemId, itemId)
-                                    onTriggered: {
-                                        const ids = libraryService.selection.count > 0
-                                            ? libraryService.selection.selectedIds
-                                            : [scoreDelegate.itemId]
-                                        if (ids.length > 1) {
-                                            let allTagged = true
-                                            for (let i = 0; i < ids.length; ++i) {
-                                                if (!libraryService.itemHasTag(ids[i], itemId)) { allTagged = false; break }
+                            AppMenu {
+                                id: folderTagSubmenu
+                                objectName: "folderTagSubmenu"
+                                title: "标签"
+                                tagIcon: true
+                                enabled: libraryService.tags.count > 0
+                                Instantiator {
+                                    model: libraryService.tags
+                                    delegate: AppMenuItem {
+                                        required property string itemId
+                                        required property string name
+                                        text: name
+                                        tagIcon: true
+                                        checkable: true
+                                        checked: libraryService.itemHasTag(scoreDelegate.itemId, itemId)
+                                        onTriggered: {
+                                            const ids = libraryService.selection.count > 0 ? libraryService.selection.selectedIds : [scoreDelegate.itemId];
+                                            if (ids.length > 1) {
+                                                let allTagged = true;
+                                                for (let i = 0; i < ids.length; ++i) {
+                                                    if (!libraryService.itemHasTag(ids[i], itemId)) {
+                                                        allTagged = false;
+                                                        break;
+                                                    }
+                                                }
+                                                if (allTagged) {
+                                                    for (let i = 0; i < ids.length; ++i)
+                                                        libraryService.removeItemTag(ids[i], itemId);
+                                                } else {
+                                                    libraryService.tagItems(ids, itemId);
+                                                }
+                                                return;
                                             }
-                                            if (allTagged) {
-                                                for (let i = 0; i < ids.length; ++i) libraryService.removeItemTag(ids[i], itemId)
+
+                                            if (libraryService.itemHasTag(scoreDelegate.itemId, itemId)) {
+                                                libraryService.removeItemTag(scoreDelegate.itemId, itemId);
                                             } else {
-                                                libraryService.tagItems(ids, itemId)
+                                                libraryService.addItemTag(scoreDelegate.itemId, itemId);
                                             }
-                                            return
-                                        }
-
-
-                                        if (libraryService.itemHasTag(scoreDelegate.itemId, itemId)) {
-                                            libraryService.removeItemTag(scoreDelegate.itemId, itemId)
-                                        } else {
-                                            libraryService.addItemTag(scoreDelegate.itemId, itemId)
                                         }
                                     }
-                                }
-                                onObjectAdded: function(index, object) { folderTagSubmenu.insertItem(index, object) }
-                                onObjectRemoved: function(index, object) { folderTagSubmenu.removeItem(object) }
-                            }
-                        }
-                        AppMenuSeparator { }
-                        AppMenuItem {
-                            symbol: "trash"
-                            text: root.selectedCount > 0 ? "删除选中项" : "删除文件夹"
-                            danger: true
-                            onTriggered: {
-                                if (root.selectedCount > 0) {
-                                    batchDeleteDialog.selectedIds = libraryService.selection.selectedIds
-                                    batchDeleteDialog.open()
-                                } else {
-                                    deleteFolderDialog.targetId = scoreDelegate.itemId
-                                    deleteFolderDialog.folderName = scoreDelegate.title
-                                    deleteFolderDialog.open()
+                                    onObjectAdded: function (index, object) {
+                                        folderTagSubmenu.insertItem(index, object);
+                                    }
+                                    onObjectRemoved: function (index, object) {
+                                        folderTagSubmenu.removeItem(object);
+                                    }
                                 }
                             }
-                        }
+                            AppMenuSeparator {}
+                            AppMenuItem {
+                                symbol: "trash"
+                                text: root.selectedCount > 0 ? "删除选中项" : "删除文件夹"
+                                danger: true
+                                onTriggered: {
+                                    if (root.selectedCount > 0) {
+                                        batchDeleteDialog.selectedIds = libraryService.selection.selectedIds;
+                                        batchDeleteDialog.open();
+                                    } else {
+                                        deleteFolderDialog.targetId = scoreDelegate.itemId;
+                                        deleteFolderDialog.folderName = scoreDelegate.title;
+                                        deleteFolderDialog.open();
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1147,42 +1168,42 @@ Rectangle {
                 target: null
                 acceptedButtons: Qt.LeftButton
                 acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                grabPermissions: PointerHandler.CanTakeOverFromItems
-                    | PointerHandler.ApprovesTakeOverByAnything
+                grabPermissions: PointerHandler.CanTakeOverFromItems | PointerHandler.ApprovesTakeOverByAnything
 
                 onActiveChanged: {
                     if (!active) {
-                        validStart = false
-                        root.rubberAutoScrollSpeed = 0
-                        root.rubberScrolled = false
-                        return
+                        validStart = false;
+                        root.rubberAutoScrollSpeed = 0;
+                        root.rubberScrolled = false;
+                        return;
                     }
 
-                    root.rubberLastContentX = grid.contentX
-                    root.rubberLastContentY = grid.contentY
-                    root.rubberScrolled = false
-                    const p = centroid.pressPosition
-                    validStart = p.x >= 0 && p.y >= 0
-                        && p.x <= librarySurface.width && p.y <= librarySurface.height
-                    if (!validStart) return
-                    selectionBox.x = p.x
-                    selectionBox.y = p.y
-                    selectionBox.width = 0
-                    selectionBox.height = 0
+                    root.rubberLastContentX = grid.contentX;
+                    root.rubberLastContentY = grid.contentY;
+                    root.rubberScrolled = false;
+                    const p = centroid.pressPosition;
+                    validStart = p.x >= 0 && p.y >= 0 && p.x <= librarySurface.width && p.y <= librarySurface.height;
+                    if (!validStart)
+                        return;
+                    selectionBox.x = p.x;
+                    selectionBox.y = p.y;
+                    selectionBox.width = 0;
+                    selectionBox.height = 0;
                 }
                 onActiveTranslationChanged: {
-                    if (!active || !validStart) return
-                    const start = centroid.pressPosition
+                    if (!active || !validStart)
+                        return;
+                    const start = centroid.pressPosition;
 
-                    const curX = Math.max(0, Math.min(librarySurface.width, centroid.position.x))
-                    const curY = Math.max(0, Math.min(librarySurface.height, centroid.position.y))
-                    selectionBox.x = Math.min(start.x, curX)
-                    selectionBox.y = Math.min(start.y, curY)
-                    selectionBox.width = Math.abs(curX - start.x)
-                    selectionBox.height = Math.abs(curY - start.y)
-                    root.updateRubberSelection()
+                    const curX = Math.max(0, Math.min(librarySurface.width, centroid.position.x));
+                    const curY = Math.max(0, Math.min(librarySurface.height, centroid.position.y));
+                    selectionBox.x = Math.min(start.x, curX);
+                    selectionBox.y = Math.min(start.y, curY);
+                    selectionBox.width = Math.abs(curX - start.x);
+                    selectionBox.height = Math.abs(curY - start.y);
+                    root.updateRubberSelection();
 
-                    root.updateRubberAutoScroll(centroid.position.y)
+                    root.updateRubberAutoScroll(centroid.position.y);
                 }
             }
 
@@ -1199,7 +1220,13 @@ Rectangle {
                     color: Theme.elevatedSurface
                     border.width: 1
                     border.color: Theme.border
-                    AppIcon { anchors.centerIn: parent; width: 32; height: 32; iconName: "music"; iconColor: Theme.mutedForeground }
+                    AppIcon {
+                        anchors.centerIn: parent
+                        width: 32
+                        height: 32
+                        iconName: "music"
+                        iconColor: Theme.mutedForeground
+                    }
                 }
                 Label {
                     Layout.alignment: Qt.AlignHCenter
@@ -1228,11 +1255,9 @@ Rectangle {
                 id: dropArea
                 anchors.fill: parent
                 z: 1
-                onDropped: function(drop) {
-
-
+                onDropped: function (drop) {
                     if (root.dragIds(drop).length > 0) {
-                        drop.acceptProposedAction()
+                        drop.acceptProposedAction();
                     }
                 }
             }
@@ -1240,9 +1265,9 @@ Rectangle {
             TapHandler {
                 acceptedButtons: Qt.RightButton
                 onTapped: {
-
-                    if (appController.libraryFilter.startsWith("tag:")) return
-                    blankContextMenu.popup()
+                    if (appController.libraryFilter.startsWith("tag:"))
+                        return;
+                    blankContextMenu.popup();
                 }
             }
         }
@@ -1269,7 +1294,9 @@ Rectangle {
                     font.weight: Font.DemiBold
                 }
 
-                Item { Layout.fillWidth: true }
+                Item {
+                    Layout.fillWidth: true
+                }
 
                 AppButton {
                     text: "全选"
@@ -1302,8 +1329,8 @@ Rectangle {
                     Layout.preferredWidth: 64
                     enabled: libraryService.stitchableScores.length >= 2
                     onClicked: {
-                        stitchImagesDialog.paths = libraryService.stitchableScores
-                        stitchImagesDialog.open()
+                        stitchImagesDialog.paths = libraryService.stitchableScores;
+                        stitchImagesDialog.open();
                     }
                 }
 
@@ -1321,8 +1348,8 @@ Rectangle {
                     Layout.preferredWidth: 70
                     enabled: root.selectedCount > 0
                     onClicked: {
-                        batchDeleteDialog.selectedIds = libraryService.selection.selectedIds
-                        batchDeleteDialog.open()
+                        batchDeleteDialog.selectedIds = libraryService.selection.selectedIds;
+                        batchDeleteDialog.open();
                     }
                 }
 
@@ -1339,10 +1366,13 @@ Rectangle {
     ListModel {
         id: rootChildFolderModel
         function refresh() {
-            clear()
-            const folders = libraryService.childFolders(libraryService.currentFolderId)
+            clear();
+            const folders = libraryService.childFolders(libraryService.currentFolderId);
             for (let i = 0; i < folders.length; i++) {
-                append({ itemId: folders[i].id, name: folders[i].name })
+                append({
+                    itemId: folders[i].id,
+                    name: folders[i].name
+                });
             }
         }
         Component.onCompleted: refresh()
@@ -1373,12 +1403,35 @@ Rectangle {
         id: blankContextMenu
         objectName: "blankContextMenu"
         readonly property bool isTagView: appController.libraryFilter.startsWith("tag:")
-        AppMenuItem { text: "新建文件夹"; symbol: "folder"; visible: !blankContextMenu.isTagView; onTriggered: newFolderDialog.open() }
-        AppMenuItem { text: "新建标签"; tagIcon: true; onTriggered: newTagDialog.open() }
-        AppMenuSeparator { visible: !blankContextMenu.isTagView }
-        AppMenuItem { text: "导入乐谱"; symbol: "import"; visible: !blankContextMenu.isTagView; onTriggered: fileDialog.open() }
-        AppMenuItem { text: "导入文件夹"; symbol: "folder"; visible: !blankContextMenu.isTagView; onTriggered: folderImportDialog.open() }
-        AppMenuSeparator { visible: !blankContextMenu.isTagView }
+        AppMenuItem {
+            text: "新建文件夹"
+            symbol: "folder"
+            visible: !blankContextMenu.isTagView
+            onTriggered: newFolderDialog.open()
+        }
+        AppMenuItem {
+            text: "新建标签"
+            tagIcon: true
+            onTriggered: newTagDialog.open()
+        }
+        AppMenuSeparator {
+            visible: !blankContextMenu.isTagView
+        }
+        AppMenuItem {
+            text: "导入乐谱"
+            symbol: "import"
+            visible: !blankContextMenu.isTagView
+            onTriggered: fileDialog.open()
+        }
+        AppMenuItem {
+            text: "导入文件夹"
+            symbol: "folder"
+            visible: !blankContextMenu.isTagView
+            onTriggered: folderImportDialog.open()
+        }
+        AppMenuSeparator {
+            visible: !blankContextMenu.isTagView
+        }
         AppMenuItem {
             text: libraryService.clipboardMode === "cut" ? "粘贴（移动）" : "粘贴"
             symbol: "paste"
@@ -1392,7 +1445,9 @@ Rectangle {
         id: newFolderDialog
         title: "新建文件夹"
         placeholderText: "输入文件夹名称"
-        onSubmitted: function(text) { libraryService.createFolder(text) }
+        onSubmitted: function (text) {
+            libraryService.createFolder(text);
+        }
     }
 
     Dialog {
@@ -1411,19 +1466,46 @@ Rectangle {
 
         enter: Transition {
             ParallelAnimation {
-                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
-                NumberAnimation { property: "scale"; from: 0.97; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
+                NumberAnimation {
+                    property: "opacity"
+                    from: 0
+                    to: 1
+                    duration: Motion.normal
+                    easing.type: Easing.OutCubic
+                }
+                NumberAnimation {
+                    property: "scale"
+                    from: 0.97
+                    to: 1
+                    duration: Motion.normal
+                    easing.type: Easing.OutCubic
+                }
             }
         }
         exit: Transition {
             ParallelAnimation {
-                NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Motion.fast; easing.type: Easing.InCubic }
-                NumberAnimation { property: "scale"; from: 1; to: 0.985; duration: Motion.fast; easing.type: Easing.InCubic }
+                NumberAnimation {
+                    property: "opacity"
+                    from: 1
+                    to: 0
+                    duration: Motion.fast
+                    easing.type: Easing.InCubic
+                }
+                NumberAnimation {
+                    property: "scale"
+                    from: 1
+                    to: 0.985
+                    duration: Motion.fast
+                    easing.type: Easing.InCubic
+                }
             }
         }
 
         header: Label {
-            leftPadding: 22; rightPadding: 22; topPadding: 20; bottomPadding: 4
+            leftPadding: 22
+            rightPadding: 22
+            topPadding: 20
+            bottomPadding: 4
             text: "新建文件夹"
             color: Theme.foreground
             font.pixelSize: Theme.fontLg
@@ -1458,16 +1540,16 @@ Rectangle {
                 AppButton {
                     text: "取消"
                     onClicked: {
-                        libraryService.resolveCreateFolderConflict("cancel")
-                        createFolderConflictDialog.close()
+                        libraryService.resolveCreateFolderConflict("cancel");
+                        createFolderConflictDialog.close();
                     }
                 }
                 AppButton {
                     text: "保留两者"
                     primary: true
                     onClicked: {
-                        libraryService.resolveCreateFolderConflict("rename")
-                        createFolderConflictDialog.close()
+                        libraryService.resolveCreateFolderConflict("rename");
+                        createFolderConflictDialog.close();
                     }
                 }
             }
@@ -1486,7 +1568,9 @@ Rectangle {
         property string targetId: ""
         title: "重命名文件夹"
         placeholderText: "输入新名称"
-        onSubmitted: function(text) { libraryService.renameFolder(targetId, text) }
+        onSubmitted: function (text) {
+            libraryService.renameFolder(targetId, text);
+        }
     }
 
     ConfirmDialog {
@@ -1502,7 +1586,9 @@ Rectangle {
         id: newTagDialog
         title: "新建标签"
         placeholderText: "输入标签名称"
-        onSubmitted: function(text) { libraryService.createTag(text) }
+        onSubmitted: function (text) {
+            libraryService.createTag(text);
+        }
     }
 
     FileDialog {
@@ -1511,7 +1597,7 @@ Rectangle {
         fileMode: FileDialog.OpenFiles
         nameFilters: ["支持的乐谱 (*.pdf *.jpg *.jpeg *.png *.bmp *.gif *.webp *.tif *.tiff)", "所有文件 (*)"]
         onAccepted: {
-            libraryService.importFiles(selectedFiles)
+            libraryService.importFiles(selectedFiles);
         }
     }
 
@@ -1529,19 +1615,18 @@ Rectangle {
         fileMode: FileDialog.OpenFiles
         nameFilters: ["图片文件 (*.jpg *.jpeg *.png *.bmp *.gif *.webp *.tif *.tiff)", "所有文件 (*)"]
         onAccepted: {
-            var paths = []
+            var paths = [];
             for (var i = 0; i < selectedFiles.length; i++) {
-                paths.push(selectedFiles[i].toString())
+                paths.push(selectedFiles[i].toString());
             }
             if (paths.length < 2) {
-                stitchImportHintDialog.open()
-                return
+                stitchImportHintDialog.open();
+                return;
             }
-            stitchImagesDialog.paths = paths
-            stitchImagesDialog.open()
+            stitchImagesDialog.paths = paths;
+            stitchImagesDialog.open();
         }
     }
-
 
     ConfirmDialog {
         id: stitchImportHintDialog
@@ -1552,12 +1637,11 @@ Rectangle {
         showCancel: false
     }
 
-
     StitchDialog {
         id: stitchImagesDialog
         title: "拼接图片"
-        onSubmitted: function(orderedPaths, direction, outputName) {
-            libraryService.stitchImages(orderedPaths, direction, outputName)
+        onSubmitted: function (orderedPaths, direction, outputName) {
+            libraryService.stitchImages(orderedPaths, direction, outputName);
         }
     }
 
@@ -1566,7 +1650,9 @@ Rectangle {
         property string scoreId: ""
         title: "重命名乐谱"
         placeholderText: "输入乐谱名称"
-        onSubmitted: function(text) { libraryService.renameScore(scoreId, text) }
+        onSubmitted: function (text) {
+            libraryService.renameScore(scoreId, text);
+        }
     }
 
     ConfirmDialog {
@@ -1584,8 +1670,8 @@ Rectangle {
         title: "批量删除？"
         message: "将删除选中的 " + batchDeleteDialog.selectedIds.length + " 个项目。此操作无法撤销"
         onAccepted: {
-            libraryService.deleteItems(batchDeleteDialog.selectedIds)
-            root.clearSelection()
+            libraryService.deleteItems(batchDeleteDialog.selectedIds);
+            root.clearSelection();
         }
     }
 
@@ -1597,10 +1683,10 @@ Rectangle {
         fileMode: FileDialog.SaveFile
         defaultSuffix: ""
         onAccepted: {
-            const error = libraryService.saveScoreAs(scoreId, selectedFile)
-            saveAsResultDialog.title = error.length > 0 ? "另存为失败" : "另存为成功"
-            saveAsResultDialog.message = error.length > 0 ? error : "乐谱已保存到所选位置"
-            saveAsResultDialog.open()
+            const error = libraryService.saveScoreAs(scoreId, selectedFile);
+            saveAsResultDialog.title = error.length > 0 ? "另存为失败" : "另存为成功";
+            saveAsResultDialog.message = error.length > 0 ? error : "乐谱已保存到所选位置";
+            saveAsResultDialog.open();
         }
     }
 
@@ -1611,10 +1697,10 @@ Rectangle {
         title: "选择导出目标目录"
         currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
         onAccepted: {
-            const error = libraryService.saveFolderAs(folderId, selectedFolder)
-            saveAsResultDialog.title = error.length > 0 ? "导出失败" : "导出成功"
-            saveAsResultDialog.message = error.length > 0 ? error : "文件夹已导出到所选位置"
-            saveAsResultDialog.open()
+            const error = libraryService.saveFolderAs(folderId, selectedFolder);
+            saveAsResultDialog.title = error.length > 0 ? "导出失败" : "导出成功";
+            saveAsResultDialog.message = error.length > 0 ? error : "文件夹已导出到所选位置";
+            saveAsResultDialog.open();
         }
     }
 
@@ -1635,18 +1721,14 @@ Rectangle {
         property string conflictSource: "paste"
 
         function resolveConflict(action) {
-
-
-
-
             if (conflictDialog.conflictSource === "merge") {
-                libraryService.resolveMergeConflict(action, conflictDialog.applyToAll)
+                libraryService.resolveMergeConflict(action, conflictDialog.applyToAll);
             } else if (conflictDialog.conflictSource === "pasteFolder") {
-                libraryService.resolvePasteFolderConflict(action, conflictDialog.applyToAll)
+                libraryService.resolvePasteFolderConflict(action, conflictDialog.applyToAll);
             } else if (conflictDialog.conflictSource === "import") {
-                libraryService.resolveImportConflict(action, conflictDialog.applyToAll)
+                libraryService.resolveImportConflict(action, conflictDialog.applyToAll);
             } else {
-                libraryService.resolvePasteConflict(action, conflictDialog.applyToAll)
+                libraryService.resolvePasteConflict(action, conflictDialog.applyToAll);
             }
         }
 
@@ -1663,19 +1745,46 @@ Rectangle {
 
         enter: Transition {
             ParallelAnimation {
-                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
-                NumberAnimation { property: "scale"; from: 0.97; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
+                NumberAnimation {
+                    property: "opacity"
+                    from: 0
+                    to: 1
+                    duration: Motion.normal
+                    easing.type: Easing.OutCubic
+                }
+                NumberAnimation {
+                    property: "scale"
+                    from: 0.97
+                    to: 1
+                    duration: Motion.normal
+                    easing.type: Easing.OutCubic
+                }
             }
         }
         exit: Transition {
             ParallelAnimation {
-                NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Motion.fast; easing.type: Easing.InCubic }
-                NumberAnimation { property: "scale"; from: 1; to: 0.985; duration: Motion.fast; easing.type: Easing.InCubic }
+                NumberAnimation {
+                    property: "opacity"
+                    from: 1
+                    to: 0
+                    duration: Motion.fast
+                    easing.type: Easing.InCubic
+                }
+                NumberAnimation {
+                    property: "scale"
+                    from: 1
+                    to: 0.985
+                    duration: Motion.fast
+                    easing.type: Easing.InCubic
+                }
             }
         }
 
         header: Label {
-            leftPadding: 24; rightPadding: 24; topPadding: 20; bottomPadding: 4
+            leftPadding: 24
+            rightPadding: 24
+            topPadding: 20
+            bottomPadding: 4
             text: "文件冲突"
             color: Theme.foreground
             font.pixelSize: Theme.fontLg
@@ -1704,7 +1813,8 @@ Rectangle {
                 onCheckedChanged: conflictDialog.applyToAll = checked
 
                 Rectangle {
-                    width: 18; height: 18
+                    width: 18
+                    height: 18
                     radius: 5
                     color: applyAllRow.checked ? Theme.accent : "transparent"
                     border.width: 1.5
@@ -1712,7 +1822,8 @@ Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     AppIcon {
                         anchors.centerIn: parent
-                        width: 12; height: 12
+                        width: 12
+                        height: 12
                         iconName: applyAllRow.checked ? "check" : ""
                         iconColor: "white"
                     }
@@ -1774,59 +1885,62 @@ Rectangle {
     Connections {
         target: libraryService
         function onPasteConflict(sourceName, targetName, index, total) {
-            conflictDialog.conflictSource = "paste"
-            conflictDialog.conflictName = sourceName
-            conflictDialog.conflictIndex = index
-            conflictDialog.conflictTotal = total
-            conflictDialog.applyToAll = false
-            applyAllRow.checked = false
-            conflictDialog.open()
+            conflictDialog.conflictSource = "paste";
+            conflictDialog.conflictName = sourceName;
+            conflictDialog.conflictIndex = index;
+            conflictDialog.conflictTotal = total;
+            conflictDialog.applyToAll = false;
+            applyAllRow.checked = false;
+            conflictDialog.open();
         }
         function onPasteFolderConflict(sourceName, targetName, index, total) {
-            conflictDialog.conflictSource = "pasteFolder"
-            conflictDialog.conflictName = sourceName
-            conflictDialog.conflictIndex = index
-            conflictDialog.conflictTotal = total
-            conflictDialog.applyToAll = false
-            applyAllRow.checked = false
-            conflictDialog.open()
+            conflictDialog.conflictSource = "pasteFolder";
+            conflictDialog.conflictName = sourceName;
+            conflictDialog.conflictIndex = index;
+            conflictDialog.conflictTotal = total;
+            conflictDialog.applyToAll = false;
+            applyAllRow.checked = false;
+            conflictDialog.open();
         }
         function onMergeConflict(sourceName, targetName, index, total) {
-            conflictDialog.conflictSource = "merge"
-            conflictDialog.conflictName = sourceName
-            conflictDialog.conflictIndex = index
-            conflictDialog.conflictTotal = total
-            conflictDialog.applyToAll = false
-            applyAllRow.checked = false
-            conflictDialog.open()
+            conflictDialog.conflictSource = "merge";
+            conflictDialog.conflictName = sourceName;
+            conflictDialog.conflictIndex = index;
+            conflictDialog.conflictTotal = total;
+            conflictDialog.applyToAll = false;
+            applyAllRow.checked = false;
+            conflictDialog.open();
         }
         function onImportConflict(sourceName, targetName, index, total) {
-            conflictDialog.conflictSource = "import"
-            conflictDialog.conflictName = sourceName
-            conflictDialog.conflictIndex = index
-            conflictDialog.conflictTotal = total
-            conflictDialog.applyToAll = false
-            applyAllRow.checked = false
-            conflictDialog.open()
+            conflictDialog.conflictSource = "import";
+            conflictDialog.conflictName = sourceName;
+            conflictDialog.conflictIndex = index;
+            conflictDialog.conflictTotal = total;
+            conflictDialog.applyToAll = false;
+            applyAllRow.checked = false;
+            conflictDialog.open();
         }
         function onPasteFinished(processedCount) {
-            if (conflictDialog.opened) conflictDialog.close()
+            if (conflictDialog.opened)
+                conflictDialog.close();
         }
         function onMergeFinished(processedCount) {
-            if (conflictDialog.opened) conflictDialog.close()
+            if (conflictDialog.opened)
+                conflictDialog.close();
         }
         function onImportFinished(processedCount) {
-            if (conflictDialog.opened) conflictDialog.close()
+            if (conflictDialog.opened)
+                conflictDialog.close();
         }
         function onCreateFolderConflict(name) {
-            createFolderConflictDialog.conflictName = name
-            createFolderConflictDialog.open()
+            createFolderConflictDialog.conflictName = name;
+            createFolderConflictDialog.open();
         }
         function onCurrentFolderChanged() {
-            rootChildFolderModel.refresh()
+            rootChildFolderModel.refresh();
         }
         function onFoldersChanged() {
-            rootChildFolderModel.refresh()
+            rootChildFolderModel.refresh();
         }
     }
 }

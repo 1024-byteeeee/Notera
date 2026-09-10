@@ -10,22 +10,27 @@ class ApplicationController final : public QObject
     Q_OBJECT
     Q_PROPERTY(QString currentPage READ currentPage WRITE setCurrentPage NOTIFY currentPageChanged)
     Q_PROPERTY(int themeMode READ themeMode WRITE setThemeMode NOTIFY themeModeChanged)
-    Q_PROPERTY(bool animationsEnabled READ animationsEnabled WRITE setAnimationsEnabled NOTIFY animationsEnabledChanged)
+    Q_PROPERTY(bool animationsEnabled READ animationsEnabled WRITE setAnimationsEnabled NOTIFY
+                   animationsEnabledChanged)
     Q_PROPERTY(QString accentColor READ accentColor WRITE setAccentColor NOTIFY accentColorChanged)
-    Q_PROPERTY(QString libraryFilter READ libraryFilter WRITE setLibraryFilter NOTIFY libraryFilterChanged)
+    Q_PROPERTY(
+        QString libraryFilter READ libraryFilter WRITE setLibraryFilter NOTIFY libraryFilterChanged)
     Q_PROPERTY(QString currentScoreTitle READ currentScoreTitle NOTIFY currentScoreChanged)
     Q_PROPERTY(QUrl currentFileUrl READ currentFileUrl NOTIFY currentScoreChanged)
     Q_PROPERTY(QString currentFileType READ currentFileType NOTIFY currentScoreChanged)
     Q_PROPERTY(QString currentScoreId READ currentScoreId NOTIFY currentScoreChanged)
     Q_PROPERTY(QString currentScoreFolderId READ currentScoreFolderId NOTIFY currentScoreChanged)
     Q_PROPERTY(int currentScorePageCount READ currentScorePageCount NOTIFY currentScoreChanged)
-    Q_PROPERTY(double autoScrollSpeed READ autoScrollSpeed WRITE setAutoScrollSpeed NOTIFY autoScrollSpeedChanged)
-    Q_PROPERTY(double defaultScrollSpeed READ defaultScrollSpeed WRITE setDefaultScrollSpeed NOTIFY defaultScrollSpeedChanged)
-    Q_PROPERTY(int longPressDragMs READ longPressDragMs WRITE setLongPressDragMs NOTIFY longPressDragMsChanged)
+    Q_PROPERTY(double autoScrollSpeed READ autoScrollSpeed WRITE setAutoScrollSpeed NOTIFY
+                   autoScrollSpeedChanged)
+    Q_PROPERTY(double defaultScrollSpeed READ defaultScrollSpeed WRITE setDefaultScrollSpeed NOTIFY
+                   defaultScrollSpeedChanged)
+    Q_PROPERTY(int longPressDragMs READ longPressDragMs WRITE setLongPressDragMs NOTIFY
+                   longPressDragMsChanged)
     Q_PROPERTY(QString dataDirectory READ dataDirectory NOTIFY dataDirectoryChanged)
     Q_PROPERTY(QString pendingDataDirectory READ pendingDataDirectory NOTIFY dataDirectoryChanged)
 
-public:
+  public:
     explicit ApplicationController(QObject* parent = nullptr);
 
     [[nodiscard]] QString currentPage() const;
@@ -61,15 +66,15 @@ public:
     Q_INVOKABLE QString exportDatabaseBackup(const QUrl& destinationFile) const;
     Q_INVOKABLE QString importDatabaseBackup(const QUrl& backupFile);
 
-
     Q_INVOKABLE void startExportDatabaseBackup(const QUrl& destinationFile);
     Q_INVOKABLE void startImportDatabaseBackup(const QUrl& backupFile);
     Q_INVOKABLE void requestRestart();
     Q_INVOKABLE QString clearAllData(const QString& confirmation);
-    Q_INVOKABLE void openScore(const QString& scoreId, const QString& title, const QString& filePath,
-        const QString& fileType, int pageCount, const QString& folderId);
+    Q_INVOKABLE void openScore(const QString& scoreId, const QString& title,
+                               const QString& filePath, const QString& fileType, int pageCount,
+                               const QString& folderId);
 
-signals:
+  signals:
     void currentPageChanged();
     void themeModeChanged();
     void animationsEnabledChanged();
@@ -86,25 +91,24 @@ signals:
     void exportDatabaseBackupFinished(bool success, QString error);
     void importDatabaseBackupFinished(bool success, QString error);
 
-private:
-
+  private:
     static QString runExportBackup(const QUrl& destinationFile);
     static QString runImportBackup(const QUrl& backupFile);
 
     QFutureWatcher<QString>* m_exportWatcher = nullptr;
     QFutureWatcher<QString>* m_importWatcher = nullptr;
-    QString m_currentPage {QStringLiteral("library")};
-    QString m_libraryFilter {QStringLiteral("all")};
-    int m_themeMode {0};
-    bool m_animationsEnabled {true};
+    QString m_currentPage{QStringLiteral("library")};
+    QString m_libraryFilter{QStringLiteral("all")};
+    int m_themeMode{0};
+    bool m_animationsEnabled{true};
     QString m_accentColor;
     QString m_currentScoreTitle;
     QUrl m_currentFileUrl;
     QString m_currentFileType;
     QString m_currentScoreId;
     QString m_currentScoreFolderId;
-    int m_currentScorePageCount {0};
-    double m_autoScrollSpeed {15.0};
-    double m_defaultScrollSpeed {15.0};
-    int m_longPressDragMs {168};
+    int m_currentScorePageCount{0};
+    double m_autoScrollSpeed{15.0};
+    double m_defaultScrollSpeed{15.0};
+    int m_longPressDragMs{168};
 };

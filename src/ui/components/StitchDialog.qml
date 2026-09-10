@@ -3,16 +3,12 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Notera
 
-
-
 Dialog {
     id: dialog
-
 
     property var paths: []
     property string defaultName: "拼接图片"
     signal submitted(var orderedPaths, string direction, string outputName)
-
 
     property string stitchDirection: "vertical"
 
@@ -29,58 +25,88 @@ Dialog {
 
     enter: Transition {
         ParallelAnimation {
-            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
-            NumberAnimation { property: "scale"; from: 0.97; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
+            NumberAnimation {
+                property: "opacity"
+                from: 0
+                to: 1
+                duration: Motion.normal
+                easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+                property: "scale"
+                from: 0.97
+                to: 1
+                duration: Motion.normal
+                easing.type: Easing.OutCubic
+            }
         }
     }
     exit: Transition {
         ParallelAnimation {
-            NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Motion.fast; easing.type: Easing.InCubic }
-            NumberAnimation { property: "scale"; from: 1; to: 0.985; duration: Motion.fast; easing.type: Easing.InCubic }
+            NumberAnimation {
+                property: "opacity"
+                from: 1
+                to: 0
+                duration: Motion.fast
+                easing.type: Easing.InCubic
+            }
+            NumberAnimation {
+                property: "scale"
+                from: 1
+                to: 0.985
+                duration: Motion.fast
+                easing.type: Easing.InCubic
+            }
         }
     }
-
-
 
     onOpened: {
-        fileModel.clear()
-        var sorted = []
+        fileModel.clear();
+        var sorted = [];
         for (var i = 0; i < dialog.paths.length; ++i) {
-            var raw = dialog.paths[i]
-            var isMap = (typeof raw === "object" && raw !== null && "path" in raw)
-            var p = isMap ? raw.path.toString() : raw.toString()
-            var name = isMap && raw.name ? raw.name.toString() : p.split("/").pop()
-            sorted.push({ path: p, name: name })
+            var raw = dialog.paths[i];
+            var isMap = (typeof raw === "object" && raw !== null && "path" in raw);
+            var p = isMap ? raw.path.toString() : raw.toString();
+            var name = isMap && raw.name ? raw.name.toString() : p.split("/").pop();
+            sorted.push({
+                path: p,
+                name: name
+            });
         }
-        sorted.sort(function(a, b) { return a.name.localeCompare(b.name, "zh") })
+        sorted.sort(function (a, b) {
+            return a.name.localeCompare(b.name, "zh");
+        });
         for (var j = 0; j < sorted.length; ++j) {
-            fileModel.append(sorted[j])
+            fileModel.append(sorted[j]);
         }
-        listView.currentIndex = 0
-        dialog.stitchDirection = "vertical"
+        listView.currentIndex = 0;
+        dialog.stitchDirection = "vertical";
         if (nameField.text.trim().length === 0) {
-            nameField.text = dialog.defaultName
+            nameField.text = dialog.defaultName;
         }
-        nameField.selectAll()
-        nameField.forceActiveFocus()
+        nameField.selectAll();
+        nameField.forceActiveFocus();
     }
 
-    ListModel { id: fileModel }
+    ListModel {
+        id: fileModel
+    }
 
     function collectOrderedPaths() {
-        var arr = []
+        var arr = [];
         for (var i = 0; i < fileModel.count; ++i) {
-            arr.push(fileModel.get(i).path)
+            arr.push(fileModel.get(i).path);
         }
-        return arr
+        return arr;
     }
 
     function moveSelected(offset) {
-        var idx = listView.currentIndex
-        var target = idx + offset
-        if (idx < 0 || target < 0 || target >= fileModel.count) return
-        fileModel.move(idx, target, 1)
-        listView.currentIndex = target
+        var idx = listView.currentIndex;
+        var target = idx + offset;
+        if (idx < 0 || target < 0 || target >= fileModel.count)
+            return;
+        fileModel.move(idx, target, 1);
+        listView.currentIndex = target;
     }
 
     header: Label {
@@ -99,7 +125,6 @@ Dialog {
         anchors.right: parent.right
         anchors.margins: 22
         spacing: 14
-
 
         RowLayout {
             spacing: 10
@@ -128,7 +153,6 @@ Dialog {
                 onClicked: dialog.stitchDirection = "horizontal"
             }
         }
-
 
         RowLayout {
             spacing: 10
@@ -211,7 +235,6 @@ Dialog {
             }
         }
 
-
         RowLayout {
             spacing: 10
 
@@ -244,9 +267,10 @@ Dialog {
     }
 
     function confirm() {
-        if (fileModel.count < 2 || nameField.text.trim().length === 0) return
-        dialog.submitted(dialog.collectOrderedPaths(), dialog.stitchDirection, nameField.text.trim())
-        dialog.accept()
+        if (fileModel.count < 2 || nameField.text.trim().length === 0)
+            return;
+        dialog.submitted(dialog.collectOrderedPaths(), dialog.stitchDirection, nameField.text.trim());
+        dialog.accept();
     }
 
     footer: Item {
@@ -278,13 +302,12 @@ Dialog {
         border.color: Theme.strongBorder
     }
 
-
     component DirectionCard: Rectangle {
         id: card
         property bool selected: false
         property string title: ""
         property string hint: ""
-        signal clicked()
+        signal clicked
 
         Layout.preferredHeight: 56
         radius: Theme.radiusMd

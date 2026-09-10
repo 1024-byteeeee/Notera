@@ -4,7 +4,8 @@
 #include <QSettings>
 #include <QStandardPaths>
 
-namespace {
+namespace
+{
 
 QString g_customRoot;
 
@@ -15,55 +16,37 @@ QString childDirectory(const QString& name)
     return directory.filePath(name);
 }
 
-}
+} // namespace
 
-namespace AppDataPaths {
-
-QString defaultRoot()
+namespace AppDataPaths
 {
-    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-}
+
+QString defaultRoot() { return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation); }
 
 QString root()
 {
-    QString path = g_customRoot.isEmpty()
-        ? QSettings().value(QStringLiteral("storage/dataDirectory"), QString()).toString()
-        : g_customRoot;
-    if (path.isEmpty()) {
+    QString path =
+        g_customRoot.isEmpty()
+            ? QSettings().value(QStringLiteral("storage/dataDirectory"), QString()).toString()
+            : g_customRoot;
+    if (path.isEmpty())
+    {
         path = defaultRoot();
     }
     QDir().mkpath(path);
     return path;
 }
 
-void setCustomRoot(const QString& path)
-{
-    g_customRoot = path;
-}
+void setCustomRoot(const QString& path) { g_customRoot = path; }
 
-QString databaseDirectory()
-{
-    return childDirectory(QStringLiteral("database"));
-}
+QString databaseDirectory() { return childDirectory(QStringLiteral("database")); }
 
-QString libraryDirectory()
-{
-    return childDirectory(QStringLiteral("library/scores"));
-}
+QString libraryDirectory() { return childDirectory(QStringLiteral("library/scores")); }
 
-QString thumbnailDirectory()
-{
-    return childDirectory(QStringLiteral("thumbnails"));
-}
+QString thumbnailDirectory() { return childDirectory(QStringLiteral("thumbnails")); }
 
-QString annotationsDirectory()
-{
-    return childDirectory(QStringLiteral("annotations"));
-}
+QString annotationsDirectory() { return childDirectory(QStringLiteral("annotations")); }
 
-QString cacheDirectory()
-{
-    return childDirectory(QStringLiteral("cache"));
-}
+QString cacheDirectory() { return childDirectory(QStringLiteral("cache")); }
 
-}
+} // namespace AppDataPaths

@@ -1,12 +1,5 @@
 #pragma once
 
-#include <QObject>
-#include <QUrl>
-#include <QHash>
-#include <QThreadPool>
-#include <QTimer>
-#include <QScopedPointer>
-#include <QTemporaryDir>
 #include "features/library/LibraryEntryModel.h"
 #include "features/library/LibrarySelectionModel.h"
 #include "features/library/NamedListModel.h"
@@ -14,6 +7,13 @@
 #include "features/library/ScoreRepository.h"
 #include "features/library/ThumbnailGenerator.h"
 #include "services/DatabaseService.h"
+#include <QHash>
+#include <QObject>
+#include <QScopedPointer>
+#include <QTemporaryDir>
+#include <QThreadPool>
+#include <QTimer>
+#include <QUrl>
 
 class LibraryService final : public QObject
 {
@@ -27,16 +27,15 @@ class LibraryService final : public QObject
     Q_PROPERTY(NamedListModel* tags READ tags CONSTANT)
     Q_PROPERTY(QString currentFolderId READ currentFolderId NOTIFY currentFolderChanged)
     Q_PROPERTY(QString currentFolderName READ currentFolderName NOTIFY currentFolderChanged)
-    Q_PROPERTY(QString currentFolderBreadcrumb READ currentFolderBreadcrumb NOTIFY currentFolderChanged)
+    Q_PROPERTY(
+        QString currentFolderBreadcrumb READ currentFolderBreadcrumb NOTIFY currentFolderChanged)
     Q_PROPERTY(bool canGoUp READ canGoUp NOTIFY currentFolderChanged)
     Q_PROPERTY(QVariantList clipboardItems READ clipboardItems NOTIFY clipboardChanged)
     Q_PROPERTY(QString clipboardMode READ clipboardMode NOTIFY clipboardChanged)
 
-
-
     Q_PROPERTY(QVariantList stitchableScores READ stitchableScores NOTIFY stitchableChanged)
 
-public:
+  public:
     explicit LibraryService(QObject* parent = nullptr);
 
     [[nodiscard]] ScoreListModel* scores();
@@ -62,11 +61,12 @@ public:
     Q_INVOKABLE void importAndStitchImages(const QStringList& filePaths);
 
     Q_INVOKABLE void stitchImages(const QVariantList& orderedPaths, const QString& direction,
-        const QString& outputName);
+                                  const QString& outputName);
     Q_INVOKABLE void toggleFavorite(const QString& scoreId, bool favorite);
     Q_INVOKABLE void toggleItemFavorite(const QString& itemId, bool favorite);
     Q_INVOKABLE void renameScore(const QString& scoreId, const QString& title);
-    Q_INVOKABLE void deleteScore(const QString& scoreId, const QString& filePath, const QString& thumbnailPath);
+    Q_INVOKABLE void deleteScore(const QString& scoreId, const QString& filePath,
+                                 const QString& thumbnailPath);
     Q_INVOKABLE void deleteItems(const QVariantList& ids);
     Q_INVOKABLE QVariantList scoresInFolder(const QString& folderId);
     Q_INVOKABLE QString scoreFolderId(const QString& scoreId);
@@ -110,7 +110,7 @@ public:
     Q_INVOKABLE void resolveMergeConflict(const QString& action, bool applyToAll);
     void markScoreOpened(const QString& scoreId);
 
-signals:
+  signals:
     void searchQueryChanged();
     void filterModeChanged();
     void foldersChanged();
@@ -130,8 +130,9 @@ signals:
     void mergeFinished(int processedCount);
     void stitchableChanged();
 
-private:
-    struct ImportTaskResult {
+  private:
+    struct ImportTaskResult
+    {
         QString scoreId;
         QString sourcePath;
         QString storedPath;
@@ -139,7 +140,7 @@ private:
         QString fileType;
         QString folderId;
         QString error;
-        int pageCount {1};
+        int pageCount{1};
     };
 
     void reload();
@@ -163,8 +164,10 @@ private:
     static QString resolveImportPath(const QVariant& value);
     void continuePaste();
     void beginPasteToFolder(const QString& folderId);
-    QString copyScoreToFolder(const QString& scoreId, const QString& targetFolderId, const QString& conflictAction);
-    QString copyFolderRecursive(const QString& folderId, const QString& targetParentId, const QString& conflictAction);
+    QString copyScoreToFolder(const QString& scoreId, const QString& targetFolderId,
+                              const QString& conflictAction);
+    QString copyFolderRecursive(const QString& folderId, const QString& targetParentId,
+                                const QString& conflictAction);
     QString uniqueNameInFolder(const QString& baseName, const QString& folderId, bool isFolder);
     bool nameExistsInFolder(const QString& name, const QString& folderId, bool isFolder);
     QString getOrCreateFolder(const QString& name, const QString& parentId);
@@ -188,39 +191,39 @@ private:
     QTimer m_thumbnailRefreshTimer;
     QHash<QString, QString> m_pendingThumbnailPaths;
     QString m_searchQuery;
-    QString m_filterMode {QStringLiteral("all")};
+    QString m_filterMode{QStringLiteral("all")};
     QString m_currentFolderId;
-    QString m_currentFolderName {QStringLiteral("乐谱库")};
-    QString m_currentFolderBreadcrumb {QStringLiteral("乐谱库")};
+    QString m_currentFolderName{QStringLiteral("乐谱库")};
+    QString m_currentFolderBreadcrumb{QStringLiteral("乐谱库")};
     QVariantList m_clipboardItems;
-    QString m_clipboardMode {QStringLiteral("none")};
+    QString m_clipboardMode{QStringLiteral("none")};
     QVariantList m_stitchableScores;
     QVariantList m_pasteQueue;
-    int m_pasteIndex {0};
+    int m_pasteIndex{0};
     QString m_pasteTargetFolderId;
     QString m_pendingConflictAction;
-    bool m_pasteApplyToAll {false};
+    bool m_pasteApplyToAll{false};
     QStringList m_cutSourceFolderIds;
     QString m_pendingFolderConflictAction;
-    bool m_folderConflictApplyToAll {false};
+    bool m_folderConflictApplyToAll{false};
     QString m_pendingCreateFolderName;
     QString m_pendingCreateFolderParentId;
     QStringList m_importQueue;
     QStringList m_importQueueTitles;
     QStringList m_importQueueFolders;
     QStringList m_importTempFiles;
-    int m_importIndex {0};
-    int m_importSucceededCount {0};
-    int m_pendingInsertCount {0};
-    bool m_importTaskActive {false};
+    int m_importIndex{0};
+    int m_importSucceededCount{0};
+    int m_pendingInsertCount{0};
+    bool m_importTaskActive{false};
     QString m_importConflictAction;
-    bool m_importApplyToAll {false};
+    bool m_importApplyToAll{false};
     QScopedPointer<QTemporaryDir> m_mergeTempDir;
     QString m_mergeBackupRoot;
     QVariantList m_mergeQueue;
-    int m_mergeIndex {0};
+    int m_mergeIndex{0};
     QString m_mergeConflictAction;
-    bool m_mergeApplyToAll {false};
+    bool m_mergeApplyToAll{false};
     QHash<QString, QString> m_mergeFolderMap;
     QHash<QString, QString> m_mergeTagMap;
     QHash<QString, QString> m_mergeHashIndex;

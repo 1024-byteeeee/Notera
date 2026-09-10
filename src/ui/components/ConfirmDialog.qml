@@ -25,14 +25,38 @@ Dialog {
 
     enter: Transition {
         ParallelAnimation {
-            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
-            NumberAnimation { property: "scale"; from: 0.97; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
+            NumberAnimation {
+                property: "opacity"
+                from: 0
+                to: 1
+                duration: Motion.normal
+                easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+                property: "scale"
+                from: 0.97
+                to: 1
+                duration: Motion.normal
+                easing.type: Easing.OutCubic
+            }
         }
     }
     exit: Transition {
         ParallelAnimation {
-            NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Motion.fast; easing.type: Easing.InCubic }
-            NumberAnimation { property: "scale"; from: 1; to: 0.985; duration: Motion.fast; easing.type: Easing.InCubic }
+            NumberAnimation {
+                property: "opacity"
+                from: 1
+                to: 0
+                duration: Motion.fast
+                easing.type: Easing.InCubic
+            }
+            NumberAnimation {
+                property: "scale"
+                from: 1
+                to: 0.985
+                duration: Motion.fast
+                easing.type: Easing.InCubic
+            }
         }
     }
 
@@ -61,8 +85,17 @@ Dialog {
             anchors.rightMargin: 22
             anchors.verticalCenter: parent.verticalCenter
             spacing: 10
-            AppButton { text: "取消"; visible: dialog.showCancel; onClicked: dialog.reject() }
-            AppButton { text: dialog.confirmText; danger: dialog.danger; primary: !dialog.danger; onClicked: dialog.accept() }
+            AppButton {
+                text: "取消"
+                visible: dialog.showCancel
+                onClicked: dialog.reject()
+            }
+            AppButton {
+                text: dialog.confirmText
+                danger: dialog.danger
+                primary: !dialog.danger
+                onClicked: dialog.accept()
+            }
         }
     }
 

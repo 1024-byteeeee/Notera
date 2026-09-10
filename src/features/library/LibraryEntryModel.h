@@ -10,8 +10,9 @@ class LibraryEntryModel final : public QAbstractListModel
     Q_OBJECT
     Q_PROPERTY(int count READ count NOTIFY countChanged)
 
-public:
-    enum Role {
+  public:
+    enum Role
+    {
         ItemTypeRole = Qt::UserRole + 1,
         ItemIdRole,
         TitleRole,
@@ -35,7 +36,6 @@ public:
 
     void replaceAll(const QVariantList& folders, const QList<Score>& scores);
 
-
     bool updateEntryTags(const QString& itemId, const QStringList& tags);
 
     bool updateEntryTitle(const QString& itemId, const QString& title);
@@ -44,21 +44,22 @@ public:
 
     bool updateEntryThumbnail(const QString& itemId, const QString& thumbnailPath);
 
-signals:
+  signals:
     void countChanged();
 
     void resetStarted();
     void resetFinished();
 
-private:
-    struct Entry {
+  private:
+    struct Entry
+    {
         QString itemType;
         QString itemId;
         QString title;
         QDateTime createdAt;
-        int pageCount {0};
+        int pageCount{0};
         QString thumbnailPath;
-        bool favorite {false};
+        bool favorite{false};
         QString filePath;
         QString fileType;
         QStringList tags;

@@ -5,7 +5,7 @@
 
 class DatabaseService final
 {
-public:
+  public:
     DatabaseService();
     ~DatabaseService();
 
@@ -15,7 +15,7 @@ public:
     [[nodiscard]] bool initialize(QString* error);
     [[nodiscard]] QSqlDatabase database() const;
 
-private:
+  private:
     static constexpr auto ConnectionName = "notera-library";
     bool applyMigrations(QString* error);
     QSqlDatabase m_database;

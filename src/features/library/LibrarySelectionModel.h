@@ -11,7 +11,7 @@ class LibrarySelectionModel final : public QObject
     Q_PROPERTY(int count READ count NOTIFY selectionChanged)
     Q_PROPERTY(QVariantList selectedIds READ selectedIds NOTIFY selectionChanged)
 
-public:
+  public:
     explicit LibrarySelectionModel(QObject* parent = nullptr);
 
     [[nodiscard]] int count() const;
@@ -22,9 +22,9 @@ public:
     Q_INVOKABLE void replace(const QVariantList& itemIds);
     Q_INVOKABLE void clear();
 
-signals:
+  signals:
     void selectionChanged();
 
-private:
+  private:
     QSet<QString> m_selectedIds;
 };

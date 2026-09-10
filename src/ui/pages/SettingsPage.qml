@@ -18,7 +18,9 @@ Rectangle {
         boundsBehavior: Flickable.StopAtBounds
         clip: true
 
-        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+        ScrollBar.vertical: ScrollBar {
+            policy: ScrollBar.AsNeeded
+        }
 
         ColumnLayout {
             id: settingsContent
@@ -101,7 +103,9 @@ Rectangle {
                                 }
                             }
 
-                            Item { Layout.fillWidth: true }
+                            Item {
+                                Layout.fillWidth: true
+                            }
 
                             Rectangle {
                                 id: themeSelector
@@ -136,12 +140,16 @@ Rectangle {
                                                 horizontalAlignment: Text.AlignHCenter
                                                 verticalAlignment: Text.AlignVCenter
                                                 scale: parent.down ? 0.97 : 1
-                                                Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Easing.OutCubic } }
+                                                Behavior on scale {
+                                                    NumberAnimation {
+                                                        duration: Motion.fast
+                                                        easing.type: Easing.OutCubic
+                                                    }
+                                                }
                                             }
                                             background: Rectangle {
                                                 radius: Theme.radiusSm
-                                                color: appController.themeMode === index ? Theme.selectedBackground
-                                                    : parent.hovered ? Theme.buttonHover : "transparent"
+                                                color: appController.themeMode === index ? Theme.selectedBackground : parent.hovered ? Theme.buttonHover : "transparent"
                                                 border.width: appController.themeMode === index ? 1 : 0
                                                 border.color: Theme.selectedBorder
                                             }
@@ -176,15 +184,15 @@ Rectangle {
                                     font.weight: Font.Medium
                                 }
                                 Label {
-                                    text: appController.accentColor.length > 0
-                                        ? "当前颜色 " + appController.accentColor.toUpperCase()
-                                        : "使用 Notera 默认金色"
+                                    text: appController.accentColor.length > 0 ? "当前颜色 " + appController.accentColor.toUpperCase() : "使用 Notera 默认金色"
                                     color: Theme.mutedForeground
                                     font.pixelSize: Theme.fontXs
                                 }
                             }
 
-                            Item { Layout.fillWidth: true }
+                            Item {
+                                Layout.fillWidth: true
+                            }
 
                             Rectangle {
                                 objectName: "accentColorPreview"
@@ -208,8 +216,8 @@ Rectangle {
                                 text: "更改"
                                 primary: true
                                 onClicked: {
-                                    accentColorDialog.draftColor = Theme.accent
-                                    accentColorDialog.open()
+                                    accentColorDialog.draftColor = Theme.accent;
+                                    accentColorDialog.open();
                                 }
                             }
                         }
@@ -244,7 +252,9 @@ Rectangle {
                                 }
                             }
 
-                            Item { Layout.fillWidth: true }
+                            Item {
+                                Layout.fillWidth: true
+                            }
 
                             Switch {
                                 id: animationsSwitch
@@ -257,27 +267,36 @@ Rectangle {
                                 implicitHeight: 26
                                 onToggled: appController.animationsEnabled = checked
 
-                                    indicator: Rectangle {
-                                        implicitWidth: 46
-                                        implicitHeight: 26
-                                        radius: 13
-                                        color: animationsSwitch.checked ? Theme.accent : Theme.buttonBackground
-                                        border.width: 1
-                                        border.color: animationsSwitch.checked ? Theme.accent : Theme.strongBorder
-                                        Behavior on color { ColorAnimation { duration: animationsSwitch.independentAnimationDuration } }
-
-                                        Rectangle {
-                                            x: animationsSwitch.checked ? parent.width - width - 4 : 4
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            width: 18
-                                            height: 18
-                                            radius: 9
-                                            color: animationsSwitch.checked ? Theme.accentForeground : Theme.mutedForeground
-                                            Behavior on x { NumberAnimation { duration: animationsSwitch.independentAnimationDuration; easing.type: Easing.OutCubic } }
+                                indicator: Rectangle {
+                                    implicitWidth: 46
+                                    implicitHeight: 26
+                                    radius: 13
+                                    color: animationsSwitch.checked ? Theme.accent : Theme.buttonBackground
+                                    border.width: 1
+                                    border.color: animationsSwitch.checked ? Theme.accent : Theme.strongBorder
+                                    Behavior on color {
+                                        ColorAnimation {
+                                            duration: animationsSwitch.independentAnimationDuration
                                         }
                                     }
-                                    contentItem: Item { }
+
+                                    Rectangle {
+                                        x: animationsSwitch.checked ? parent.width - width - 4 : 4
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 18
+                                        height: 18
+                                        radius: 9
+                                        color: animationsSwitch.checked ? Theme.accentForeground : Theme.mutedForeground
+                                        Behavior on x {
+                                            NumberAnimation {
+                                                duration: animationsSwitch.independentAnimationDuration
+                                                easing.type: Easing.OutCubic
+                                            }
+                                        }
+                                    }
                                 }
+                                contentItem: Item {}
+                            }
                         }
                     }
                 }
@@ -333,7 +352,9 @@ Rectangle {
                                 }
                             }
 
-                            Item { Layout.fillWidth: true }
+                            Item {
+                                Layout.fillWidth: true
+                            }
 
                             Slider {
                                 id: speedSlider
@@ -369,7 +390,6 @@ Rectangle {
                                     border.color: Theme.accent
                                 }
                             }
-
 
                             SpinBox {
                                 id: speedSpin
@@ -470,7 +490,9 @@ Rectangle {
                                 }
                             }
 
-                            Item { Layout.fillWidth: true }
+                            Item {
+                                Layout.fillWidth: true
+                            }
 
                             Slider {
                                 id: longPressSlider
@@ -506,7 +528,6 @@ Rectangle {
                                     border.color: Theme.accent
                                 }
                             }
-
 
                             SpinBox {
                                 id: longPressSpin
@@ -602,9 +623,7 @@ Rectangle {
                                     font.weight: Font.Medium
                                 }
                                 Label {
-                                    text: appController.pendingDataDirectory.length > 0
-                                        ? "重启后迁移至：" + appController.pendingDataDirectory
-                                        : appController.dataDirectory
+                                    text: appController.pendingDataDirectory.length > 0 ? "重启后迁移至：" + appController.pendingDataDirectory : appController.dataDirectory
                                     color: Theme.mutedForeground
                                     font.pixelSize: Theme.fontXs
                                     elide: Text.ElideMiddle
@@ -613,7 +632,9 @@ Rectangle {
                                 }
                             }
 
-                            Item { Layout.fillWidth: true }
+                            Item {
+                                Layout.fillWidth: true
+                            }
 
                             RowLayout {
                                 Layout.alignment: Qt.AlignRight
@@ -622,10 +643,10 @@ Rectangle {
                                     objectName: "openDataDirectoryButton"
                                     text: "打开"
                                     onClicked: {
-                                        const error = appController.openDataDirectory()
+                                        const error = appController.openDataDirectory();
                                         if (error.length > 0) {
-                                            migrateResultDialog.message = error
-                                            migrateResultDialog.open()
+                                            migrateResultDialog.message = error;
+                                            migrateResultDialog.open();
                                         }
                                     }
                                 }
@@ -674,10 +695,21 @@ Rectangle {
                                     ColumnLayout {
                                         Layout.fillWidth: true
                                         spacing: 3
-                                        Label { text: "导出数据库备份"; color: Theme.foreground; font.pixelSize: Theme.fontMd; font.weight: Font.Medium }
-                                        Label { text: "导出完整备份包（数据库、乐谱、缩略图），可跨设备恢复"; color: Theme.secondaryForeground; font.pixelSize: Theme.fontXs }
+                                        Label {
+                                            text: "导出数据库备份"
+                                            color: Theme.foreground
+                                            font.pixelSize: Theme.fontMd
+                                            font.weight: Font.Medium
+                                        }
+                                        Label {
+                                            text: "导出完整备份包（数据库、乐谱、缩略图），可跨设备恢复"
+                                            color: Theme.secondaryForeground
+                                            font.pixelSize: Theme.fontXs
+                                        }
                                     }
-                                    Item { Layout.fillWidth: true }
+                                    Item {
+                                        Layout.fillWidth: true
+                                    }
                                     AppButton {
                                         objectName: "exportBackupButton"
                                         text: "导出"
@@ -702,10 +734,21 @@ Rectangle {
                                     ColumnLayout {
                                         Layout.fillWidth: true
                                         spacing: 3
-                                        Label { text: "导入数据库备份"; color: Theme.foreground; font.pixelSize: Theme.fontMd; font.weight: Font.Medium }
-                                        Label { text: "从备份包导入，可合并到当前库或替换当前所有数据"; color: Theme.secondaryForeground; font.pixelSize: Theme.fontXs }
+                                        Label {
+                                            text: "导入数据库备份"
+                                            color: Theme.foreground
+                                            font.pixelSize: Theme.fontMd
+                                            font.weight: Font.Medium
+                                        }
+                                        Label {
+                                            text: "从备份包导入，可合并到当前库或替换当前所有数据"
+                                            color: Theme.secondaryForeground
+                                            font.pixelSize: Theme.fontXs
+                                        }
                                     }
-                                    Item { Layout.fillWidth: true }
+                                    Item {
+                                        Layout.fillWidth: true
+                                    }
                                     AppButton {
                                         objectName: "importBackupButton"
                                         text: "导入"
@@ -731,10 +774,21 @@ Rectangle {
                             spacing: 12
                             ColumnLayout {
                                 spacing: 3
-                                Label { text: "关于 Notera"; color: Theme.foreground; font.pixelSize: Theme.fontMd; font.weight: Font.Medium }
-                                Label { text: "简单的本地乐谱阅读器"; color: Theme.mutedForeground; font.pixelSize: Theme.fontXs }
+                                Label {
+                                    text: "关于 Notera"
+                                    color: Theme.foreground
+                                    font.pixelSize: Theme.fontMd
+                                    font.weight: Font.Medium
+                                }
+                                Label {
+                                    text: "简单的本地乐谱阅读器"
+                                    color: Theme.mutedForeground
+                                    font.pixelSize: Theme.fontXs
+                                }
                             }
-                            Item { Layout.fillWidth: true }
+                            Item {
+                                Layout.fillWidth: true
+                            }
                             Label {
                                 objectName: "versionLabel"
                                 Layout.alignment: Qt.AlignRight
@@ -780,10 +834,21 @@ Rectangle {
                             spacing: 16
                             ColumnLayout {
                                 spacing: 3
-                                Label { text: "清空所有数据"; color: Theme.danger; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
-                                Label { text: "永久删除全部乐谱、文件夹、标签、收藏、缓存和设置"; color: Theme.secondaryForeground; font.pixelSize: Theme.fontXs }
+                                Label {
+                                    text: "清空所有数据"
+                                    color: Theme.danger
+                                    font.pixelSize: Theme.fontMd
+                                    font.weight: Font.DemiBold
+                                }
+                                Label {
+                                    text: "永久删除全部乐谱、文件夹、标签、收藏、缓存和设置"
+                                    color: Theme.secondaryForeground
+                                    font.pixelSize: Theme.fontXs
+                                }
                             }
-                            Item { Layout.fillWidth: true }
+                            Item {
+                                Layout.fillWidth: true
+                            }
                             AppButton {
                                 objectName: "clearAllDataButton"
                                 text: "清空所有数据"
@@ -803,9 +868,9 @@ Rectangle {
         title: "选择数据存储位置"
         currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
         onAccepted: {
-            migrateConfirmDialog.message = "将把所有数据迁移到：\n" + selectedFolder + "\n\n迁移完成后需要重启应用才能生效。是否继续？"
-            migrateConfirmDialog.newDirectory = selectedFolder
-            migrateConfirmDialog.open()
+            migrateConfirmDialog.message = "将把所有数据迁移到：\n" + selectedFolder + "\n\n迁移完成后需要重启应用才能生效。是否继续？";
+            migrateConfirmDialog.newDirectory = selectedFolder;
+            migrateConfirmDialog.open();
         }
     }
 
@@ -818,11 +883,9 @@ Rectangle {
         nameFilters: ["Notera 备份 (*.notera-backup *.zip)", "所有文件 (*)"]
         currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
         onAccepted: {
-
-
-            appShell.showLoading("正在导出备份")
-            exportTimer.targetFile = selectedFile
-            exportTimer.restart()
+            appShell.showLoading("正在导出备份");
+            exportTimer.targetFile = selectedFile;
+            exportTimer.restart();
         }
     }
 
@@ -834,9 +897,9 @@ Rectangle {
         nameFilters: ["Notera 备份 (*.notera-backup *.zip)", "所有文件 (*)"]
         currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
         onAccepted: {
-            importModeDialog.backupFile = selectedFile
-            importModeDialog.backupInfo = libraryService.probeDatabaseBackup(selectedFile)
-            importModeDialog.open()
+            importModeDialog.backupFile = selectedFile;
+            importModeDialog.backupInfo = libraryService.probeDatabaseBackup(selectedFile);
+            importModeDialog.open();
         }
     }
 
@@ -855,7 +918,10 @@ Rectangle {
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
         header: Label {
-            leftPadding: 22; rightPadding: 22; topPadding: 20; bottomPadding: 4
+            leftPadding: 22
+            rightPadding: 22
+            topPadding: 20
+            bottomPadding: 4
             text: "导入数据库备份"
             color: Theme.foreground
             font.pixelSize: Theme.fontLg
@@ -867,16 +933,14 @@ Rectangle {
             Label {
                 Layout.fillWidth: true
                 text: {
-                    const info = importModeDialog.backupInfo
+                    const info = importModeDialog.backupInfo;
                     if (info && info.valid) {
-                        let summary = "备份包含 "
-                            + (info.scoreCount !== undefined ? info.scoreCount : "?") + " 份乐谱、"
-                            + (info.folderCount !== undefined ? info.folderCount : "?") + " 个文件夹、"
-                            + (info.tagCount !== undefined ? info.tagCount : "?") + " 个标签"
-                        if (info.createdAt) summary += "\n创建于 " + info.createdAt
-                        return summary
+                        let summary = "备份包含 " + (info.scoreCount !== undefined ? info.scoreCount : "?") + " 份乐谱、" + (info.folderCount !== undefined ? info.folderCount : "?") + " 个文件夹、" + (info.tagCount !== undefined ? info.tagCount : "?") + " 个标签";
+                        if (info.createdAt)
+                            summary += "\n创建于 " + info.createdAt;
+                        return summary;
                     }
-                    return info && info.error ? "备份信息不可用：" + info.error : "备份信息不可用"
+                    return info && info.error ? "备份信息不可用：" + info.error : "备份信息不可用";
                 }
                 color: Theme.secondaryForeground
                 font.pixelSize: Theme.fontMd
@@ -906,21 +970,21 @@ Rectangle {
                     text: "替换所有数据"
                     danger: true
                     onClicked: {
-                        importConfirmDialog.backupFile = importModeDialog.backupFile
-                        importConfirmDialog.message = "导入将替换当前所有乐谱、文件夹、标签和设置，此操作不可撤销。\n\n是否继续？"
-                        importModeDialog.close()
-                        importConfirmDialog.open()
+                        importConfirmDialog.backupFile = importModeDialog.backupFile;
+                        importConfirmDialog.message = "导入将替换当前所有乐谱、文件夹、标签和设置，此操作不可撤销。\n\n是否继续？";
+                        importModeDialog.close();
+                        importConfirmDialog.open();
                     }
                 }
                 AppButton {
                     text: "合并到当前库"
                     primary: true
                     onClicked: {
-                        importModeDialog.close()
+                        importModeDialog.close();
 
-                        appShell.showLoading("正在导入备份")
-                        mergeImportTimer.backupFile = importModeDialog.backupFile
-                        mergeImportTimer.restart()
+                        appShell.showLoading("正在导入备份");
+                        mergeImportTimer.backupFile = importModeDialog.backupFile;
+                        mergeImportTimer.restart();
                     }
                 }
             }
@@ -949,7 +1013,7 @@ Rectangle {
         onOpened: hexColorInput.text = draftColor.toString().toUpperCase()
         onDraftColorChanged: {
             if (hexColorInput && hexColorInput.text !== draftColor.toString().toUpperCase())
-                hexColorInput.text = draftColor.toString().toUpperCase()
+                hexColorInput.text = draftColor.toString().toUpperCase();
         }
 
         header: Label {
@@ -1015,8 +1079,9 @@ Rectangle {
                 leftPadding: 12
                 rightPadding: 12
                 onTextChanged: {
-                    const value = text.trim()
-                    if (/^#[0-9a-fA-F]{6}$/.test(value)) accentColorDialog.draftColor = value
+                    const value = text.trim();
+                    if (/^#[0-9a-fA-F]{6}$/.test(value))
+                        accentColorDialog.draftColor = value;
                 }
                 background: Rectangle {
                     radius: Theme.radiusMd
@@ -1034,14 +1099,17 @@ Rectangle {
                 anchors.rightMargin: 22
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 10
-                AppButton { text: "取消"; onClicked: accentColorDialog.reject() }
+                AppButton {
+                    text: "取消"
+                    onClicked: accentColorDialog.reject()
+                }
                 AppButton {
                     text: "应用"
                     primary: true
                     enabled: /^#[0-9a-fA-F]{6}$/.test(hexColorInput.text.trim())
                     onClicked: {
-                        appController.accentColor = hexColorInput.text.trim()
-                        accentColorDialog.accept()
+                        appController.accentColor = hexColorInput.text.trim();
+                        accentColorDialog.accept();
                     }
                 }
             }
@@ -1062,10 +1130,9 @@ Rectangle {
         title: "导入数据库备份？"
         confirmText: "开始导入"
         onAccepted: {
-
-            appShell.showLoading("正在导入备份")
-            replaceImportTimer.backupFile = importConfirmDialog.backupFile
-            replaceImportTimer.restart()
+            appShell.showLoading("正在导入备份");
+            replaceImportTimer.backupFile = importConfirmDialog.backupFile;
+            replaceImportTimer.restart();
         }
     }
 
@@ -1083,12 +1150,12 @@ Rectangle {
         title: "迁移数据？"
         confirmText: "开始迁移"
         onAccepted: {
-            const error = appController.migrateDataDirectory(newDirectory)
+            const error = appController.migrateDataDirectory(newDirectory);
             if (error === "" || error === undefined || error === null) {
-                appController.requestRestart()
+                appController.requestRestart();
             } else {
-                migrateResultDialog.message = "迁移失败：\n" + error
-                migrateResultDialog.open()
+                migrateResultDialog.message = "迁移失败：\n" + error;
+                migrateResultDialog.open();
             }
         }
     }
@@ -1100,8 +1167,8 @@ Rectangle {
         confirmText: "继续"
         message: "将永久删除所有乐谱文件、缩略图、文件夹、标签、收藏、阅读记录、缓存和应用设置。此操作无法撤销"
         onAccepted: {
-            clearConfirmInput.text = ""
-            clearTypedDialog.open()
+            clearConfirmInput.text = "";
+            clearTypedDialog.open();
         }
     }
 
@@ -1117,7 +1184,10 @@ Rectangle {
         padding: 22
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
         header: Label {
-            leftPadding: 22; rightPadding: 22; topPadding: 20; bottomPadding: 4
+            leftPadding: 22
+            rightPadding: 22
+            topPadding: 20
+            bottomPadding: 4
             text: "输入确认文字"
             color: Theme.foreground
             font.pixelSize: Theme.fontLg
@@ -1155,19 +1225,22 @@ Rectangle {
                 anchors.rightMargin: 22
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 10
-                AppButton { text: "取消"; onClicked: clearTypedDialog.reject() }
+                AppButton {
+                    text: "取消"
+                    onClicked: clearTypedDialog.reject()
+                }
                 AppButton {
                     objectName: "confirmClearAllDataButton"
                     text: "永久清空"
                     danger: true
                     enabled: clearConfirmInput.text === "确认清空所有数据"
                     onClicked: {
-                        const error = appController.clearAllData(clearConfirmInput.text)
+                        const error = appController.clearAllData(clearConfirmInput.text);
                         if (error.length > 0) {
-                            migrateResultDialog.message = error
-                            migrateResultDialog.open()
+                            migrateResultDialog.message = error;
+                            migrateResultDialog.open();
                         } else {
-                            clearTypedDialog.close()
+                            clearTypedDialog.close();
                         }
                     }
                 }
@@ -1187,17 +1260,13 @@ Rectangle {
         confirmText: "确定"
     }
 
-
-
-
-
     Timer {
         id: exportTimer
         interval: 50
         repeat: false
         property url targetFile: ""
         onTriggered: {
-            appController.startExportDatabaseBackup(targetFile)
+            appController.startExportDatabaseBackup(targetFile);
         }
     }
     Timer {
@@ -1206,12 +1275,12 @@ Rectangle {
         repeat: false
         property url backupFile: ""
         onTriggered: {
-            const error = libraryService.importDatabaseBackupMerged(backupFile)
-            appShell.hideLoading()
+            const error = libraryService.importDatabaseBackupMerged(backupFile);
+            appShell.hideLoading();
             if (error && error.length > 0) {
-                backupResultDialog.title = "合并失败"
-                backupResultDialog.message = error
-                backupResultDialog.open()
+                backupResultDialog.title = "合并失败";
+                backupResultDialog.message = error;
+                backupResultDialog.open();
             }
         }
     }
@@ -1221,7 +1290,7 @@ Rectangle {
         repeat: false
         property url backupFile: ""
         onTriggered: {
-            appController.startImportDatabaseBackup(backupFile)
+            appController.startImportDatabaseBackup(backupFile);
         }
     }
 
@@ -1235,22 +1304,22 @@ Rectangle {
     Connections {
         target: appController
         function onExportDatabaseBackupFinished(success, error) {
-            appShell.hideLoading()
-            backupResultDialog.title = success ? "导出成功" : "导出失败"
-            backupResultDialog.message = success ? "备份已导出到所选位置" : error
-            backupResultDialog.open()
+            appShell.hideLoading();
+            backupResultDialog.title = success ? "导出成功" : "导出失败";
+            backupResultDialog.message = success ? "备份已导出到所选位置" : error;
+            backupResultDialog.open();
         }
         function onImportDatabaseBackupFinished(success, error) {
-            appShell.hideLoading()
+            appShell.hideLoading();
             if (success) {
-                backupResultDialog.title = "导入成功"
-                backupResultDialog.message = "数据库已导入，应用将自动重启以完成恢复"
-                backupResultDialog.open()
-                restartTimer.restart()
+                backupResultDialog.title = "导入成功";
+                backupResultDialog.message = "数据库已导入，应用将自动重启以完成恢复";
+                backupResultDialog.open();
+                restartTimer.restart();
             } else {
-                backupResultDialog.title = "导入失败"
-                backupResultDialog.message = error
-                backupResultDialog.open()
+                backupResultDialog.title = "导入失败";
+                backupResultDialog.message = error;
+                backupResultDialog.open();
             }
         }
     }

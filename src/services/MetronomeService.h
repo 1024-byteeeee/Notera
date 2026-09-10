@@ -11,11 +11,12 @@ class MetronomeService final : public QObject
     Q_OBJECT
     Q_PROPERTY(bool running READ running NOTIFY runningChanged)
     Q_PROPERTY(int bpm READ bpm WRITE setBpm NOTIFY bpmChanged)
-    Q_PROPERTY(int beatsPerMeasure READ beatsPerMeasure WRITE setBeatsPerMeasure NOTIFY beatsPerMeasureChanged)
+    Q_PROPERTY(int beatsPerMeasure READ beatsPerMeasure WRITE setBeatsPerMeasure NOTIFY
+                   beatsPerMeasureChanged)
     Q_PROPERTY(int beatUnit READ beatUnit WRITE setBeatUnit NOTIFY beatUnitChanged)
     Q_PROPERTY(double volume READ volume WRITE setVolume NOTIFY volumeChanged)
 
-public:
+  public:
     explicit MetronomeService(QObject* parent = nullptr);
     ~MetronomeService() override;
 
@@ -33,7 +34,7 @@ public:
     Q_INVOKABLE void stop();
     Q_INVOKABLE void toggle();
 
-signals:
+  signals:
     void runningChanged();
     void bpmChanged();
     void beatsPerMeasureChanged();
@@ -41,19 +42,19 @@ signals:
     void volumeChanged();
     void beat(int beatIndex);
 
-private slots:
+  private slots:
     void onTick();
 
-private:
+  private:
     void updateTimerInterval();
 
     QTimer m_timer;
     std::unique_ptr<MetronomeAudio> m_audio;
 
-    bool m_running {false};
-    int m_bpm {120};
-    int m_beatsPerMeasure {4};
-    int m_beatUnit {4};
-    double m_volume {0.8};
-    int m_currentBeat {0};
+    bool m_running{false};
+    int m_bpm{120};
+    int m_beatsPerMeasure{4};
+    int m_beatUnit{4};
+    double m_volume{0.8};
+    int m_currentBeat{0};
 };

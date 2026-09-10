@@ -5,7 +5,7 @@
 
 class MetronomeAudio
 {
-public:
+  public:
     virtual ~MetronomeAudio() = default;
     virtual void setSources(const QString& accentPath, const QString& normalPath) = 0;
     virtual void setVolume(double volume) = 0;

@@ -6,28 +6,21 @@
 #include <algorithm>
 #include <limits>
 
-namespace Notera {
-
-PdfRenderCache::PdfRenderCache(QObject* parent)
-    : QObject(parent)
-{
-}
-
-int PdfRenderCache::quantizeScale(qreal scale)
+namespace Notera
 {
 
-    return qRound(scale * 10000.0);
-}
+PdfRenderCache::PdfRenderCache(QObject* parent) : QObject(parent) {}
 
-QString PdfRenderCache::makeKey(int page, qreal scale, int rotation,
-    int tileRow, int tileCol)
+int PdfRenderCache::quantizeScale(qreal scale) { return qRound(scale * 10000.0); }
+
+QString PdfRenderCache::makeKey(int page, qreal scale, int rotation, int tileRow, int tileCol)
 {
-    QString key = QString::number(page) + QLatin1Char('_')
-        + QString::number(quantizeScale(scale)) + QLatin1Char('_')
-        + QString::number(rotation);
-    if (tileRow >= 0 && tileCol >= 0) {
-        key += QLatin1Char('_') + QString::number(tileRow)
-            + QLatin1Char('_') + QString::number(tileCol);
+    QString key = QString::number(page) + QLatin1Char('_') + QString::number(quantizeScale(scale)) +
+                  QLatin1Char('_') + QString::number(rotation);
+    if (tileRow >= 0 && tileCol >= 0)
+    {
+        key += QLatin1Char('_') + QString::number(tileRow) + QLatin1Char('_') +
+               QString::number(tileCol);
     }
     return key;
 }
@@ -37,12 +30,12 @@ size_t PdfRenderCache::imageBytes(const QImage& img)
     if (img.isNull())
         return 0;
 
-    return static_cast<size_t>(img.width()) * static_cast<size_t>(img.height())
-        * static_cast<size_t>((img.depth() + 7) / 8);
+    return static_cast<size_t>(img.width()) * static_cast<size_t>(img.height()) *
+           static_cast<size_t>((img.depth() + 7) / 8);
 }
 
-void PdfRenderCache::insert(int page, qreal scale, int rotation, const QImage& image,
-    int tileRow, int tileCol)
+void PdfRenderCache::insert(int page, qreal scale, int rotation, const QImage& image, int tileRow,
+                            int tileCol)
 {
     if (image.isNull())
         return;
@@ -52,13 +45,16 @@ void PdfRenderCache::insert(int page, qreal scale, int rotation, const QImage& i
     const size_t bytes = imageBytes(image);
 
     auto it = m_entries.find(key);
-    if (it != m_entries.end()) {
+    if (it != m_entries.end())
+    {
 
         m_currentBytes -= it->bytes;
         it->image = image;
         it->bytes = bytes;
         it->lastAccess = QDateTime::currentMSecsSinceEpoch();
-    } else {
+    }
+    else
+    {
         Entry entry;
         entry.image = image;
         entry.bytes = bytes;
@@ -70,8 +66,7 @@ void PdfRenderCache::insert(int page, qreal scale, int rotation, const QImage& i
     evictIfNeeded();
 }
 
-QImage PdfRenderCache::get(int page, qreal scale, int rotation,
-    int tileRow, int tileCol)
+QImage PdfRenderCache::get(int page, qreal scale, int rotation, int tileRow, int tileCol)
 {
     QMutexLocker lock(&m_mutex);
     const QString key = makeKey(page, scale, rotation, tileRow, tileCol);
@@ -82,8 +77,7 @@ QImage PdfRenderCache::get(int page, qreal scale, int rotation,
     return it->image;
 }
 
-bool PdfRenderCache::has(int page, qreal scale, int rotation,
-    int tileRow, int tileCol) const
+bool PdfRenderCache::has(int page, qreal scale, int rotation, int tileRow, int tileCol) const
 {
     QMutexLocker lock(&m_mutex);
     return m_entries.contains(makeKey(page, scale, rotation, tileRow, tileCol));
@@ -96,7 +90,8 @@ QString PdfRenderCache::closestKey(int page, qreal scale, int rotation) const
     QString bestKey;
     int bestDiff = std::numeric_limits<int>::max();
 
-    for (auto it = m_entries.constBegin(); it != m_entries.constEnd(); ++it) {
+    for (auto it = m_entries.constBegin(); it != m_entries.constEnd(); ++it)
+    {
         const QString& key = it.key();
         const QStringList parts = key.split(QLatin1Char('_'));
         if (parts.size() != 3)
@@ -110,7 +105,8 @@ QString PdfRenderCache::closestKey(int page, qreal scale, int rotation) const
         if (p != page || r != rotation)
             continue;
         const int diff = qAbs(s - targetQ);
-        if (diff < bestDiff) {
+        if (diff < bestDiff)
+        {
             bestDiff = diff;
             bestKey = key;
         }
@@ -161,13 +157,15 @@ void PdfRenderCache::evictIfNeeded()
 
     QList<QPair<qint64, QString>> byTime;
     byTime.reserve(m_entries.size());
-    for (auto it = m_entries.constBegin(); it != m_entries.constEnd(); ++it) {
+    for (auto it = m_entries.constBegin(); it != m_entries.constEnd(); ++it)
+    {
         byTime.append({it->lastAccess, it.key()});
     }
     std::sort(byTime.begin(), byTime.end(),
-        [](const auto& a, const auto& b) { return a.first < b.first; });
+              [](const auto& a, const auto& b) { return a.first < b.first; });
 
-    for (const auto& [_, key] : byTime) {
+    for (const auto& [_, key] : byTime)
+    {
         if (m_currentBytes <= m_memoryBudget)
             break;
         auto it = m_entries.find(key);
@@ -178,4 +176,4 @@ void PdfRenderCache::evictIfNeeded()
     }
 }
 
-}
+} // namespace Notera

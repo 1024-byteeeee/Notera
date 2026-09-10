@@ -3,12 +3,6 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Notera
 
-
-
-
-
-
-
 Item {
     id: root
 
@@ -18,7 +12,6 @@ Item {
     z: 10000
     anchors.fill: parent
 
-
     Rectangle {
         anchors.fill: parent
         color: "#00000080"
@@ -26,7 +19,6 @@ Item {
         MouseArea {
             anchors.fill: parent
         }
-
 
         Rectangle {
             anchors.centerIn: parent
@@ -62,12 +54,12 @@ Item {
     }
 
     function show(msg) {
-        if (msg !== undefined && msg.length > 0) root.message = msg
-        root.visible = true
+        if (msg !== undefined && msg.length > 0)
+            root.message = msg;
+        root.visible = true;
     }
 
     function hide() {
-
-        root.visible = false
+        root.visible = false;
     }
 }

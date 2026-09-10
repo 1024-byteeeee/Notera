@@ -17,30 +17,30 @@ Rectangle {
     function folderHasChildren(folderId) {
         for (let i = 0; i < libraryService.folders.count; i++) {
             if (libraryService.folders.get(i).parentId === folderId) {
-                return true
+                return true;
             }
         }
-        return false
+        return false;
     }
 
     function isFolderExpanded(folderId) {
-        return !!root.expandedFolderIds[folderId]
+        return !!root.expandedFolderIds[folderId];
     }
 
     function toggleFolder(folderId) {
         if (root.expandedFolderIds[folderId]) {
-            delete root.expandedFolderIds[folderId]
+            delete root.expandedFolderIds[folderId];
         } else {
-            root.expandedFolderIds[folderId] = true
+            root.expandedFolderIds[folderId] = true;
         }
-        root.refreshVisibleFolders()
+        root.refreshVisibleFolders();
     }
 
     function refreshVisibleFolders() {
-        root.visibleFoldersModel.clear()
+        root.visibleFoldersModel.clear();
         function addChildren(parentId, depth) {
             for (let i = 0; i < libraryService.folders.count; i++) {
-                const f = libraryService.folders.get(i)
+                const f = libraryService.folders.get(i);
                 if (f.parentId === parentId) {
                     root.visibleFoldersModel.append({
                         itemId: f.itemId,
@@ -49,38 +49,40 @@ Rectangle {
                         depth: depth,
                         hasChildren: root.folderHasChildren(f.itemId),
                         expanded: root.isFolderExpanded(f.itemId)
-                    })
+                    });
                     if (root.isFolderExpanded(f.itemId)) {
-                        addChildren(f.itemId, depth + 1)
+                        addChildren(f.itemId, depth + 1);
                     }
                 }
             }
         }
-        addChildren("", 0)
+        addChildren("", 0);
     }
 
     function draggedIds(drag) {
-        return drag.source && drag.source.dragIds ? drag.source.dragIds : []
+        return drag.source && drag.source.dragIds ? drag.source.dragIds : [];
     }
     function canMoveAll(ids, folderId) {
-        if (!ids || ids.length === 0) return false
+        if (!ids || ids.length === 0)
+            return false;
         for (let i = 0; i < ids.length; ++i) {
-            if (!libraryService.canMoveItemToFolder(ids[i], folderId)) return false
+            if (!libraryService.canMoveItemToFolder(ids[i], folderId))
+                return false;
         }
-        return true
+        return true;
     }
 
     Connections {
         target: libraryService.folders
         function onCountChanged() {
-            root.refreshVisibleFolders()
+            root.refreshVisibleFolders();
         }
     }
 
     Connections {
         target: libraryService
         function onFoldersChanged() {
-            root.refreshVisibleFolders()
+            root.refreshVisibleFolders();
         }
     }
 
@@ -98,17 +100,15 @@ Rectangle {
         property bool hasChildren: false
         property bool expanded: false
         property bool tagEntry: false
-        readonly property bool acceptsLibraryDrop: navId === "all" || navId === "favorites"
-            || navId.startsWith("folder:") || navId.startsWith("tag:")
+        readonly property bool acceptsLibraryDrop: navId === "all" || navId === "favorites" || navId.startsWith("folder:") || navId.startsWith("tag:")
         readonly property int hoverTransitionDuration: 0
-        signal contextRequested()
-        signal toggleExpand()
+        signal contextRequested
+        signal toggleExpand
 
         Layout.fillWidth: true
         implicitHeight: 40
         radius: Theme.radiusMd
-        color: navDrop.containsDrag ? Theme.accentSoft
-            : selected ? Theme.selectedBackground : (navMouse.containsMouse ? Theme.buttonHover : Qt.rgba(Theme.buttonHover.r, Theme.buttonHover.g, Theme.buttonHover.b, 0))
+        color: navDrop.containsDrag ? Theme.accentSoft : selected ? Theme.selectedBackground : (navMouse.containsMouse ? Theme.buttonHover : Qt.rgba(Theme.buttonHover.r, Theme.buttonHover.g, Theme.buttonHover.b, 0))
         border.width: selected ? 1 : 0
         border.color: selected ? Theme.selectedBorder : "transparent"
 
@@ -130,7 +130,12 @@ Rectangle {
             anchors.rightMargin: 12
             spacing: 10
             scale: navMouse.pressed ? 0.985 : 1
-            Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Easing.OutCubic } }
+            Behavior on scale {
+                NumberAnimation {
+                    duration: Motion.fast
+                    easing.type: Easing.OutCubic
+                }
+            }
 
             AppIcon {
                 Layout.preferredWidth: 16
@@ -177,52 +182,56 @@ Rectangle {
         MouseArea {
             id: navMouse
             anchors.fill: parent
-            acceptedButtons: navItem.contextEnabled
-                ? Qt.LeftButton | Qt.RightButton
-                : Qt.LeftButton
+            acceptedButtons: navItem.contextEnabled ? Qt.LeftButton | Qt.RightButton : Qt.LeftButton
             hoverEnabled: true
             preventStealing: true
             cursorShape: Qt.PointingHandCursor
-            onPressed: function(mouse) {
+            onPressed: function (mouse) {
                 if (mouse.button === Qt.RightButton && navItem.contextEnabled) {
-                    navItem.contextRequested()
+                    navItem.contextRequested();
                 }
             }
-            onClicked: function(mouse) {
-                if (mouse.button === Qt.RightButton) return
+            onClicked: function (mouse) {
+                if (mouse.button === Qt.RightButton)
+                    return;
                 if (navItem.targetPage === "library") {
-                    if (navItem.navId === "all") libraryService.goToLibraryRoot()
-                    appController.libraryFilter = navItem.navId
-                    appController.currentPage = "library"
+                    if (navItem.navId === "all")
+                        libraryService.goToLibraryRoot();
+                    appController.libraryFilter = navItem.navId;
+                    appController.currentPage = "library";
                 } else {
-                    appController.currentPage = navItem.targetPage
+                    appController.currentPage = navItem.targetPage;
                 }
             }
         }
-
 
         DropArea {
             id: navDrop
             anchors.fill: parent
             z: 5
             enabled: navItem.acceptsLibraryDrop
-            onEntered: function(drag) {
-                const ids = root.draggedIds(drag)
-                if (navItem.navId === "all") drag.accepted = root.canMoveAll(ids, "")
+            onEntered: function (drag) {
+                const ids = root.draggedIds(drag);
+                if (navItem.navId === "all")
+                    drag.accepted = root.canMoveAll(ids, "");
                 else if (navItem.navId.startsWith("folder:"))
-                    drag.accepted = root.canMoveAll(ids, navItem.navId.substring(7))
-                else drag.accepted = ids.length > 0
+                    drag.accepted = root.canMoveAll(ids, navItem.navId.substring(7));
+                else
+                    drag.accepted = ids.length > 0;
             }
-            onDropped: function(drop) {
-                const ids = root.draggedIds(drop)
-                if (ids.length === 0) return
-                if (navItem.navId === "all") libraryService.moveItems(ids, "")
-                else if (navItem.navId === "favorites") libraryService.favoriteItems(ids)
+            onDropped: function (drop) {
+                const ids = root.draggedIds(drop);
+                if (ids.length === 0)
+                    return;
+                if (navItem.navId === "all")
+                    libraryService.moveItems(ids, "");
+                else if (navItem.navId === "favorites")
+                    libraryService.favoriteItems(ids);
                 else if (navItem.navId.startsWith("folder:"))
-                    libraryService.moveItems(ids, navItem.navId.substring(7))
+                    libraryService.moveItems(ids, navItem.navId.substring(7));
                 else if (navItem.navId.startsWith("tag:"))
-                    libraryService.tagItems(ids, navItem.navId.substring(4))
-                drop.acceptProposedAction()
+                    libraryService.tagItems(ids, navItem.navId.substring(4));
+                drop.acceptProposedAction();
             }
         }
     }
@@ -269,15 +278,21 @@ Rectangle {
 
         NavItem {
             objectName: "libraryNavItem"
-            label: "乐谱库"; navId: "all"; symbol: "music"
+            label: "乐谱库"
+            navId: "all"
+            symbol: "music"
             selected: appController.currentPage === "library" && appController.libraryFilter === "all"
         }
         NavItem {
-            label: "最近使用"; navId: "recent"; symbol: "recent"
+            label: "最近使用"
+            navId: "recent"
+            symbol: "recent"
             selected: appController.currentPage === "library" && appController.libraryFilter === "recent"
         }
         NavItem {
-            label: "收藏"; navId: "favorites"; symbol: "star-filled"
+            label: "收藏"
+            navId: "favorites"
+            symbol: "star-filled"
             selected: appController.currentPage === "library" && appController.libraryFilter === "favorites"
         }
 
@@ -299,7 +314,9 @@ Rectangle {
             boundsBehavior: Flickable.StopAtBounds
             clip: true
 
-            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+            ScrollBar.vertical: ScrollBar {
+                policy: ScrollBar.AsNeeded
+            }
 
             ColumnLayout {
                 id: collectionsLayout
@@ -321,7 +338,9 @@ Rectangle {
                         font.weight: Font.DemiBold
                         font.letterSpacing: 0.7
                     }
-                    Item { Layout.fillWidth: true }
+                    Item {
+                        Layout.fillWidth: true
+                    }
                     IconButton {
                         objectName: "newFolderButton"
                         symbol: "plus"
@@ -329,8 +348,8 @@ Rectangle {
                         implicitHeight: 26
                         Accessible.name: "新建文件夹"
                         onClicked: {
-                            newFolderDialog.value = ""
-                            newFolderDialog.open()
+                            newFolderDialog.value = "";
+                            newFolderDialog.open();
                         }
                     }
                 }
@@ -354,9 +373,9 @@ Rectangle {
                         selected: appController.currentPage === "library" && appController.libraryFilter === navId
                         onToggleExpand: root.toggleFolder(itemId)
                         onContextRequested: {
-                            folderMenu.targetId = itemId
-                            folderMenu.targetName = name
-                            folderMenu.popup()
+                            folderMenu.targetId = itemId;
+                            folderMenu.targetName = name;
+                            folderMenu.popup();
                         }
                     }
                 }
@@ -383,7 +402,9 @@ Rectangle {
                         font.weight: Font.DemiBold
                         font.letterSpacing: 0.7
                     }
-                    Item { Layout.fillWidth: true }
+                    Item {
+                        Layout.fillWidth: true
+                    }
                     IconButton {
                         objectName: "newTagButton"
                         symbol: "plus"
@@ -391,8 +412,8 @@ Rectangle {
                         implicitHeight: 26
                         Accessible.name: "新建标签"
                         onClicked: {
-                            newTagDialog.value = ""
-                            newTagDialog.open()
+                            newTagDialog.value = "";
+                            newTagDialog.open();
                         }
                     }
                 }
@@ -410,9 +431,9 @@ Rectangle {
                         contextEnabled: true
                         selected: appController.currentPage === "library" && appController.libraryFilter === navId
                         onContextRequested: {
-                            tagMenu.targetId = itemId
-                            tagMenu.targetName = name
-                            tagMenu.popup()
+                            tagMenu.targetId = itemId;
+                            tagMenu.targetName = name;
+                            tagMenu.popup();
                         }
                     }
                 }
@@ -435,7 +456,10 @@ Rectangle {
         }
 
         NavItem {
-            label: "设置"; navId: "settings"; symbol: "settings"; targetPage: "settings"
+            label: "设置"
+            navId: "settings"
+            symbol: "settings"
+            targetPage: "settings"
             selected: appController.currentPage === "settings"
         }
     }
@@ -445,27 +469,35 @@ Rectangle {
         objectName: "folderEditorDialog"
         title: "新建文件夹"
         placeholderText: "输入文件夹名称"
-        onSubmitted: function(text) { libraryService.createFolder(text) }
+        onSubmitted: function (text) {
+            libraryService.createFolder(text);
+        }
     }
     AppDialog {
         id: newTagDialog
         title: "新建标签"
         placeholderText: "输入标签名称"
-        onSubmitted: function(text) { libraryService.createTag(text) }
+        onSubmitted: function (text) {
+            libraryService.createTag(text);
+        }
     }
     AppDialog {
         id: renameFolderDialog
         property string targetId: ""
         title: "重命名文件夹"
         placeholderText: "输入新名称"
-        onSubmitted: function(text) { libraryService.renameFolder(targetId, text) }
+        onSubmitted: function (text) {
+            libraryService.renameFolder(targetId, text);
+        }
     }
     AppDialog {
         id: renameTagDialog
         property string targetId: ""
         title: "重命名标签"
         placeholderText: "输入新名称"
-        onSubmitted: function(text) { libraryService.renameTag(targetId, text) }
+        onSubmitted: function (text) {
+            libraryService.renameTag(targetId, text);
+        }
     }
 
     ConfirmDialog {
@@ -473,13 +505,13 @@ Rectangle {
         property bool deletingFolder: true
         property string targetId: ""
         title: deletingFolder ? "删除文件夹？" : "删除标签？"
-        message: deletingFolder
-            ? "文件夹、子文件夹及其中的所有乐谱都会被删除。此操作无法撤销"
-            : "删除标签不会删除任何乐谱"
+        message: deletingFolder ? "文件夹、子文件夹及其中的所有乐谱都会被删除。此操作无法撤销" : "删除标签不会删除任何乐谱"
         onAccepted: {
-            if (deletingFolder) libraryService.deleteFolder(targetId)
-            else libraryService.deleteTag(targetId)
-            appController.libraryFilter = "all"
+            if (deletingFolder)
+                libraryService.deleteFolder(targetId);
+            else
+                libraryService.deleteTag(targetId);
+            appController.libraryFilter = "all";
         }
     }
 
@@ -492,20 +524,20 @@ Rectangle {
             symbol: "edit"
             text: "重命名"
             onTriggered: {
-                renameFolderDialog.targetId = folderMenu.targetId
-                renameFolderDialog.value = folderMenu.targetName
-                renameFolderDialog.open()
+                renameFolderDialog.targetId = folderMenu.targetId;
+                renameFolderDialog.value = folderMenu.targetName;
+                renameFolderDialog.open();
             }
         }
-        AppMenuSeparator { }
+        AppMenuSeparator {}
         AppMenuItem {
             symbol: "trash"
             text: "删除文件夹"
             danger: true
             onTriggered: {
-                deleteCollectionDialog.deletingFolder = true
-                deleteCollectionDialog.targetId = folderMenu.targetId
-                deleteCollectionDialog.open()
+                deleteCollectionDialog.deletingFolder = true;
+                deleteCollectionDialog.targetId = folderMenu.targetId;
+                deleteCollectionDialog.open();
             }
         }
     }
@@ -519,20 +551,20 @@ Rectangle {
             symbol: "edit"
             text: "重命名"
             onTriggered: {
-                renameTagDialog.targetId = tagMenu.targetId
-                renameTagDialog.value = tagMenu.targetName
-                renameTagDialog.open()
+                renameTagDialog.targetId = tagMenu.targetId;
+                renameTagDialog.value = tagMenu.targetName;
+                renameTagDialog.open();
             }
         }
-        AppMenuSeparator { }
+        AppMenuSeparator {}
         AppMenuItem {
             symbol: "trash"
             text: "删除标签"
             danger: true
             onTriggered: {
-                deleteCollectionDialog.deletingFolder = false
-                deleteCollectionDialog.targetId = tagMenu.targetId
-                deleteCollectionDialog.open()
+                deleteCollectionDialog.deletingFolder = false;
+                deleteCollectionDialog.targetId = tagMenu.targetId;
+                deleteCollectionDialog.open();
             }
         }
     }

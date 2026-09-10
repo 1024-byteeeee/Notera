@@ -8,8 +8,9 @@ class NamedListModel final : public QAbstractListModel
     Q_OBJECT
     Q_PROPERTY(int count READ count NOTIFY countChanged)
 
-public:
-    enum Role {
+  public:
+    enum Role
+    {
         ItemIdRole = Qt::UserRole + 1,
         NameRole,
         ParentIdRole
@@ -26,11 +27,12 @@ public:
 
     void replaceAll(const QVariantList& values);
 
-signals:
+  signals:
     void countChanged();
 
-private:
-    struct Item {
+  private:
+    struct Item
+    {
         QString id;
         QString name;
         QString parentId;

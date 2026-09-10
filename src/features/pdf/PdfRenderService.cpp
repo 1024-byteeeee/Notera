@@ -5,23 +5,22 @@
 #include <QSignalBlocker>
 #include <QUrl>
 
-namespace Notera {
+namespace Notera
+{
 
 PdfRenderService::PdfRenderService(QObject* parent)
-    : QObject(parent)
-    , m_renderer(new QPdfPageRenderer(this))
-    , m_cache(new PdfRenderCache(this))
+    : QObject(parent), m_renderer(new QPdfPageRenderer(this)), m_cache(new PdfRenderCache(this))
 {
     m_renderer->setRenderMode(QPdfPageRenderer::RenderMode::MultiThreaded);
-    connect(m_renderer, &QPdfPageRenderer::pageRendered,
-        this, &PdfRenderService::onPageRendered);
+    connect(m_renderer, &QPdfPageRenderer::pageRendered, this, &PdfRenderService::onPageRendered);
 }
 
 PdfRenderService::~PdfRenderService() = default;
 
 void PdfRenderService::onOwnedDocumentStatusChanged(QPdfDocument::Status status)
 {
-    if (status == QPdfDocument::Status::Ready && m_document == m_ownedDocument) {
+    if (status == QPdfDocument::Status::Ready && m_document == m_ownedDocument)
+    {
         emit documentChanged();
     }
 }
@@ -29,49 +28,54 @@ void PdfRenderService::onOwnedDocumentStatusChanged(QPdfDocument::Status status)
 QPdfDocumentRenderOptions::Rotation PdfRenderService::rotationFromDegrees(int degrees)
 {
     const int norm = ((degrees % 360) + 360) % 360;
-    switch (norm) {
-    case 90:  return QPdfDocumentRenderOptions::Rotation::Clockwise90;
-    case 180: return QPdfDocumentRenderOptions::Rotation::Clockwise180;
-    case 270: return QPdfDocumentRenderOptions::Rotation::Clockwise270;
-    default:  return QPdfDocumentRenderOptions::Rotation::None;
+    switch (norm)
+    {
+    case 90:
+        return QPdfDocumentRenderOptions::Rotation::Clockwise90;
+    case 180:
+        return QPdfDocumentRenderOptions::Rotation::Clockwise180;
+    case 270:
+        return QPdfDocumentRenderOptions::Rotation::Clockwise270;
+    default:
+        return QPdfDocumentRenderOptions::Rotation::None;
     }
 }
 
 void PdfRenderService::setDocument(QObject* document)
 {
 
-
-
-
-
     QPdfDocument* pdfDoc = nullptr;
     QString newSource;
 
-    if (document) {
+    if (document)
+    {
 
         pdfDoc = qobject_cast<QPdfDocument*>(document);
-        if (pdfDoc) {
+        if (pdfDoc)
+        {
 
             if (m_document == pdfDoc)
                 return;
-        } else {
+        }
+        else
+        {
 
             const QVariant sourceVar = document->property("source");
-            if (sourceVar.isValid() && sourceVar.canConvert<QUrl>()) {
+            if (sourceVar.isValid() && sourceVar.canConvert<QUrl>())
+            {
                 const QUrl source = sourceVar.toUrl();
-                if (source.isValid() && !source.isEmpty()) {
+                if (source.isValid() && !source.isEmpty())
+                {
                     newSource = source.toLocalFile();
 
                     if (newSource == m_currentSource && m_ownedDocument)
                         return;
-                    if (!m_ownedDocument) {
+                    if (!m_ownedDocument)
+                    {
                         m_ownedDocument = new QPdfDocument(this);
-                        connect(m_ownedDocument, &QPdfDocument::statusChanged,
-                            this, &PdfRenderService::onOwnedDocumentStatusChanged);
+                        connect(m_ownedDocument, &QPdfDocument::statusChanged, this,
+                                &PdfRenderService::onOwnedDocumentStatusChanged);
                     }
-
-
-
 
                     const QSignalBlocker blocker(m_ownedDocument);
                     m_ownedDocument->load(newSource);
@@ -81,22 +85,21 @@ void PdfRenderService::setDocument(QObject* document)
         }
     }
 
-
     cancelAll();
     m_cache->clear();
     m_document = pdfDoc;
     m_currentSource = newSource;
-    if (m_document) {
+    if (m_document)
+    {
         m_renderer->setDocument(m_document);
 
         if (m_document->status() == QPdfDocument::Status::Ready)
             emit documentChanged();
     }
-
 }
 
-quint64 PdfRenderService::requestRender(int page, qreal scale, int rotation,
-    QSize imageSize, int priority, int tileRow, int tileCol, int tileCount)
+quint64 PdfRenderService::requestRender(int page, qreal scale, int rotation, QSize imageSize,
+                                        int priority, int tileRow, int tileCol, int tileCount)
 {
     const Priority prio = (priority == 1) ? Priority::Low : Priority::High;
     if (!m_document || m_document->status() != QPdfDocument::Status::Ready)
@@ -107,7 +110,6 @@ quint64 PdfRenderService::requestRender(int page, qreal scale, int rotation,
         return 0;
     if (m_cache->has(page, scale, rotation, tileRow, tileCol))
         return 0;
-
 
     const quint64 id = m_nextId++;
 
@@ -122,7 +124,8 @@ quint64 PdfRenderService::requestRender(int page, qreal scale, int rotation,
     req.tileCol = tileCol;
     req.tileCount = qMax(1, tileCount);
 
-    if (!m_inFlight) {
+    if (!m_inFlight)
+    {
 
         const quint64 rendererId = m_renderer->requestPage(page, imageSize, buildOptions(req));
         if (rendererId == 0)
@@ -130,7 +133,9 @@ quint64 PdfRenderService::requestRender(int page, qreal scale, int rotation,
         req.rendererId = rendererId;
         req.inFlight = true;
         m_inFlight = true;
-    } else {
+    }
+    else
+    {
 
         if (prio == Priority::High)
             m_highQueue.append(id);
@@ -146,13 +151,14 @@ QPdfDocumentRenderOptions PdfRenderService::buildOptions(const Request& req) con
 {
     QPdfDocumentRenderOptions options;
     options.setRotation(rotationFromDegrees(req.rotation));
-    if (req.tileRow >= 0 && req.tileCol >= 0 && req.tileCount > 1) {
+    if (req.tileRow >= 0 && req.tileCol >= 0 && req.tileCount > 1)
+    {
 
         const int blockW = req.imageSize.width() / req.tileCount;
         const int blockH = req.imageSize.height() / req.tileCount;
         options.setScaledSize(req.imageSize);
-        options.setScaledClipRect(QRect(
-            req.tileCol * blockW, req.tileRow * blockH, blockW, blockH));
+        options.setScaledClipRect(
+            QRect(req.tileCol * blockW, req.tileRow * blockH, blockW, blockH));
     }
     return options;
 }
@@ -164,7 +170,6 @@ void PdfRenderService::dispatchNext()
     if (!m_document || m_document->status() != QPdfDocument::Status::Ready)
         return;
 
-
     quint64 id = 0;
     if (!m_highQueue.isEmpty())
         id = m_highQueue.takeFirst();
@@ -174,15 +179,16 @@ void PdfRenderService::dispatchNext()
         return;
 
     auto it = m_requests.find(id);
-    if (it == m_requests.end()) {
+    if (it == m_requests.end())
+    {
 
         dispatchNext();
         return;
     }
 
-    const quint64 rendererId = m_renderer->requestPage(
-        it->page, it->imageSize, buildOptions(*it));
-    if (rendererId == 0) {
+    const quint64 rendererId = m_renderer->requestPage(it->page, it->imageSize, buildOptions(*it));
+    if (rendererId == 0)
+    {
 
         m_requests.erase(it);
         dispatchNext();
@@ -206,7 +212,6 @@ void PdfRenderService::cancelRequest(quint64 requestId)
     if (requestId == 0)
         return;
 
-
     removeRequest(requestId);
 }
 
@@ -216,38 +221,44 @@ void PdfRenderService::cancelAll()
     m_lowQueue.clear();
     m_requests.clear();
 
-
     m_inFlight = false;
 }
 
 void PdfRenderService::cancelLowPriority()
 {
 
-    for (const quint64 id : m_lowQueue) {
+    for (const quint64 id : m_lowQueue)
+    {
         m_requests.remove(id);
     }
     m_lowQueue.clear();
 
-
-    if (m_inFlight) {
-        for (auto it = m_requests.begin(); it != m_requests.end(); ) {
-            if (it->inFlight && it->priority == Priority::Low) {
+    if (m_inFlight)
+    {
+        for (auto it = m_requests.begin(); it != m_requests.end();)
+        {
+            if (it->inFlight && it->priority == Priority::Low)
+            {
                 it = m_requests.erase(it);
-            } else {
+            }
+            else
+            {
                 ++it;
             }
         }
     }
 }
 
-void PdfRenderService::onPageRendered(int pageNumber, QSize              ,
-    const QImage& image, const QPdfDocumentRenderOptions&            , quint64 requestId)
+void PdfRenderService::onPageRendered(int pageNumber, QSize, const QImage& image,
+                                      const QPdfDocumentRenderOptions&, quint64 requestId)
 {
 
     Request req;
     bool found = false;
-    for (auto it = m_requests.begin(); it != m_requests.end(); ++it) {
-        if (it->rendererId == requestId && it->inFlight) {
+    for (auto it = m_requests.begin(); it != m_requests.end(); ++it)
+    {
+        if (it->rendererId == requestId && it->inFlight)
+        {
             req = it.value();
             found = true;
             m_requests.erase(it);
@@ -257,31 +268,29 @@ void PdfRenderService::onPageRendered(int pageNumber, QSize              ,
 
     m_inFlight = false;
 
-    if (!found) {
+    if (!found)
+    {
 
         dispatchNext();
         return;
     }
 
-    if (pageNumber != req.page) {
+    if (pageNumber != req.page)
+    {
         dispatchNext();
         return;
     }
 
-    if (!image.isNull()) {
-        m_cache->insert(req.page, req.scale, req.rotation, image,
-            req.tileRow, req.tileCol);
+    if (!image.isNull())
+    {
+        m_cache->insert(req.page, req.scale, req.rotation, image, req.tileRow, req.tileCol);
     }
     emit renderFinished(req.id, req.page, req.scale, req.rotation);
-
 
     dispatchNext();
 }
 
-
-
-bool PdfRenderService::hasCache(int page, qreal scale, int rotation,
-    int tileRow, int tileCol) const
+bool PdfRenderService::hasCache(int page, qreal scale, int rotation, int tileRow, int tileCol) const
 {
     return m_cache->has(page, scale, rotation, tileRow, tileCol);
 }
@@ -297,14 +306,8 @@ void PdfRenderService::clearCache()
     m_cache->clear();
 }
 
-int PdfRenderService::cachePageCount() const
-{
-    return m_cache->pageCount();
-}
+int PdfRenderService::cachePageCount() const { return m_cache->pageCount(); }
 
-qreal PdfRenderService::cacheMemoryMB() const
-{
-    return m_cache->memoryMB();
-}
+qreal PdfRenderService::cacheMemoryMB() const { return m_cache->memoryMB(); }
 
-}
+} // namespace Notera

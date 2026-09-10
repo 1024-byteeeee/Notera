@@ -2,7 +2,8 @@
 
 #include <QString>
 
-namespace AppDataPaths {
+namespace AppDataPaths
+{
 
 [[nodiscard]] QString root();
 [[nodiscard]] QString defaultRoot();
@@ -13,4 +14,4 @@ void setCustomRoot(const QString& path);
 [[nodiscard]] QString annotationsDirectory();
 [[nodiscard]] QString cacheDirectory();
 
-}
+} // namespace AppDataPaths

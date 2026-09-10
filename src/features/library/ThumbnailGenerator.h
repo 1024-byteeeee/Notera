@@ -9,15 +9,15 @@ class ThumbnailGenerator final : public QObject
 {
     Q_OBJECT
 
-public:
+  public:
     explicit ThumbnailGenerator(QObject* parent = nullptr);
     void generate(const QString& scoreId, const QString& scorePath, const QString& fileType);
 
-signals:
+  signals:
     void generated(QString scoreId, QString thumbnailPath);
     void failed(QString scoreId, QString message);
 
-private:
+  private:
     QFutureSynchronizer<void> m_tasks;
     QThreadPool m_threadPool;
 };

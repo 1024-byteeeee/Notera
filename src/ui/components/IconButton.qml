@@ -21,13 +21,17 @@ Button {
         iconName: control.symbol
         iconColor: control.danger ? Theme.danger : (control.selected ? Theme.accent : Theme.mutedForeground)
         scale: control.down && control.enabled ? 0.88 : control.hovered && control.enabled ? 1.06 : 1
-        Behavior on scale { NumberAnimation { duration: Motion.fast; easing.type: Easing.OutCubic } }
+        Behavior on scale {
+            NumberAnimation {
+                duration: Motion.fast
+                easing.type: Easing.OutCubic
+            }
+        }
     }
 
     background: Rectangle {
         radius: Theme.radiusSm
-        color: control.down || control.hovered ? (control.danger ? Theme.dangerSoft : Theme.buttonHover)
-            : control.selected ? Theme.accentSoft : "transparent"
+        color: control.down || control.hovered ? (control.danger ? Theme.dangerSoft : Theme.buttonHover) : control.selected ? Theme.accentSoft : "transparent"
         border.width: control.activeFocus ? 1 : 0
         border.color: Theme.inputFocusBorder
     }

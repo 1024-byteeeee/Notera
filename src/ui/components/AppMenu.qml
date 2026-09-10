@@ -37,14 +37,38 @@ Menu {
 
     enter: Transition {
         ParallelAnimation {
-            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Motion.menuEnter; easing.type: Easing.OutCubic }
-            NumberAnimation { property: "scale"; from: 0.97; to: 1; duration: Motion.menuEnter; easing.type: Easing.OutCubic }
+            NumberAnimation {
+                property: "opacity"
+                from: 0
+                to: 1
+                duration: Motion.menuEnter
+                easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+                property: "scale"
+                from: 0.97
+                to: 1
+                duration: Motion.menuEnter
+                easing.type: Easing.OutCubic
+            }
         }
     }
     exit: Transition {
         ParallelAnimation {
-            NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Motion.menuExit; easing.type: Easing.InCubic }
-            NumberAnimation { property: "scale"; from: 1; to: 0.985; duration: Motion.menuExit; easing.type: Easing.InCubic }
+            NumberAnimation {
+                property: "opacity"
+                from: 1
+                to: 0
+                duration: Motion.menuExit
+                easing.type: Easing.InCubic
+            }
+            NumberAnimation {
+                property: "scale"
+                from: 1
+                to: 0.985
+                duration: Motion.menuExit
+                easing.type: Easing.InCubic
+            }
         }
     }
 }

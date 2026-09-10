@@ -23,20 +23,44 @@ Dialog {
 
     enter: Transition {
         ParallelAnimation {
-            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
-            NumberAnimation { property: "scale"; from: 0.97; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
+            NumberAnimation {
+                property: "opacity"
+                from: 0
+                to: 1
+                duration: Motion.normal
+                easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+                property: "scale"
+                from: 0.97
+                to: 1
+                duration: Motion.normal
+                easing.type: Easing.OutCubic
+            }
         }
     }
     exit: Transition {
         ParallelAnimation {
-            NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Motion.fast; easing.type: Easing.InCubic }
-            NumberAnimation { property: "scale"; from: 1; to: 0.985; duration: Motion.fast; easing.type: Easing.InCubic }
+            NumberAnimation {
+                property: "opacity"
+                from: 1
+                to: 0
+                duration: Motion.fast
+                easing.type: Easing.InCubic
+            }
+            NumberAnimation {
+                property: "scale"
+                from: 1
+                to: 0.985
+                duration: Motion.fast
+                easing.type: Easing.InCubic
+            }
         }
     }
 
     onOpened: {
-        editor.forceActiveFocus()
-        editor.selectAll()
+        editor.forceActiveFocus();
+        editor.selectAll();
     }
 
     header: Label {
@@ -61,8 +85,8 @@ Dialog {
         rightPadding: 12
         onAccepted: {
             if (text.trim().length > 0) {
-                dialog.submitted(text.trim())
-                dialog.close()
+                dialog.submitted(text.trim());
+                dialog.close();
             }
         }
         background: Rectangle {
@@ -91,8 +115,8 @@ Dialog {
                 primary: true
                 enabled: editor.text.trim().length > 0
                 onClicked: {
-                    dialog.submitted(editor.text.trim())
-                    dialog.accept()
+                    dialog.submitted(editor.text.trim());
+                    dialog.accept();
                 }
             }
         }

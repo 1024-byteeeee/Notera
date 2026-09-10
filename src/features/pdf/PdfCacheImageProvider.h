@@ -5,22 +5,20 @@
 #include <QSize>
 #include <QString>
 
-namespace Notera {
+namespace Notera
+{
 
 class PdfRenderCache;
 
-
-
 class PdfCacheImageProvider final : public QQuickImageProvider
 {
-public:
+  public:
     explicit PdfCacheImageProvider(PdfRenderCache* cache);
 
-    QImage requestImage(const QString& id, QSize* size,
-        const QSize& requestedSize) override;
+    QImage requestImage(const QString& id, QSize* size, const QSize& requestedSize) override;
 
-private:
+  private:
     PdfRenderCache* m_cache;
 };
 
-}
+} // namespace Notera

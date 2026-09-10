@@ -9,8 +9,9 @@ class ScoreListModel final : public QAbstractListModel
     Q_OBJECT
     Q_PROPERTY(int count READ count NOTIFY countChanged)
 
-public:
-    enum Role {
+  public:
+    enum Role
+    {
         IdRole = Qt::UserRole + 1,
         TitleRole,
         ComposerRole,
@@ -32,9 +33,9 @@ public:
 
     void replaceAll(QList<Score> scores);
 
-signals:
+  signals:
     void countChanged();
 
-private:
+  private:
     QList<Score> m_scores;
 };

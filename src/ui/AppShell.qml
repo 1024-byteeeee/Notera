@@ -12,48 +12,58 @@ Item {
     readonly property int transitionDuration: Motion.normal
 
     function pageIndex(page) {
-        return page === "library" ? 0 : page === "reader" ? 1 : 2
+        return page === "library" ? 0 : page === "reader" ? 1 : 2;
     }
 
     function animateContent() {
         if (!Motion.enabled) {
-            pageStack.opacity = 1
-            pageTranslate.y = 0
-            return
+            pageStack.opacity = 1;
+            pageTranslate.y = 0;
+            return;
         }
-        pageTransition.stop()
-        pageStack.opacity = 0
-        pageTranslate.y = 8
-        transitionRunCount += 1
-        pageTransition.start()
+        pageTransition.stop();
+        pageStack.opacity = 0;
+        pageTranslate.y = 8;
+        transitionRunCount += 1;
+        pageTransition.start();
     }
 
     function switchPage(page) {
-        const nextIndex = pageIndex(page)
-        if (nextIndex === pageStack.currentIndex) return
-        pageTransition.stop()
-        pageStack.currentIndex = nextIndex
-        animateContent()
+        const nextIndex = pageIndex(page);
+        if (nextIndex === pageStack.currentIndex)
+            return;
+        pageTransition.stop();
+        pageStack.currentIndex = nextIndex;
+        animateContent();
     }
 
+    function showLoading(message) {
+        loadingDialog.show(message);
+    }
 
-
-    function showLoading(message) { loadingDialog.show(message) }
-
-    function hideLoading() { loadingDialog.hide() }
+    function hideLoading() {
+        loadingDialog.hide();
+    }
 
     Connections {
         target: appController
-        function onCurrentPageChanged() { appShell.switchPage(appController.currentPage) }
+        function onCurrentPageChanged() {
+            appShell.switchPage(appController.currentPage);
+        }
         function onLibraryFilterChanged() {
-            libraryService.filterMode = appController.libraryFilter
-            if (appController.currentPage === "library") appShell.animateContent()
+            libraryService.filterMode = appController.libraryFilter;
+            if (appController.currentPage === "library")
+                appShell.animateContent();
         }
     }
     Connections {
         target: libraryService
-        function onErrorOccurred(message) { toast.show(message, false) }
-        function onNoticeOccurred(message) { toast.show(message, true) }
+        function onErrorOccurred(message) {
+            toast.show(message, false);
+        }
+        function onNoticeOccurred(message) {
+            toast.show(message, true);
+        }
     }
 
     Sidebar {
@@ -71,11 +81,13 @@ Item {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         currentIndex: 0
-        transform: Translate { id: pageTranslate }
+        transform: Translate {
+            id: pageTranslate
+        }
 
-        LibraryPage { }
-        ReaderPage { }
-        SettingsPage { }
+        LibraryPage {}
+        ReaderPage {}
+        SettingsPage {}
     }
 
     ParallelAnimation {
@@ -102,11 +114,11 @@ Item {
         property bool isSuccess: true
 
         function show(message, success) {
-            text = message
-            isSuccess = success
-            opacity = 1
-            visible = true
-            hideTimer.restart()
+            text = message;
+            isSuccess = success;
+            opacity = 1;
+            visible = true;
+            hideTimer.restart();
         }
 
         anchors.horizontalCenter: parent.horizontalCenter
@@ -122,7 +134,11 @@ Item {
         implicitHeight: toastLabel.implicitHeight + 22
         z: 100
 
-        Behavior on opacity { NumberAnimation { duration: Motion.normal } }
+        Behavior on opacity {
+            NumberAnimation {
+                duration: Motion.normal
+            }
+        }
 
         Label {
             id: toastLabel
@@ -139,8 +155,8 @@ Item {
             id: hideTimer
             interval: 2800
             onTriggered: {
-                toast.opacity = 0
-                hideCompleteTimer.start()
+                toast.opacity = 0;
+                hideCompleteTimer.start();
             }
         }
         Timer {
@@ -149,7 +165,6 @@ Item {
             onTriggered: toast.visible = false
         }
     }
-
 
     LoadingDialog {
         id: loadingDialog

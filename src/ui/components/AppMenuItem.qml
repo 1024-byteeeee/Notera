@@ -8,15 +8,11 @@ MenuItem {
     property bool danger: false
     property string symbol: ""
     property bool tagIcon: false
-    readonly property string effectiveSymbol: control.symbol.length > 0 ? control.symbol
-        : (control.subMenu && control.subMenu.symbol ? control.subMenu.symbol : "")
-    readonly property bool effectiveTagIcon: control.tagIcon
-        || (control.subMenu && control.subMenu.tagIcon ? control.subMenu.tagIcon : false)
-    readonly property int visibleArrowCount: control.arrow && control.arrow.visible
-        && control.arrow.implicitWidth > 0 ? 1 : 0
+    readonly property string effectiveSymbol: control.symbol.length > 0 ? control.symbol : (control.subMenu && control.subMenu.symbol ? control.subMenu.symbol : "")
+    readonly property bool effectiveTagIcon: control.tagIcon || (control.subMenu && control.subMenu.tagIcon ? control.subMenu.tagIcon : false)
+    readonly property int visibleArrowCount: control.arrow && control.arrow.visible && control.arrow.implicitWidth > 0 ? 1 : 0
     readonly property real arrowVisualWidth: control.arrow && control.arrow.visible ? control.arrow.implicitWidth : 0
-    readonly property real arrowRightInset: control.arrow && control.arrow.visible
-        ? control.width - control.arrow.x - control.arrow.width : 0
+    readonly property real arrowRightInset: control.arrow && control.arrow.visible ? control.width - control.arrow.x - control.arrow.width : 0
 
     implicitHeight: 40
     leftPadding: 12
@@ -45,25 +41,29 @@ MenuItem {
             width: 8
             height: 12
             onPaint: {
-                const ctx = getContext("2d")
-                ctx.reset()
-                ctx.strokeStyle = control.enabled ? Theme.mutedForeground : Theme.faintForeground
-                ctx.lineWidth = 1.5
-                ctx.lineCap = "round"
-                ctx.lineJoin = "round"
-                ctx.beginPath()
-                ctx.moveTo(2.5, 2.5)
-                ctx.lineTo(5.5, 6)
-                ctx.lineTo(2.5, 9.5)
-                ctx.stroke()
+                const ctx = getContext("2d");
+                ctx.reset();
+                ctx.strokeStyle = control.enabled ? Theme.mutedForeground : Theme.faintForeground;
+                ctx.lineWidth = 1.5;
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
+                ctx.beginPath();
+                ctx.moveTo(2.5, 2.5);
+                ctx.lineTo(5.5, 6);
+                ctx.lineTo(2.5, 9.5);
+                ctx.stroke();
             }
             Connections {
                 target: Theme
-                function onModeChanged() { arrowCanvas.requestPaint() }
+                function onModeChanged() {
+                    arrowCanvas.requestPaint();
+                }
             }
             Connections {
                 target: control
-                function onEnabledChanged() { arrowCanvas.requestPaint() }
+                function onEnabledChanged() {
+                    arrowCanvas.requestPaint();
+                }
             }
         }
     }
@@ -111,12 +111,10 @@ MenuItem {
         Label {
             Layout.fillWidth: true
             text: control.text
-            color: !control.enabled ? Theme.faintForeground
-                : control.danger ? Theme.danger : Theme.foreground
+            color: !control.enabled ? Theme.faintForeground : control.danger ? Theme.danger : Theme.foreground
             font.pixelSize: Theme.fontMd
             verticalAlignment: Text.AlignVCenter
         }
-
     }
 
     background: Rectangle {
