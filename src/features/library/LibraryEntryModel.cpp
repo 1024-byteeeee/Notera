@@ -81,7 +81,7 @@ void LibraryEntryModel::replaceAll(const QVariantList& folders, const QList<Scor
 
 bool LibraryEntryModel::updateEntryTags(const QString& itemId, const QStringList& tags)
 {
-    // folder 与 score 共用同一 model（itemId 为全局唯一 UUID），均需实时更新
+
     for (int row = 0; row < m_entries.size(); ++row) {
         if (m_entries.at(row).itemId != itemId) continue;
         if (m_entries.at(row).tags == tags) return true;

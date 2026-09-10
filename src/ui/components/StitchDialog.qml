@@ -3,17 +3,17 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Notera
 
-// 拼接对话框：让用户指定拼接方向（纵向/横向）、拼接顺序（列表上移/下移）、
-// 拼接后的文件名。确认后发出 submitted(orderedPaths, direction, outputName)。
+
+
 Dialog {
     id: dialog
 
-    // 待拼接图片路径列表（QUrl 字符串），打开时按文件名排序显示
+
     property var paths: []
     property string defaultName: "拼接图片"
     signal submitted(var orderedPaths, string direction, string outputName)
 
-    // 当前拼接方向
+
     property string stitchDirection: "vertical"
 
     parent: Overlay.overlay
@@ -40,8 +40,8 @@ Dialog {
         }
     }
 
-    // 打开时：按显示名排序重建列表（批量/右键传 {path,name} 用乐谱标题，
-    // 拼接导入传路径字符串则用文件名），文件名输入框填入默认名
+
+
     onOpened: {
         fileModel.clear()
         var sorted = []
@@ -100,7 +100,7 @@ Dialog {
         anchors.margins: 22
         spacing: 14
 
-        // 拼接方向
+
         RowLayout {
             spacing: 10
 
@@ -129,7 +129,7 @@ Dialog {
             }
         }
 
-        // 拼接顺序
+
         RowLayout {
             spacing: 10
 
@@ -211,7 +211,7 @@ Dialog {
             }
         }
 
-        // 文件名
+
         RowLayout {
             spacing: 10
 
@@ -278,7 +278,7 @@ Dialog {
         border.color: Theme.strongBorder
     }
 
-    // 方向选择卡片
+
     component DirectionCard: Rectangle {
         id: card
         property bool selected: false

@@ -64,9 +64,9 @@ struct RestartGuard {
     }
 };
 
-// 单实例守卫：第二个进程启动时连接到主实例的 LocalServer，
-// 发送 ACTIVATE 后退出；主实例收到后把窗口提到前台。
-// smoke test 豁免（测试可能并行运行多个实例）。
+
+
+
 class SingleInstanceGuard
 {
 public:
@@ -90,7 +90,7 @@ public:
         }
         delete socket;
 
-        // 主实例：清理可能残留的 socket 文件并监听
+
         QLocalServer::removeServer(serverName);
         m_server = new QLocalServer();
         if (m_server->listen(serverName)) {
@@ -104,7 +104,7 @@ public:
                     client->disconnectFromServer();
                     client->deleteLater();
                 });
-                // 兜底：1s 后强制清理客户端连接
+
                 QTimer::singleShot(1000, client, &QLocalSocket::deleteLater);
             });
         }
@@ -155,9 +155,9 @@ QQuickItem* findVisualItem(QObject* root, const QString& objectName)
     return findVisualItem(qobject_cast<QQuickItem*>(root), objectName);
 }
 
-// 按 objectName 收集所有匹配的 QQuickItem（childItems 可视树递归）。
-// 注意：contentItem() 上的 findChildren<QQuickItem*>()（QObject 树）在此应用
-// 的场景图结构下不可靠（曾出现仅返回 2 个顶层项），必须走 childItems 可视树。
+
+
+
 QList<QQuickItem*> findItemsByObjectName(QQuickItem* parent, const QString& objectName)
 {
     QList<QQuickItem*> result;
@@ -254,14 +254,14 @@ bool popupIsOpen(QObject* root, const QString& objectName)
     return opened && width > 0.0 && height > 0.0;
 }
 
-// 等待对象某个布尔属性变为 false。用嵌套事件循环驱动动画计时器，
-// 确保 Popup 的关闭动画（exit Transition）跑完、遮罩真正撤销后再返回，
-// 避免"关闭后立刻点击"被仍在关闭的弹窗遮罩吞掉。
+
+
+
 bool waitForPropertyFalse(QObject* obj, const QByteArray& propertyName, int timeoutMs = 6000)
 {
     if (!obj) return true;
-    // 用 QPointer 捕获：轮询期间对象可能被异步操作销毁（如 model reset 重建
-    // GridView delegate），裸指针会悬垂段错误；QPointer 自动置空，视为已满足
+
+
     QPointer<QObject> guard(obj);
     const auto met = [guard, propertyName] {
         return !guard || !guard->property(propertyName).toBool();
@@ -329,7 +329,7 @@ int main(int argc, char* argv[])
         app.setApplicationName(QStringLiteral("NoteraTest"));
     }
 
-    // 单实例：非 smoke test 模式下，若已有实例运行则激活其窗口并退出
+
     std::unique_ptr<SingleInstanceGuard> singleInstance;
     if (!isSmokeTest) {
         singleInstance = std::make_unique<SingleInstanceGuard>();
@@ -460,7 +460,7 @@ int main(int argc, char* argv[])
         &libraryService, &LibraryService::markScoreOpened);
 
     if (arguments.contains(QStringLiteral("--merge-smoke-test"))) {
-        // 预清理历史残留，避免脏库导致误判
+
         {
             const auto connection = QStringLiteral("notera_merge_smoke_pretest");
             {
@@ -482,7 +482,7 @@ int main(int argc, char* argv[])
             }
             QSqlDatabase::removeDatabase(connection);
         }
-        // 构造一份符合备份格式的压缩包：manifest + 数据库(标签/文件夹/乐谱) + library/scores 源文件
+
         QTemporaryDir backupRoot(QDir::tempPath() + QStringLiteral("/notera-merge-backup-XXXXXX"));
         QTemporaryDir zipDir(QDir::tempPath() + QStringLiteral("/notera-merge-zip-XXXXXX"));
         if (!backupRoot.isValid() || !zipDir.isValid()) return 1;
@@ -566,7 +566,7 @@ int main(int argc, char* argv[])
             if (writer.status() != QZipWriter::NoError) return 1;
         }
 
-        // 探测备份信息
+
         const auto probe = libraryService.probeDatabaseBackup(QUrl::fromLocalFile(zipPath));
         if (!probe.value(QStringLiteral("valid")).toBool()
             || probe.value(QStringLiteral("scoreCount")).toInt() != 1
@@ -576,14 +576,14 @@ int main(int argc, char* argv[])
             return 1;
         }
 
-        // 首次合并：标签/文件夹/乐谱并入当前库
+
         const auto mergeError = libraryService.importDatabaseBackupMerged(QUrl::fromLocalFile(zipPath));
         if (!mergeError.isEmpty()) {
             qWarning() << "[merge-smoke] FAIL first merge:" << mergeError;
             return 1;
         }
         {
-            // 乐谱在非根目录（挂在合并文件夹下），默认列表不显示，直接用 SQL 断言
+
             const auto connection = QStringLiteral("notera_merge_smoke_check");
             bool okScore = false;
             bool okFolder = false;
@@ -606,7 +606,7 @@ int main(int argc, char* argv[])
                     if (query.exec(QStringLiteral("SELECT COUNT(*) FROM score_tags st JOIN scores s ON st.score_id = s.id "
                             "JOIN tags t ON st.tag_id = t.id WHERE s.title = 'MERGE-SMOKE-SCORE' AND t.name = 'MERGE-SMOKE-TAG'"))
                         && query.next()) okTag = query.value(0).toInt() == 1;
-                    // created_at 单位为毫秒（2020-01-01 之后），秒单位错误会落回 1970 附近
+
                     if (query.exec(QStringLiteral("SELECT created_at FROM scores WHERE title = 'MERGE-SMOKE-SCORE'"))
                         && query.next()) okTime = query.value(0).toLongLong() > 1577836800000LL;
                 }
@@ -635,7 +635,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        // 二次合并：同一备份再次导入 → 文件内容重复 → 哈希判重 → 冲突 → 跳过，不新增
+
         bool conflicted = false;
         QObject::connect(&libraryService, &LibraryService::mergeConflict, &libraryService,
             [&conflicted, &libraryService](const QString&, const QString&, int, int) {
@@ -684,7 +684,7 @@ int main(int argc, char* argv[])
             << "err" << mergeError2;
         if (!mergeError2.isEmpty()) return 1;
         if (!conflicted || countBeforeSecond != countAfterSecond) return 1;
-        // 清理测试数据，避免污染开发库
+
         {
             const auto connection = QStringLiteral("notera_merge_smoke_cleanup");
             {
@@ -714,13 +714,13 @@ int main(int argc, char* argv[])
     }
 
     if (arguments.contains(QStringLiteral("--clipboard-smoke-test"))) {
-        // 验证：多选复制/剪切、冲突弹窗不勾选"应用到所有"时单次决策生效、剪切后源消失
+
         const auto libDir = AppDataPaths::libraryDirectory();
         const auto dbPath = AppDataPaths::databaseDirectory() + QStringLiteral("/notera.db");
         QDir().mkpath(libDir);
         QDir().mkpath(AppDataPaths::databaseDirectory());
 
-        // 1. 预清理
+
         {
             const auto connection = QStringLiteral("clipboard_smoke_preclean");
             {
@@ -742,7 +742,7 @@ int main(int argc, char* argv[])
             QSqlDatabase::removeDatabase(connection);
         }
 
-        // 2. 创建测试数据：2 个乐谱（根目录）+ 1 个目标文件夹
+
         QImage testImage(160, 220, QImage::Format_RGB32);
         testImage.fill(Qt::blue);
         const auto file1 = libDir + QStringLiteral("/clipboard-smoke-1.png");
@@ -793,7 +793,7 @@ int main(int argc, char* argv[])
                         return 1;
                     }
                 }
-                // 额外创建一个用于剪切测试的乐谱，放在目标文件夹里，名字唯一避免冲突
+
                 testImage.save(libDir + QStringLiteral("/clipboard-smoke-cut.png"));
                 QSqlQuery insertCut(database);
                 insertCut.prepare(QStringLiteral("INSERT INTO scores (id, title, composer, file_name, file_path, file_type, page_count, favorite, last_page, created_at, updated_at, folder_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"));
@@ -808,18 +808,18 @@ int main(int argc, char* argv[])
                 insertCut.addBindValue(1);
                 insertCut.addBindValue(now);
                 insertCut.addBindValue(now);
-                insertCut.addBindValue(QString()); // 放在根目录，避免干扰复制测试计数
+                insertCut.addBindValue(QString());
                 if (!insertCut.exec()) {
                     qWarning() << "[clipboard-smoke] FAIL: insert cut score" << insertCut.lastError().text();
                     return 1;
                 }
-                // 文件夹内部冲突测试：创建文件夹 + 内部同名乐谱
+
                 testImage.save(libDir + QStringLiteral("/clip-smoke-inner-score.png"));
                 QSqlQuery insertInnerFolder(database);
                 insertInnerFolder.prepare(QStringLiteral("INSERT INTO folders (id, name, parent_id, created_at, updated_at) VALUES (?,?,?,?,?)"));
                 insertInnerFolder.addBindValue(QStringLiteral("clip-smoke-inner-folder"));
                 insertInnerFolder.addBindValue(QStringLiteral("CLIP-SMOKE-INNER-FOLDER"));
-                insertInnerFolder.addBindValue(QVariant()); // 根目录 parent_id 必须为 NULL，不能是空字符串
+                insertInnerFolder.addBindValue(QVariant());
                 insertInnerFolder.addBindValue(now);
                 insertInnerFolder.addBindValue(now);
                 if (!insertInnerFolder.exec()) {
@@ -844,13 +844,13 @@ int main(int argc, char* argv[])
                     qWarning() << "[clipboard-smoke] FAIL: insert inner score" << insertInnerScore.lastError().text();
                     return 1;
                 }
-                // 嵌套文件夹冲突测试：A 内含 B，B 内含乐谱
+
                 testImage.save(libDir + QStringLiteral("/nested-score.png"));
                 QSqlQuery insertNestedA(database);
                 insertNestedA.prepare(QStringLiteral("INSERT INTO folders (id, name, parent_id, created_at, updated_at) VALUES (?,?,?,?,?)"));
                 insertNestedA.addBindValue(QStringLiteral("nested-a"));
                 insertNestedA.addBindValue(QStringLiteral("NESTED-A"));
-                insertNestedA.addBindValue(QVariant()); // 根目录 parent_id 必须为 NULL
+                insertNestedA.addBindValue(QVariant());
                 insertNestedA.addBindValue(now);
                 insertNestedA.addBindValue(now);
                 if (!insertNestedA.exec()) {
@@ -886,7 +886,7 @@ int main(int argc, char* argv[])
                     qWarning() << "[clipboard-smoke] FAIL: insert nested score" << insertNestedScore.lastError().text();
                     return 1;
                 }
-                // 逐个冲突测试：文件夹内含 2 个乐谱，用于验证不勾选应用到所有时逐个弹窗
+
                 QSqlQuery insertMultiFolder(database);
                 insertMultiFolder.prepare(QStringLiteral("INSERT INTO folders (id, name, parent_id, created_at, updated_at) VALUES (?,?,?,?,?)"));
                 insertMultiFolder.addBindValue(QStringLiteral("multi-conflict-folder"));
@@ -927,7 +927,7 @@ int main(int argc, char* argv[])
             QSqlDatabase::removeDatabase(connection);
         }
 
-        // 3. 多选复制到目标文件夹（无冲突）
+
         libraryService.goToLibraryRoot();
         libraryService.enterFolder(QStringLiteral("clip-smoke-target"));
         if (libraryService.currentFolderId() != QStringLiteral("clip-smoke-target")) {
@@ -948,17 +948,17 @@ int main(int argc, char* argv[])
             }
         }
 
-        // 4. 再次复制到同一目标文件夹（有冲突），不勾选"应用到所有"：
-        //    第一个冲突选"保留两者"(rename)，第二个选"跳过"(skip)
+
+
         libraryService.copyItems({QStringLiteral("clip-smoke-1"), QStringLiteral("clip-smoke-2")});
-        libraryService.pasteItems(); // 遇到第一个冲突，emit pasteConflict 后暂停
-        // 不勾选 applyToAll，选 rename → 应只对当前项生效，然后遇到第二个冲突暂停
+        libraryService.pasteItems();
+
         libraryService.resolvePasteConflict(QStringLiteral("rename"), false);
-        // 第二个冲突选 skip → 应跳过，完成
+
         libraryService.resolvePasteConflict(QStringLiteral("skip"), false);
         {
             const auto inTarget = libraryService.scoresInFolder(QStringLiteral("clip-smoke-target"));
-            // 原始 2 个 + 重命名 1 个（CLIPBOARD-SMOKE-1 副本）= 3 个；第二个被跳过
+
             if (inTarget.size() != 3) {
                 qWarning() << "[clipboard-smoke] FAIL: expected 3 scores after conflict (rename+skip), got" << inTarget.size();
                 for (const auto& s : inTarget) qWarning() << "  " << s.toMap().value("title").toString();
@@ -975,7 +975,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        // 4b. 同目录复制乐谱（对齐 Windows）：复制到同一文件夹应弹冲突窗，而不是静默生成“ - 副本”
+
         {
             QObject ctx;
             QEventLoop copyLoop;
@@ -988,13 +988,13 @@ int main(int argc, char* argv[])
             QTimer::singleShot(800, &copyLoop, &QEventLoop::quit);
             libraryService.copyItems({QStringLiteral("clip-smoke-1")});
             libraryService.goToLibraryRoot();
-            libraryService.pasteItems(); // 同目录复制：应弹冲突窗
+            libraryService.pasteItems();
             copyLoop.exec();
             if (!conflictFired) {
                 qWarning() << "[clipboard-smoke] FAIL: same-folder score copy should fire conflict";
                 return 1;
             }
-            // 冲突未解决前不应产生重复项
+
             {
                 const auto inRoot = libraryService.scoresInFolder(QString());
                 int count = 0;
@@ -1006,7 +1006,7 @@ int main(int argc, char* argv[])
                     return 1;
                 }
             }
-            // 选“保留两者”：新增“(2)”副本，源不被删除
+
             libraryService.resolvePasteConflict(QStringLiteral("rename"), false);
             {
                 const auto inRoot = libraryService.scoresInFolder(QString());
@@ -1022,7 +1022,7 @@ int main(int argc, char* argv[])
                     return 1;
                 }
             }
-            // 再次同目录复制，选“替换”：替换自身无意义，不应删除源文件也不应新增重复项
+
             {
                 QObject ctx2;
                 QEventLoop loop2;
@@ -1050,7 +1050,7 @@ int main(int argc, char* argv[])
                     if (t == QStringLiteral("CLIPBOARD-SMOKE-1")) foundOriginal = true;
                     if (t == QStringLiteral("CLIPBOARD-SMOKE-1 (2)")) foundCopy = true;
                 }
-                // 源必须保留，且不应出现“(3)”或删除“(2)”
+
                 if (!foundOriginal || !foundCopy) {
                     qWarning() << "[clipboard-smoke] FAIL: same-folder overwrite should be a no-op preserving all items";
                     return 1;
@@ -1058,7 +1058,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        // 5. 测试剪切：把根目录的 CLIPBOARD-SMOKE-CUT 剪切到目标文件夹，验证源消失、目标出现
+
         libraryService.goToLibraryRoot();
         libraryService.cutItems({QStringLiteral("clip-smoke-cut")});
         if (libraryService.clipboardMode() != QStringLiteral("cut")) {
@@ -1066,7 +1066,7 @@ int main(int argc, char* argv[])
             return 1;
         }
         libraryService.enterFolder(QStringLiteral("clip-smoke-target"));
-        libraryService.pasteItems(); // 目标文件夹无同名冲突，直接移动
+        libraryService.pasteItems();
         {
             const auto inRoot = libraryService.scoresInFolder(QString());
             bool foundInRoot = false;
@@ -1082,14 +1082,14 @@ int main(int argc, char* argv[])
                 qWarning() << "[clipboard-smoke] FAIL: cut did not move score (inRoot=" << foundInRoot << " inTarget=" << foundInTarget << ")";
                 return 1;
             }
-            // 剪切完成后 clipboard 应被清空
+
             if (libraryService.clipboardMode() != QStringLiteral("none") || !libraryService.clipboardItems().isEmpty()) {
                 qWarning() << "[clipboard-smoke] FAIL: clipboard not cleared after cut paste";
                 return 1;
             }
         }
 
-        // 5b. 移动（拖拽 / 菜单“移动到文件夹”）遇同名冲突（对齐 Windows）：弹冲突窗而非静默重复
+
         {
             QObject ctx;
             QEventLoop moveLoop;
@@ -1107,7 +1107,7 @@ int main(int argc, char* argv[])
                 return 1;
             }
             libraryService.resolvePasteConflict(QStringLiteral("rename"), false);
-            // 验证：根目录不再有 CLIPBOARD-SMOKE-2；目标内有原 CLIPBOARD-SMOKE-2 与“(2)”副本
+
             const auto inRoot = libraryService.scoresInFolder(QString());
             const auto inTarget = libraryService.scoresInFolder(QStringLiteral("clip-smoke-target"));
             bool rootHasOriginal = false;
@@ -1127,9 +1127,9 @@ int main(int argc, char* argv[])
             }
         }
 
-        // 同目录复制文件夹（对齐 Windows）：复制到同一父文件夹应弹冲突窗，选"保留两者"生成" (2)"副本，内部乐谱一并复制
+
         {
-            QObject ctx; // 块结束时自动断开所有以此为 context 的连接
+            QObject ctx;
             QEventLoop copyLoop;
             bool folderConflictFired = false;
             QObject::connect(&libraryService, &LibraryService::pasteFolderConflict, &ctx, [&](const QString&, const QString&, int, int) {
@@ -1140,13 +1140,13 @@ int main(int argc, char* argv[])
             QTimer::singleShot(800, &copyLoop, &QEventLoop::quit);
             libraryService.copyItems({QStringLiteral("clip-smoke-inner-folder")});
             libraryService.goToLibraryRoot();
-            libraryService.pasteItems(); // 同目录复制：应弹冲突窗
+            libraryService.pasteItems();
             copyLoop.exec();
             if (!folderConflictFired) {
                 qWarning() << "[clipboard-smoke] FAIL: same-folder folder copy should fire folder conflict";
                 return 1;
             }
-            // 冲突未解决前不应产生重复文件夹
+
             {
                 const auto rootFolders = libraryService.childFolders(QString());
                 int count = 0;
@@ -1159,7 +1159,7 @@ int main(int argc, char* argv[])
                 }
             }
             libraryService.resolvePasteFolderConflict(QStringLiteral("rename"), false);
-            // 验证：根目录下有原始文件夹和“(2)”副本文件夹，副本内含内部乐谱
+
             const auto rootFolders = libraryService.childFolders(QString());
             bool foundOriginal = false;
             bool foundCopy = false;
@@ -1183,9 +1183,9 @@ int main(int argc, char* argv[])
             }
         }
 
-        // 嵌套文件夹同目录复制（对齐 Windows）：A 内含 B，B 内含乐谱；选"保留两者"生成"A (2)"副本，结构完整
+
         {
-            QObject ctx; // 块结束时自动断开所有以此为 context 的连接
+            QObject ctx;
             QEventLoop copyLoop;
             bool folderConflictFired = false;
             QObject::connect(&libraryService, &LibraryService::pasteFolderConflict, &ctx, [&](const QString&, const QString&, int, int) {
@@ -1196,14 +1196,14 @@ int main(int argc, char* argv[])
             QTimer::singleShot(800, &copyLoop, &QEventLoop::quit);
             libraryService.copyItems({QStringLiteral("nested-a")});
             libraryService.goToLibraryRoot();
-            libraryService.pasteItems(); // 同目录复制：应弹冲突窗
+            libraryService.pasteItems();
             copyLoop.exec();
             if (!folderConflictFired) {
                 qWarning() << "[clipboard-smoke] FAIL: same-folder nested copy should fire folder conflict";
                 return 1;
             }
             libraryService.resolvePasteFolderConflict(QStringLiteral("rename"), false);
-            // 验证：根目录下存在“NESTED-A (2)”，其内 NESTED-B 及乐谱结构完整
+
             const auto rootFolders = libraryService.childFolders(QString());
             QString copyId;
             for (const auto& f : rootFolders) {
@@ -1233,7 +1233,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        // 跨文件夹复制同名文件夹（对齐 Windows）：文件夹级冲突弹窗，选"保留两者"生成" (2)"副本
+
         {
             QObject ctx;
             libraryService.createFolder(QStringLiteral("MULTI-CONFLICT-DEST"));
@@ -1249,7 +1249,7 @@ int main(int argc, char* argv[])
                 qWarning() << "[clipboard-smoke] FAIL: cannot find MULTI-CONFLICT-DEST";
                 return 1;
             }
-            // 在 DEST 内建同名子文件夹，制造跨文件夹同名冲突
+
             libraryService.enterFolder(destId);
             libraryService.createFolder(QStringLiteral("MULTI-CONFLICT-FOLDER"));
 
@@ -1257,19 +1257,19 @@ int main(int argc, char* argv[])
             QEventLoop multiLoop;
             QObject::connect(&libraryService, &LibraryService::pasteFolderConflict, &ctx, [&](const QString&, const QString&, int, int) {
                 ++folderConflictCount;
-                // 第一个冲突：选保留两者(rename)，不应用到所有
+
                 libraryService.resolvePasteFolderConflict(QStringLiteral("rename"), false);
             });
             QObject::connect(&libraryService, &LibraryService::pasteFinished, &ctx, [&](int) { multiLoop.quit(); });
             QTimer::singleShot(1500, &multiLoop, &QEventLoop::quit);
             libraryService.copyItems({QStringLiteral("multi-conflict-folder")});
-            libraryService.pasteItems(); // 粘贴到当前文件夹 DEST：DEST 内已有同名文件夹 → 冲突弹窗
+            libraryService.pasteItems();
             multiLoop.exec();
             if (folderConflictCount < 1) {
                 qWarning() << "[clipboard-smoke] FAIL: expected at least 1 folder conflict dialog for cross-folder copy, got" << folderConflictCount;
                 return 1;
             }
-            // 验证：DEST 内同时有原同名文件夹与“(2)”副本
+
             const auto destSubs = libraryService.childFolders(destId);
             bool foundOriginal = false;
             bool foundRenamed = false;
@@ -1285,7 +1285,7 @@ int main(int argc, char* argv[])
             libraryService.goToLibraryRoot();
         }
 
-        // 剪切文件夹（无冲突）：验证整个文件夹被移动到目标，文件不丢失，源文件夹被清理
+
         {
             QObject ctx;
             libraryService.createFolder(QStringLiteral("CUT-DEST"));
@@ -1309,7 +1309,7 @@ int main(int argc, char* argv[])
             QTimer::singleShot(1000, &cutFolderLoop, &QEventLoop::quit);
             libraryService.pasteItems();
             cutFolderLoop.exec();
-            // 验证：目标文件夹内有 MULTI-CONFLICT-FOLDER
+
             const auto destSubs = libraryService.childFolders(destId);
             bool foundMoved = false;
             for (const auto& f : destSubs) {
@@ -1322,7 +1322,7 @@ int main(int argc, char* argv[])
                 qWarning() << "[clipboard-smoke] FAIL: cut folder did not appear in destination (file lost?)";
                 return 1;
             }
-            // 验证：根目录不再有 MULTI-CONFLICT-FOLDER（已被移动）
+
             libraryService.goToLibraryRoot();
             const auto rootFolders = libraryService.childFolders(QString());
             bool foundInRoot = false;
@@ -1336,7 +1336,7 @@ int main(int argc, char* argv[])
                 qWarning() << "[clipboard-smoke] FAIL: cut folder still in root (not moved)";
                 return 1;
             }
-            // 验证：移动后的文件夹内仍有 2 个乐谱（文件未丢失）
+
             QString movedFolderId;
             for (const auto& f : destSubs) {
                 if (f.toMap().value(QStringLiteral("name")).toString() == QStringLiteral("MULTI-CONFLICT-FOLDER")) {
@@ -1379,7 +1379,7 @@ int main(int argc, char* argv[])
         libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
         waitForImport();
         if (libraryService.scores()->rowCount() != previousCount + 1) return 1;
-        // 再次导入同名文件：对齐 Windows，应触发导入冲突弹窗，而不是静默产生重复项
+
         {
             QObject ctx;
             bool conflictFired = false;
@@ -1387,13 +1387,13 @@ int main(int argc, char* argv[])
                 [&](const QString&, const QString&, int, int) { conflictFired = true; });
             libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
             if (!conflictFired) return 1;
-            // 冲突未解决前不应产生重复项
+
             if (libraryService.scores()->rowCount() != previousCount + 1) return 1;
-            // 选“替换”：总数不变（替换而非新增）
+
             libraryService.resolveImportConflict(QStringLiteral("overwrite"), false);
             waitForImport();
             if (libraryService.scores()->rowCount() != previousCount + 1) return 1;
-            // 选“保留两者”：新增一个“(2)”副本
+
             conflictFired = false;
             libraryService.importLocalFile(QUrl::fromLocalFile(imagePath));
             if (!conflictFired) return 1;
@@ -1405,10 +1405,10 @@ int main(int argc, char* argv[])
     }
 
     if (arguments.contains(QStringLiteral("--tag-smoke-test"))) {
-        // 验证标签全生命周期：创建/重名拒绝/大小写不敏感/乐谱与文件夹打标/标签筛选/删除级联
+
         const auto libDir = AppDataPaths::libraryDirectory();
         const auto dbPath = AppDataPaths::databaseDirectory() + QStringLiteral("/notera.db");
-        // 1. 清理旧测试数据
+
         {
             const auto connection = QStringLiteral("tag_smoke_preclean");
             {
@@ -1424,7 +1424,7 @@ int main(int argc, char* argv[])
             }
             QSqlDatabase::removeDatabase(connection);
         }
-        // 2. 通过公共服务 API 创建测试乐谱 + 文件夹（自动刷新模型）
+
         QImage testImage(100, 100, QImage::Format_RGB32);
         testImage.fill(Qt::green);
         const auto file1 = libDir + QStringLiteral("/TAG-SMOKE-SCORE.png");
@@ -1477,7 +1477,7 @@ int main(int argc, char* argv[])
             return 1;
         }
 
-        // 3. 创建标签
+
         libraryService.createTag(QStringLiteral("TAG-SMOKE-A"));
         if (libraryService.tags()->count() != 1) {
             qWarning() << "[tag-smoke] FAIL: createTag did not create exactly 1 tag, got" << libraryService.tags()->count();
@@ -1486,7 +1486,7 @@ int main(int argc, char* argv[])
         const auto tagA = libraryService.tags()->get(0).toMap().value(QStringLiteral("itemId")).toString();
         if (tagA.isEmpty()) return 1;
 
-        // 4. 精确同名重复创建：应被拒绝并提示，而不是静默报"已创建"
+
         {
             QObject ctx;
             QString errorMessage;
@@ -1502,7 +1502,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        // 5. 大小写不同的同名标签：应视为重复拒绝（对齐 Windows 大小写不敏感）
+
         {
             QObject ctx;
             QString errorMessage;
@@ -1514,7 +1514,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        // 6. 重命名为已存在的标签名（含大小写变体）：应拒绝且名称不变
+
         libraryService.createTag(QStringLiteral("TAG-SMOKE-B"));
         if (libraryService.tags()->count() != 2) return 1;
         const auto tagB = libraryService.tags()->get(1).toMap().value(QStringLiteral("itemId")).toString();
@@ -1528,7 +1528,7 @@ int main(int argc, char* argv[])
                 return 1;
             }
         }
-        // 重命名为 A 的大小写变体：也应拒绝
+
         {
             QObject ctx;
             QString errorMessage;
@@ -1539,7 +1539,7 @@ int main(int argc, char* argv[])
                 return 1;
             }
         }
-        // 名称应保持未变
+
         {
             QString error;
             const auto tags = libraryService.tags()->get(0).toMap().value(QStringLiteral("itemId")).toString();
@@ -1555,7 +1555,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        // 7. 给乐谱和文件夹打标签
+
         libraryService.addItemTag(scoreId, tagA);
         if (!libraryService.itemHasTag(scoreId, tagA)) {
             qWarning() << "[tag-smoke] FAIL: addItemTag score";
@@ -1566,14 +1566,14 @@ int main(int argc, char* argv[])
             qWarning() << "[tag-smoke] FAIL: addItemTag folder";
             return 1;
         }
-        // 移除乐谱标签
+
         libraryService.removeItemTag(scoreId, tagA);
         if (libraryService.itemHasTag(scoreId, tagA)) {
             qWarning() << "[tag-smoke] FAIL: removeItemTag score";
             return 1;
         }
 
-        // 8. 标签筛选：tag: 模式下应同时显示带该标签的文件夹与乐谱
+
         libraryService.addItemTag(scoreId, tagA);
         libraryService.setFilterMode(QStringLiteral("tag:") + tagA);
         {
@@ -1585,7 +1585,7 @@ int main(int argc, char* argv[])
         }
         libraryService.setFilterMode(QStringLiteral("all"));
 
-        // 9. 删除标签：关联应级联清除，不再能筛选到
+
         libraryService.deleteTag(tagA);
         if (libraryService.itemHasTag(scoreId, tagA)
             || libraryService.itemHasTag(folderId, tagA)) {
@@ -1596,7 +1596,7 @@ int main(int argc, char* argv[])
             qWarning() << "[tag-smoke] FAIL: deleteTag should leave only TAG-SMOKE-B, got" << libraryService.tags()->count();
             return 1;
         }
-        // 删除后清理剩余测试标签
+
         libraryService.deleteTag(tagB);
         qWarning() << "[tag-smoke] PASS: create/reject-duplicate/case-insensitive/add/remove/filter/delete all work";
         return 0;
@@ -1627,8 +1627,8 @@ int main(int argc, char* argv[])
             QUrl::fromLocalFile(secondPath).toString()});
         waitForStitchImport();
         if (libraryService.scores()->rowCount() != previousCount + 1) return 1;
-        // 再次拼接同名图片：对齐 Windows，目标已存在同名“拼接乐谱”时应触发导入冲突弹窗，
-        // 而不是静默产生重复项；选“保留两者”后生成“(2)”副本
+
+
         {
             QObject ctx;
             bool conflictFired = false;
@@ -1640,7 +1640,7 @@ int main(int argc, char* argv[])
                 qWarning() << "[stitch-smoke] FAIL: duplicate stitch import should fire import conflict";
                 return 1;
             }
-            // 冲突未解决前不应产生重复项
+
             if (libraryService.scores()->rowCount() != previousCount + 1) return 1;
             libraryService.resolveImportConflict(QStringLiteral("rename"), false);
             waitForStitchImport();
@@ -1658,8 +1658,8 @@ int main(int argc, char* argv[])
         if (renameSmokeFolderId.isEmpty()) return 1;
     }
 
-    // PDF 渲染服务（QPdfPageRenderer MultiThreaded + LRU 渲染缓存）。
-    // 先于 engine 创建，确保析构时 engine 先析构（contextProperty 持裸指针）。
+
+
     Notera::PdfRenderService pdfRenderService;
 
     QQmlApplicationEngine engine;
@@ -1676,7 +1676,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    // 单实例主实例：收到第二个进程的激活请求时，把主窗口提到前台
+
     if (singleInstance) {
         singleInstance->setActivateCallback([&engine]() {
             for (QObject* const obj : engine.rootObjects()) {
@@ -1819,8 +1819,8 @@ int main(int argc, char* argv[])
                 fail("import-button-geometry");
                 return;
             }
-            // 回归：点击导入按钮应弹出导入菜单（导入文件… / 导入文件夹… / 拼接导入…），
-            // 防止 onClicked 引用未定义 id 导致点击无反应
+
+
             auto* const importMenu = root->findChild<QObject*>(QStringLiteral("importMenu"));
             if (!importMenu
                 || !clickItem(root, QStringLiteral("importButton"), Qt::LeftButton)
@@ -1931,7 +1931,7 @@ int main(int argc, char* argv[])
             sendMouseEvent(window, QEvent::MouseButtonPress, rubberStart, Qt::LeftButton, Qt::LeftButton);
             sendMouseEvent(window, QEvent::MouseMove, rubberEnd, Qt::NoButton, Qt::LeftButton);
             const auto expectedStart = librarySurface->mapFromScene(rubberStart);
-            // MouseMove 的框选位置更新可能在事件派发时序下延迟一帧，等待 selectionBox 收敛到预期起点
+
             bool rubberOriginReady = false;
             for (int attempt = 0; attempt < 40; ++attempt) {
                 if (selectionBox->isVisible()
@@ -1992,13 +1992,13 @@ int main(int argc, char* argv[])
             }
             libraryService.selection()->clear();
 
-            // 回归测试：框选后滚动使已选项滚出视野，选择必须保持选中。
-            // 根因：滚动（自动滚动/滚轮）期间鼠标移动触发 updateRubberSelection 的
-            // 替换模式，GridView 回收滚出视野的 delegate 后 itemAtIndex 返回 null，
-            // 已选中项被 replace(ids) 误删；修复后检测到 contentY 变化即切换并集模式。
+
+
+
+
             {
                 const int baseEntryCount = libraryService.entries()->rowCount();
-                // 1) 临时导入额外文件，制造网格溢出（滚动后 delegate 可被回收）
+
                 QTemporaryDir rollDir;
                 if (!rollDir.isValid()) return;
                 QStringList extraPaths;
@@ -2022,7 +2022,7 @@ int main(int argc, char* argv[])
                     fail("rubber-scroll-regression-import");
                     return;
                 }
-                // 2) 框选第一行并记录选中项
+
                 selectionBox->setX(0);
                 selectionBox->setY(0);
                 selectionBox->setWidth(librarySurface->width());
@@ -2033,13 +2033,13 @@ int main(int argc, char* argv[])
                     fail("rubber-scroll-regression-preselect");
                     return;
                 }
-                // 3) 滚动到底：第一行滚出视野，delegate 被 GridView 回收
+
                 const auto maxContentY = qMax<qreal>(0.0,
                     rubberSelectionGrid->property("contentHeight").toDouble()
                     - rubberSelectionGrid->property("height").toDouble());
                 rubberSelectionGrid->setProperty("contentY", maxContentY);
                 for (int i = 0; i < 5; ++i) QCoreApplication::processEvents();
-                // 4) 模拟滚动期间鼠标移动触发的选择更新（rubberAccumulateSelection=false）
+
                 QMetaObject::invokeMethod(libraryPage, "updateRubberSelection");
                 const auto selectedAfterScroll = libraryService.selection()->selectedIds();
                 for (const auto& id : selectedBeforeScroll) {
@@ -2050,10 +2050,10 @@ int main(int argc, char* argv[])
                 }
                 libraryService.selection()->clear();
 
-                // 回归：滚轮无限上滚/下滚已修复。
-                // 根因：GridView 的 WheelHandler 直接赋值 contentY 绕过 Flickable
-                // 边界限制，滚过末尾会把内容推出边界显示空白；修复后手动夹紧在
-                // [0, maxContentY]。此时网格因 10 个额外文件而超高，可真实滚动。
+
+
+
+
                 {
                     const auto maxContentY = qMax<qreal>(0.0,
                         rubberSelectionGrid->property("contentHeight").toDouble()
@@ -2065,9 +2065,9 @@ int main(int argc, char* argv[])
                     const auto gridCenter = rubberSelectionGrid->mapToScene(QPointF(
                         rubberSelectionGrid->width() / 2.0, rubberSelectionGrid->height() / 2.0));
                     const auto globalCenter = QPointF(window->mapToGlobal(gridCenter.toPoint()));
-                    // 先移动鼠标到网格中心，确保滚轮事件路由到 grid 的 WheelHandler
+
                     sendMouseEvent(window, QEvent::MouseMove, gridCenter, Qt::NoButton, Qt::NoButton);
-                    // 1) 从顶部向上滚：contentY 必须夹在 0
+
                     rubberSelectionGrid->setProperty("contentY", 0.0);
                     for (int i = 0; i < 5; ++i) QCoreApplication::processEvents();
                     QWheelEvent upEvent(gridCenter, globalCenter, QPoint(0, 0), QPoint(0, 240),
@@ -2078,7 +2078,7 @@ int main(int argc, char* argv[])
                         fail("wheel-clamp-top");
                         return;
                     }
-                    // 2) 滚到底后继续向下滚：contentY 必须夹在 maxContentY
+
                     rubberSelectionGrid->setProperty("contentY", maxContentY);
                     for (int i = 0; i < 5; ++i) QCoreApplication::processEvents();
                     QWheelEvent downEvent(gridCenter, globalCenter, QPoint(0, 0), QPoint(0, -240),
@@ -2089,11 +2089,11 @@ int main(int argc, char* argv[])
                         fail("wheel-clamp-bottom");
                         return;
                     }
-                    // 3) 滚回顶部（恢复现场），避免影响后续测试
+
                     rubberSelectionGrid->setProperty("contentY", 0.0);
                     for (int i = 0; i < 5; ++i) QCoreApplication::processEvents();
                 }
-                // 5) 清理：删除临时导入的文件，恢复现场
+
                 const auto entryIdRole = libraryService.entries()->roleNames().key("itemId", -1);
                 const auto rollTitleRole = libraryService.entries()->roleNames().key("title", -1);
                 QVariantList extraIds;
@@ -2111,7 +2111,7 @@ int main(int argc, char* argv[])
                 }
             }
 
-            // 回归测试：导入文件夹（递归扫描 + 库内重建子文件夹层级 + 非乐谱文件跳过 + 空目录不建）
+
             {
                 const int baseEntryCount = libraryService.entries()->rowCount();
                 const int baseFolderCount = libraryService.folders()->rowCount();
@@ -2170,7 +2170,7 @@ int main(int argc, char* argv[])
                     fail("folder-import-hierarchy-root");
                     return;
                 }
-                // 进入 sub：应包含 b 与 deep 文件夹
+
                 libraryService.setFilterMode(QStringLiteral("folder:") + subFolderId);
                 {
                     QStringList subTitles;
@@ -2188,7 +2188,7 @@ int main(int argc, char* argv[])
                         fail("folder-import-hierarchy-sub");
                         return;
                     }
-                    // 进入 deep：应包含 c
+
                     libraryService.setFilterMode(QStringLiteral("folder:") + deepFolderId);
                     {
                         QStringList deepTitles;
@@ -2202,7 +2202,7 @@ int main(int argc, char* argv[])
                         }
                     }
                 }
-                // 清理：切回根视图，删除导入的文件夹（递归）与根下文件，恢复现场
+
                 libraryService.setFilterMode(QStringLiteral("all"));
                 {
                     QVariantList importedIds;
@@ -2220,8 +2220,8 @@ int main(int argc, char* argv[])
                     fail("folder-import-cleanup");
                     return;
                 }
-                // 稳定等待：让导入/删除触发的异步缩略图任务在继续后续测试前排空，
-                // 避免其完成信号在主线程忙时挤占菜单关闭动画的驱动时序
+
+
                 {
                     QEventLoop settleLoop;
                     QTimer::singleShot(800, &settleLoop, &QEventLoop::quit);
@@ -2243,9 +2243,9 @@ int main(int argc, char* argv[])
             libraryService.setItemFolder(draggedScoreId, QString {});
             for (int i = 0; i < 10; ++i) QCoreApplication::processEvents();
 
-            // folder-import 段的异步 folders reload 可能导致 Sidebar 的 visibleFoldersModel 尚未收敛
-            // （Repeater 无 delegate 或残留宽度为 0 的旧 delegate）。等待真正可点击的 folderNavItem 就绪。
-            // 注意：contentItem() 上的 findChildren（QObject 树）在此场景不可靠，必须用 childItems()（QQuickItem 可视树）。
+
+
+
             bool folderNavReady = false;
             for (int attempt = 0; attempt < 80; ++attempt) {
                 const auto* win = qobject_cast<QQuickWindow*>(root);
@@ -2501,7 +2501,7 @@ int main(int argc, char* argv[])
                 return;
             }
 
-            // 弄脏视图（滚到中部），重开后应复位到顶部
+
             const auto dirtyMaxY = qMax<qreal>(0.0, readerView->property("contentHeight").toDouble()
                 - readerView->property("height").toDouble());
             readerView->setProperty("contentY", dirtyMaxY * 0.6);
@@ -2675,7 +2675,7 @@ int main(int argc, char* argv[])
                 return;
             }
             libraryService.goToLibraryRoot();
-            // 对齐 Windows：同目录复制也弹冲突窗（不再静默生成“ - 副本”），选“跳过”不产生副本、源保留
+
             {
                 QObject ctx;
                 bool sameFolderConflictFired = false;
@@ -2707,8 +2707,8 @@ int main(int argc, char* argv[])
                     }
                 }
             }
-            // 制造跨文件夹同名冲突验证冲突弹窗布局：
-            // 在 Z 界面测试文件夹内建同名子文件夹，再把根目录的 A 界面测试文件夹复制进去
+
+
             libraryService.enterFolder(recentFirstFolderId);
             libraryService.createFolder(QStringLiteral("A界面测试文件夹"));
             libraryService.copyItems({folderId});
@@ -2739,10 +2739,10 @@ int main(int argc, char* argv[])
                 return;
             }
 
-            // 回归：多页 PDF 虚拟化。ReaderPage 改用 PdfMultiPageView（TableView），
-            // 只实例化可见行 + 预加载缓冲内的页面；打开 82 页 PDF 时 PdfPageImage
-            // 实例数必须远小于页数，滚动后仍受控，且 currentPage 跟随滚动。
-            // 置于 smoke 末尾：openScore 会改变 currentScoreId，避免污染前置有状态断言。
+
+
+
+
             {
                 auto* const pdfWindow = qobject_cast<QQuickWindow*>(root);
                 auto* const pdfView = root->findChild<QObject*>(QStringLiteral("pdfView"));
@@ -2789,7 +2789,7 @@ int main(int argc, char* argv[])
                     fail("pdf-lazy-virtualized-range");
                     return;
                 }
-                // 滚到底：实例数仍受控，currentPage 应跟随滚动到末页附近
+
                 const auto pdfMaxY = qMax<qreal>(0.0, pdfView->property("contentHeight").toDouble()
                     - pdfView->property("height").toDouble());
                 pdfView->setProperty("contentY", pdfMaxY);
@@ -2810,10 +2810,10 @@ int main(int argc, char* argv[])
                 }
             }
 
-            // 大页面分块渲染打开回归测试：
-            // 生成 1200×1600pt 大页面 PDF（渲染宽度>1800px 触发 2×2 分块），
-            // 打开后必须在 3 秒内 currentPageRenderingStatus 变为 Image.Ready。
-            // 曾因分块模式下 CachedPdfPageImage.status 不更新，导致永远卡在"正在打开PDF…"转圈。
+
+
+
+
             {
                 auto* const pdfTileWindow = qobject_cast<QQuickWindow*>(root);
                 auto* const pdfTileView = root->findChild<QObject*>(QStringLiteral("pdfView"));
@@ -2843,7 +2843,7 @@ int main(int argc, char* argv[])
                 controller.openScore(QStringLiteral("pdf-tile-regression"),
                     QStringLiteral("PDF分块渲染回归"), pdfTilePath, QStringLiteral("pdf"), 5, QString());
 
-                // 等待文档加载完成（最多 3 秒）
+
                 {
                     QEventLoop docWait;
                     QTimer docTimer;
@@ -2852,9 +2852,9 @@ int main(int argc, char* argv[])
                     int docAttempts = 0;
                     QObject::connect(&docTimer, &QTimer::timeout, [&]() {
                         auto* const doc = pdfTileView->property("document").value<QObject*>();
-                        // PdfDocument.Status: Null=0, Loading=1, Ready=2, Error=3
+
                         const int s = doc ? doc->property("status").toInt() : -1;
-                        if (s == 2 /* Ready */) {
+                        if (s == 2            ) {
                             docReady = true;
                             docWait.quit();
                         } else if (++docAttempts > 30) {
@@ -2871,20 +2871,20 @@ int main(int argc, char* argv[])
                     }
                 }
 
-                // 轮询等待渲染完成（分块模式下第一个块完成即标记 Ready）
+
                 QEventLoop tileWait;
                 QTimer tileTimer;
                 tileTimer.setInterval(100);
                 bool tileReady = false;
                 int tileAttempts = 0;
                 QObject::connect(&tileTimer, &QTimer::timeout, [&]() {
-                    // QQuickImageBase::Status: Null=0, Ready=1, Loading=2, Error=3
+
                     const int status = pdfTileView->property("currentPageRenderingStatus").toInt();
-                    if (status == 1 /* Image.Ready */) {
+                    if (status == 1                  ) {
                         tileReady = true;
                         tileWait.quit();
                     } else if (++tileAttempts > 30) {
-                        tileWait.quit(); // 超时 3 秒
+                        tileWait.quit();
                     }
                 });
                 tileTimer.start();

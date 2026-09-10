@@ -24,15 +24,15 @@ Rectangle {
     property real pinchViewportY: 0
     property bool viewInitializationPending: false
     property int viewInitializationToken: 0
-    // baseScaleUnit: zoomLevel=1.0 时 PdfMultiPageView 应使用的 renderScale。
-    // 让文档最大页显示宽 = min(视口宽-48, 1100)。
-    // 用 maxPageWidth 而非首页宽，避免首页尺寸异常导致后续页显示过大。
-    //
-    // 注意：不用 readonly property 绑定，因为 ReaderPage 在 StackLayout 中初始不可见，
-    // pdfView.width=0；切换到 reader 页时宽度从 0→正常值，QML 绑定在某些时序下
-    // 未正确重算（实测全屏窗口下 baseScaleUnit 停留在初始值 0，renderScale fallback
-    // 到 1，页面显示为原始点大小且偏左上角）。改为普通 property + 手动更新函数，
-    // 在所有相关变化点显式刷新，确保健壮性。
+
+
+
+
+
+
+
+
+
     property real baseScaleUnit: 0
 
     function updateBaseScaleUnit() {
@@ -66,7 +66,7 @@ Rectangle {
     function goToPrevScore() {
         if (!root.hasPrev) return
         const s = root.folderScores[root.currentScoreIndex - 1]
-        // 切换时显示加载弹窗，真实反映加载过程；完成后立即关闭
+
         appShell.showLoading(root.isPdf ? "正在打开乐谱" : "正在加载图片")
         appController.openScore(s.id, s.title, s.filePath, s.fileType, s.pageCount, s.folderId)
     }
@@ -527,20 +527,20 @@ Rectangle {
                 onPageCountChanged: { root.updateBaseScaleUnit(); root.finishInitialViewIfReady() }
                 onStatusChanged: function(status) {
                     if (status === PdfDocument.Ready) {
-                        // 设置文档到渲染服务（QPdfPageRenderer + LRU 缓存）
+
                         pdfRender.setDocument(pdfDocument)
                         root.updateBaseScaleUnit()
                         root.finishInitialViewIfReady()
                     } else if (status === PdfDocument.Null) {
-                        // 关闭文件时清缓存
+
                         pdfRender.clearCache()
                         root.baseScaleUnit = 0
                     }
                 }
             }
 
-            // 虚拟化多页 PDF 视图：TableView 只实例化可见行，万页不卡。
-            // 缩放由 root.zoomLevel 单一真源驱动（renderScale 绑定换算）。
+
+
             PdfMultiPageView {
                 id: pdfView
                 objectName: "pdfView"
@@ -586,7 +586,7 @@ Rectangle {
                 boundsBehavior: Flickable.StopAtBounds
                 onMovementStarted: root.markUserInteraction()
                 contentWidth: imageViewport.width
-                // 内容高必须含顶部偏移与底部留白，否则滚到底时图片底部会被裁掉
+
                 contentHeight: imageViewport.height + imageViewport.y + 24
 
                 Item {
@@ -615,10 +615,10 @@ Rectangle {
 
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-                // Ctrl/Cmd + 滚轮精细缩放：WheelHandler 必须挂在 Flickable 内部。
-                // Qt 6.8 分发逻辑对每个 item 先检查其 PointerHandler、再调该 item 的 wheelEvent；
-                // 挂在父级会被 imageFlick 的滚动处理先拦截（接受后停止向上传递）。
-                // acceptedModifiers 的 OR 组合要求"全部"按下，因此 Ctrl 与 Meta 拆成两个 handler。
+
+
+
+
                 WheelHandler {
                     target: null
                     objectName: "zoomWheelCtrl"
@@ -641,7 +641,7 @@ Rectangle {
                 }
             }
 
-            // PDF 视图的 Ctrl/Cmd + 滚轮（PdfMultiPageView 内嵌拦截）→ 精细缩放
+
             Connections {
                 target: pdfView
                 function onCtrlWheelZoomRequested(deltaY, viewportX, viewportY) {
@@ -670,8 +670,8 @@ Rectangle {
                 font.pixelSize: Theme.fontMd
             }
 
-            // 加载指示：显示到 PDF 解析完成且首屏渲染就绪，
-            // 避免"转圈 → 白页 → 内容"的感知断层。
+
+
             Rectangle {
                 objectName: "pdfLoadingOverlay"
                 visible: root.isPdf && appController.currentFileUrl.toString().length > 0
@@ -721,7 +721,7 @@ Rectangle {
                     font.pixelSize: Theme.fontSm
                 }
 
-                // PDF 页码跳转
+
                 TextField {
                     id: pageJumpField
                     visible: root.isPdf
@@ -783,10 +783,10 @@ Rectangle {
         }
         function onCurrentPageChanged() {
             if (appController.currentPage === "reader") {
-                // 每次进入 reader 页都重置视图：第二次打开同一个文件时
-                // currentScore 不变，onCurrentScoreChanged 不触发，必须在此
-                // 重置 zoomLevel / viewRotation / contentX/Y，否则残留上一次
-                // 用户缩放后的状态。
+
+
+
+
                 root.beginViewInitialization()
             } else {
                 metronome.stop()
@@ -1089,9 +1089,9 @@ Rectangle {
         onTriggered: metronomePanel.flashBeat = -1
     }
 
-    // 打开文件：加载期间显示弹窗；内容加载完成（文件已展示）后立即关闭，
-    // 不做最小展示时长表演——真实反映加载过程。
-    // （导入/导出的加载弹窗在 SettingsPage 同样立即关闭）
+
+
+
     onViewInitializationPendingChanged: {
         if (root.viewInitializationPending) {
             appShell.showLoading(root.isPdf ? "正在打开乐谱" : "正在加载图片")

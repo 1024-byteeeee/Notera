@@ -473,8 +473,8 @@ QString ApplicationController::runExportBackup(const QUrl& destinationFile)
 
     QString error;
     const auto snapshotPath = backupRoot + QStringLiteral("/database/notera.db");
-    // 后台线程不能复用主线程创建的 SQLite 连接（线程亲和），这里使用线程本地连接。
-    // VACUUM INTO 会把源库的一致性快照写到目标文件，等价于原主线程实现。
+
+
     const auto connectionName = QStringLiteral("notera_export_")
         + QUuid::createUuid().toString(QUuid::WithoutBraces);
     bool snapshotOk = false;
@@ -529,7 +529,7 @@ QString ApplicationController::exportDatabaseBackup(const QUrl& destinationFile)
 void ApplicationController::startExportDatabaseBackup(const QUrl& destinationFile)
 {
     if (m_exportWatcher && m_exportWatcher->isRunning()) {
-        return; // 已有导出任务进行中，忽略重复请求
+        return;
     }
     if (!m_exportWatcher) {
         m_exportWatcher = new QFutureWatcher<QString>(this);
@@ -574,9 +574,9 @@ QString ApplicationController::runImportBackup(const QUrl& backupFile)
         removeDirectoryRecursively(stagedRoot);
         return error;
     }
-    // 后台线程使用线程局部 QSettings 实例（底层 QConfFile 由 Qt 内部锁保护，
-    // 与主线程实例互不干扰），把待恢复目录登记到 staging，应用重启时由
-    // applyPendingBackupRestore() 完成切换。
+
+
+
     QSettings settings;
     settings.setValue(QStringLiteral("storage/pendingBackupRestore"), stagedRoot);
     settings.sync();
@@ -599,7 +599,7 @@ QString ApplicationController::importDatabaseBackup(const QUrl& backupFile)
 void ApplicationController::startImportDatabaseBackup(const QUrl& backupFile)
 {
     if (m_importWatcher && m_importWatcher->isRunning()) {
-        return; // 已有导入任务进行中，忽略重复请求
+        return;
     }
     if (!m_importWatcher) {
         m_importWatcher = new QFutureWatcher<QString>(this);

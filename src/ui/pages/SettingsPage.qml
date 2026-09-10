@@ -370,7 +370,7 @@ Rectangle {
                                 }
                             }
 
-                            // 手动输入：与滑块双向同步（滑块拖动 / 直接输入 / 箭头微调）
+
                             SpinBox {
                                 id: speedSpin
                                 Layout.preferredWidth: 92
@@ -507,7 +507,7 @@ Rectangle {
                                 }
                             }
 
-                            // 手动输入：与滑块双向同步（滑块拖动 / 直接输入 / 箭头微调）
+
                             SpinBox {
                                 id: longPressSpin
                                 Layout.preferredWidth: 92
@@ -818,8 +818,8 @@ Rectangle {
         nameFilters: ["Notera 备份 (*.notera-backup *.zip)", "所有文件 (*)"]
         currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
         onAccepted: {
-            // 先显示全局加载对话框，再延迟执行同步阻塞的导出操作，
-            // 给 UI 一帧时间渲染弹窗，避免"卡死无反馈"
+
+
             appShell.showLoading("正在导出备份")
             exportTimer.targetFile = selectedFile
             exportTimer.restart()
@@ -917,7 +917,7 @@ Rectangle {
                     primary: true
                     onClicked: {
                         importModeDialog.close()
-                        // 先显示全局加载对话框，再延迟执行同步阻塞的导入操作
+
                         appShell.showLoading("正在导入备份")
                         mergeImportTimer.backupFile = importModeDialog.backupFile
                         mergeImportTimer.restart()
@@ -1062,7 +1062,7 @@ Rectangle {
         title: "导入数据库备份？"
         confirmText: "开始导入"
         onAccepted: {
-            // 先显示全局加载对话框，再延迟执行同步阻塞的导入操作
+
             appShell.showLoading("正在导入备份")
             replaceImportTimer.backupFile = importConfirmDialog.backupFile
             replaceImportTimer.restart()
@@ -1187,10 +1187,10 @@ Rectangle {
         confirmText: "确定"
     }
 
-    // 延迟触发异步导出/导入：先渲染加载对话框，再启动后台线程任务。
-    // 完成后由 appController 的 exportDatabaseBackupFinished /
-    // importDatabaseBackupFinished 信号回调 hideLoading 与结果提示，
-    // 主线程不再被文件操作阻塞，加载动画可正常旋转。
+
+
+
+
     Timer {
         id: exportTimer
         interval: 50
@@ -1224,7 +1224,7 @@ Rectangle {
             appController.startImportDatabaseBackup(backupFile)
         }
     }
-    // 替换导入成功后，等待结果弹窗展示完毕再重启应用以完成恢复
+
     Timer {
         id: restartTimer
         interval: 1500

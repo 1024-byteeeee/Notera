@@ -9,7 +9,7 @@ Dialog {
     property string message: ""
     property string confirmText: "删除"
     property bool danger: true
-    // 提示类弹窗：只保留一个金色确认按钮（无取消）
+
     property bool showCancel: true
 
     parent: Overlay.overlay

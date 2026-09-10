@@ -1027,7 +1027,7 @@ bool ScoreRepository::deleteFolder(const QString& folderId, QString* error)
         return false;
     }
     QSqlQuery query(m_database);
-    // First, collect all folder IDs in the tree (CTE is statement-scoped)
+
     query.prepare(QStringLiteral(R"(
         WITH RECURSIVE tree(id) AS (
             SELECT id FROM folders WHERE id = ?
@@ -1050,7 +1050,7 @@ bool ScoreRepository::deleteFolder(const QString& folderId, QString* error)
         m_database.commit();
         return true;
     }
-    // Delete all scores in these folders
+
     QSqlQuery deleteScoresQuery(m_database);
     deleteScoresQuery.prepare(QStringLiteral("DELETE FROM scores WHERE folder_id IN (%1)").arg(
         QStringList(folderIds.size(), QStringLiteral("?")).join(QStringLiteral(","))));
@@ -1062,7 +1062,7 @@ bool ScoreRepository::deleteFolder(const QString& folderId, QString* error)
         *error = deleteScoresQuery.lastError().text();
         return false;
     }
-    // Delete all folders
+
     QSqlQuery deleteFoldersQuery(m_database);
     deleteFoldersQuery.prepare(QStringLiteral("DELETE FROM folders WHERE id IN (%1)").arg(
         QStringList(folderIds.size(), QStringLiteral("?")).join(QStringLiteral(","))));

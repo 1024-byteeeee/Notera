@@ -319,7 +319,7 @@ void LibraryService::createFolder(const QString& name)
     QString error;
     const auto parentId = (m_filterMode == QStringLiteral("all")
         || m_filterMode.startsWith(QStringLiteral("folder:"))) ? m_currentFolderId : QString {};
-    // 对齐 Windows 文件管理器：当前目录已存在同名文件夹时，先弹窗让用户决定如何处理
+
     if (nameExistsInFolder(trimmed, parentId, true)) {
         m_pendingCreateFolderName = trimmed;
         m_pendingCreateFolderParentId = parentId;
@@ -349,7 +349,7 @@ void LibraryService::resolveCreateFolderConflict(const QString& action)
     QString error;
     auto targetName = name;
     if (action == QStringLiteral("rename")) {
-        // 保留两者：自动追加序号生成唯一名称（对齐 Windows 的“新建文件夹 (2)”行为）
+
         targetName = uniqueNameInFolder(name, parentId, true);
     }
     if (!m_repository.createFolder(targetName, parentId, &error)) {
@@ -369,7 +369,7 @@ void LibraryService::createTag(const QString& name)
     }
     const auto trimmed = name.trimmed();
     QString error;
-    // 对齐 Windows：标签名大小写不敏感，存在同名标签时拒绝创建（避免 INSERT OR IGNORE 静默"成功"）
+
     const auto existing = m_repository.tags(&error);
     for (const auto& t : existing) {
         if (QString::compare(t.toMap().value(QStringLiteral("name")).toString(), trimmed, Qt::CaseInsensitive) == 0) {
@@ -393,7 +393,7 @@ void LibraryService::renameFolder(const QString& folderId, const QString& name)
     }
     QString error;
     const auto trimmed = name.trimmed();
-    // 对齐 Windows：同目录下已存在同名文件夹时拒绝重命名
+
     const auto parentId = m_repository.folderParent(folderId, &error);
     const auto siblings = m_repository.childFolders(parentId, QString(), &error);
     for (const auto& f : siblings) {
@@ -439,8 +439,8 @@ void LibraryService::deleteFolder(const QString& folderId)
         emit errorOccurred(QStringLiteral("删除文件夹失败"));
         return;
     }
-    // 对齐 Windows：仅当删除的是当前所在文件夹时才退回乐谱库根目录；
-    // 删除子文件夹后应停留在当前目录
+
+
     if (m_currentFolderId == folderId) {
         m_currentFolderId.clear();
         m_currentFolderName = QStringLiteral("乐谱库");
@@ -462,7 +462,7 @@ void LibraryService::renameTag(const QString& tagId, const QString& name)
     }
     const auto trimmed = name.trimmed();
     QString error;
-    // 对齐 Windows：标签名大小写不敏感，重命名为已存在的同名标签时拒绝（与文件夹重命名一致）
+
     const auto existing = m_repository.tags(&error);
     for (const auto& t : existing) {
         const auto existingTagId = t.toMap().value(QStringLiteral("id")).toString();
@@ -507,7 +507,7 @@ void LibraryService::importLocalFile(const QUrl& url)
         emit errorOccurred(QStringLiteral("请选择电脑上的文件"));
         return;
     }
-    // 统一走导入队列，以支持"同目录导入同名文件"时的冲突弹窗
+
     importFiles({ QVariant(url) });
 }
 
@@ -524,7 +524,7 @@ void LibraryService::importFiles(const QVariantList& paths)
         resolved.append(localPath);
     }
     if (resolved.isEmpty()) return;
-    // 导入进行中时追加到队列，而不是拒绝
+
     if (m_importTaskActive || !m_importQueue.isEmpty()) {
         const auto defaultFolderId = currentImportTargetFolder();
         for (int i = 0; i < resolved.size(); ++i) {
@@ -556,9 +556,9 @@ void LibraryService::importFolder(const QVariant& folderPathVariant)
         emit errorOccurred(QStringLiteral("请选择电脑上的文件夹"));
         return;
     }
-    // canonicalFilePath 解析符号链接（如 macOS 的 /var → /private/var），
-    // 保证 rootDir 与 QFileInfo::absolutePath 前缀一致，relativeFilePath 才能
-    // 正确得到相对目录，否则子文件夹会全部被误归到根目录
+
+
+
     const auto rootPath = QFileInfo(resolvedPath).canonicalFilePath();
     if (rootPath.isEmpty()) {
         emit errorOccurred(QStringLiteral("所选文件夹不存在"));
@@ -570,7 +570,7 @@ void LibraryService::importFolder(const QVariant& folderPathVariant)
         return;
     }
 
-    // 1) 递归扫描：相对目录 → 其中支持的乐谱文件（pdf + 图片），其余文件静默跳过
+
     QHash<QString, QStringList> filesByDir;
     const QDir rootDir(rootPath);
     QDirIterator it(rootPath, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
@@ -578,7 +578,7 @@ void LibraryService::importFolder(const QVariant& folderPathVariant)
         it.next();
         const auto info = it.fileInfo();
         if (!info.isFile() || !FileService::isSupportedScoreFile(info.filePath())) continue;
-        // relativeFilePath 对根目录本身返回 "."，统一归一化为空串表示根
+
         auto relDir = rootDir.relativeFilePath(info.absolutePath());
         if (relDir == QLatin1String(".")) relDir.clear();
         filesByDir[relDir].append(info.filePath());
@@ -588,8 +588,8 @@ void LibraryService::importFolder(const QVariant& folderPathVariant)
         return;
     }
 
-    // 2) 按深度建库内文件夹：只创建包含支持文件的目录（含祖先链），
-    //    同名文件夹直接合并（文件级同名仍走现有冲突弹窗）
+
+
     const auto targetRoot = currentImportTargetFolder();
     QHash<QString, QString> dirToId;
     dirToId.insert(QString(), targetRoot);
@@ -601,17 +601,17 @@ void LibraryService::importFolder(const QVariant& folderPathVariant)
         if (dir.isEmpty()) continue;
         const auto slashPos = dir.lastIndexOf(QLatin1Char('/'));
         const auto parentRel = slashPos < 0 ? QString() : dir.left(slashPos);
-        // 注意根目录 folderId 是空串，必须用 contains 判断祖先是否存在，
-        // 不能用 isEmpty()（会把"根"误判成祖先缺失导致子文件夹全被跳过）
+
+
         if (!dirToId.contains(parentRel)) continue;
         const auto id = getOrCreateFolder(dir.mid(slashPos + 1), dirToId.value(parentRel));
-        if (id.isEmpty()) return;   // 创建失败时错误已通过 errorOccurred 发出
+        if (id.isEmpty()) return;
         dirToId.insert(dir, id);
     }
     reloadFolders();
     reload();
 
-    // 3) 文件按各自目录入队，复用现有异步导入管线（冲突弹窗/批量事务/缩略图）
+
     const auto enqueueFolderFiles = [this, &dirToId, &filesByDir] {
         auto sortedDirs = filesByDir.keys();
         std::sort(sortedDirs.begin(), sortedDirs.end());
@@ -625,7 +625,7 @@ void LibraryService::importFolder(const QVariant& folderPathVariant)
         }
     };
     if (m_importTaskActive || !m_importQueue.isEmpty()) {
-        // 已有导入在途：追加到队列，等待当前任务结束后统一处理
+
         enqueueFolderFiles();
         return;
     }
@@ -651,9 +651,9 @@ QString LibraryService::currentImportTargetFolder() const
 
 QString LibraryService::resolveImportPath(const QVariant& value)
 {
-    // QML 的 list<url>（FileDialog.selectedFiles / drop.urls）传参到 QVariantList 时，
-    // 元素被包成嵌套的 QVariant(QVariant(QUrl))，userType 是 QVariant 而非 QUrl，
-    // 必须先递归解包到 QUrl / 字符串后再解析，否则所有元素都会解析失败。
+
+
+
     auto v = value;
     while (v.metaType() == QMetaType::fromType<QVariant>()) {
         const auto inner = v.value<QVariant>();
@@ -722,16 +722,16 @@ void LibraryService::continueImport()
             continue;
         }
 
-        // 队列项可携带标题覆盖（拼接导入等），否则取文件名主干
+
         const auto titleOverride = m_importIndex < m_importQueueTitles.size() ? m_importQueueTitles[m_importIndex] : QString {};
         const auto baseTitle = titleOverride.trimmed().isEmpty() ? source.completeBaseName() : titleOverride.trimmed();
-        // 目标文件夹：优先取队列项携带的 folderId（文件夹导入按各自层级入位），
-        // 普通文件导入队列为空时回退到当前文件夹
+
+
         const auto folderId = (m_importIndex < m_importQueueFolders.size())
             ? m_importQueueFolders.at(m_importIndex)
             : currentImportTargetFolder();
 
-        // 目标目录存在同名乐谱：弹窗让用户决定如何处理（替换 / 保留两者 / 跳过 / 取消）
+
         if (nameExistsInFolder(baseTitle, folderId, false)) {
             QString action = m_importConflictAction;
             if (action.isEmpty()) {
@@ -748,7 +748,7 @@ void LibraryService::continueImport()
             if (action == QStringLiteral("rename")) {
                 title = uniqueNameInFolder(baseTitle, folderId, false);
             } else if (action == QStringLiteral("overwrite")) {
-                // 替换：删除目标目录内所有同名旧记录（连同磁盘文件/缩略图，先取路径再删记录），再导入新文件
+
                 const auto scores = m_repository.listAtFolder(folderId, QString(), &error);
                 bool removedAny = false;
                 for (const auto& s : scores) {
@@ -762,7 +762,7 @@ void LibraryService::continueImport()
                     }
                 }
                 if (!removedAny) {
-                    // 旧记录删除失败：跳过本次导入，避免产生同名重复项
+
                     consumeImportTemp(sourcePath);
                     ++m_importIndex;
                     if (!m_importApplyToAll) m_importConflictAction.clear();
@@ -777,7 +777,7 @@ void LibraryService::continueImport()
         startImportTask(sourcePath, baseTitle, folderId);
         return;
     }
-    // 清理未消费的临时源文件（正常流程应在消费时删除，这里兜底）
+
     for (const auto& temp : m_importTempFiles) QFile::remove(temp);
     m_importTempFiles.clear();
     const int processed = m_importIndex;
@@ -785,7 +785,7 @@ void LibraryService::continueImport()
     m_importQueueTitles.clear();
     m_importQueueFolders.clear();
     m_importIndex = 0;
-    // 提交批量导入中剩余的未提交事务
+
     if (m_pendingInsertCount > 0) {
         QString txError;
         if (!m_repository.commitTransaction(&txError)) {
@@ -843,13 +843,13 @@ void LibraryService::finishImportTask(ImportTaskResult result)
             .updatedAt = now
         };
         QString error;
-        // 批量事务：每 32 条 insert 提交一次，避免每条都 fsync
+
         if (m_pendingInsertCount == 0 && !m_repository.beginTransaction(&error)) {
             emit errorOccurred(QStringLiteral("将乐谱添加到乐谱库失败"));
         } else if (!m_repository.insert(score, result.folderId, &error)) {
             (void)FileService::removeFile(result.storedPath, &error);
             QString txError;
-            if (!m_repository.commitTransaction(&txError)) { // 保留之前已成功的 insert
+            if (!m_repository.commitTransaction(&txError)) {
                 qWarning() << "[LibraryService] commitTransaction failed after insert error:" << txError;
             }
             m_pendingInsertCount = 0;
@@ -866,8 +866,8 @@ void LibraryService::finishImportTask(ImportTaskResult result)
                 }
                 m_pendingInsertCount = 0;
             }
-            // 导入过程中不做中间 reload：大量文件时全量刷新会导致 UI 卡顿，
-            // 全部导入完成后由 continueImport 末尾统一 reload。
+
+
         }
     }
     ++m_importIndex;
@@ -961,8 +961,8 @@ void LibraryService::stitchImages(const QVariantList& orderedPaths, const QStrin
         images.append(img);
     }
 
-    // 拼接方向：vertical=纵向（上下叠，宽度取最大、水平居中）；
-    // horizontal=横向（左右拼，高度取最大、垂直居中）
+
+
     const bool horizontal = (direction == QLatin1String("horizontal"));
     qint64 canvasWidth = 0;
     qint64 canvasHeight = 0;
@@ -1032,7 +1032,7 @@ void LibraryService::stitchImages(const QVariantList& orderedPaths, const QStrin
         return;
     }
 
-    // 导入当前文件夹；同名时走统一导入冲突流程（替换 / 保留两者 / 跳过 / 取消）
+
     const QString title = outputName.trimmed().isEmpty()
         ? QStringLiteral("拼接图片 %1张").arg(images.size()) : outputName.trimmed();
     const auto folderId = (m_filterMode == QStringLiteral("all")
@@ -1135,7 +1135,7 @@ void LibraryService::importAndStitchImages(const QStringList& filePaths)
         return;
     }
 
-    // 对齐 Windows：目标目录已存在同名“拼接乐谱”时，走统一导入冲突流程（替换 / 保留两者 / 跳过 / 取消）
+
     const auto title = QStringLiteral("拼接乐谱 %1张").arg(images.size());
     const auto folderId = (m_filterMode == QStringLiteral("all")
         || m_filterMode.startsWith(QStringLiteral("folder:"))) ? m_currentFolderId : QString {};
@@ -1171,7 +1171,7 @@ void LibraryService::toggleItemFavorite(const QString& itemId, const bool favori
         return;
     }
     reloadFolders();
-    // 收藏视图下取消收藏后条目应从列表消失，必须整表刷新；其余视图只局部刷新收藏状态
+
     if (m_filterMode == QStringLiteral("favorites")) {
         reload();
     } else {
@@ -1187,7 +1187,7 @@ void LibraryService::renameScore(const QString& scoreId, const QString& title)
     }
     QString error;
     const auto trimmed = title.trimmed();
-    // 对齐 Windows：同文件夹下已存在同名乐谱时拒绝重命名
+
     const auto folderId = m_repository.scoreFolderId(scoreId, &error);
     const auto siblings = m_repository.listAtFolder(folderId, QString(), &error);
     for (const auto& s : siblings) {
@@ -1386,8 +1386,8 @@ void LibraryService::removeItemTag(const QString& itemId, const QString& tagId)
         emit errorOccurred(QStringLiteral("移除标签失败"));
         return;
     }
-    // 在"标签"过滤视图下移除当前过滤标签时，该条目应从列表消失，必须整表刷新；
-    // 其余场景只局部更新 tags，保留视图滚动位置。
+
+
     if (m_filterMode == QStringLiteral("tag:") + tagId) {
         reload();
     } else {
@@ -1463,8 +1463,8 @@ QString LibraryService::moveItems(const QVariantList& itemIds, const QString& fo
 {
     const auto ids = uniqueItemIds(itemIds);
     if (ids.isEmpty()) return QStringLiteral("没有可移动的项目");
-    // 对齐 Windows：移动 = 剪切 + 粘贴，目标目录存在同名项目时走统一冲突弹窗，
-    // 避免拖拽 /“移动到文件夹”菜单静默产生重复项；同时复用剪切粘贴的完整冲突流程。
+
+
     m_clipboardItems.clear();
     for (const auto& id : ids) m_clipboardItems.append(QVariant(id));
     m_clipboardMode = QStringLiteral("cut");
@@ -1640,7 +1640,7 @@ void LibraryService::importFile(const QString& sourcePath, const QString& titleO
     const auto destinationFolder = (m_filterMode == QStringLiteral("all")
         || m_filterMode.startsWith(QStringLiteral("folder:"))) ? m_currentFolderId : QString {};
     if (!m_repository.insert(score, destinationFolder, &error)) {
-        (void)FileService::removeFile(storedPath, &error); // 回滚：尽力删除已复制文件
+        (void)FileService::removeFile(storedPath, &error);
         emit errorOccurred(QStringLiteral("将乐谱添加到乐谱库失败"));
         return;
     }
@@ -1687,7 +1687,7 @@ bool LibraryService::nameExistsInFolder(const QString& name, const QString& fold
     if (isFolder) {
         const auto folders = m_repository.childFolders(folderId, QString(), &error);
         for (const auto& f : folders) {
-            // 对齐 Windows：名称比较忽略大小写
+
             if (QString::compare(f.toMap().value(QStringLiteral("name")).toString(), name, Qt::CaseInsensitive) == 0) {
                 return true;
             }
@@ -1738,10 +1738,10 @@ QString LibraryService::copyScoreToFolder(const QString& scoreId, const QString&
         } else if (conflictAction == QStringLiteral("overwrite")) {
             bool deletedAny = false;
             for (const auto& s : scores) {
-                // 同目录复制：目标里的同名项就是源自身，绝不能删除源文件
+
                 if (s.id == scoreId) continue;
                 if (QString::compare(s.title, sourceTitle, Qt::CaseInsensitive) != 0) continue;
-                // 必须先取路径再删记录：记录删除后 filePathById 会返回空，导致文件/缩略图残留磁盘
+
                 (void)FileService::removeFile(s.filePath, &error);
                 (void)FileService::removeFile(s.thumbnailPath, &error);
                 if (!m_repository.remove(s.id, &error)) {
@@ -1749,7 +1749,7 @@ QString LibraryService::copyScoreToFolder(const QString& scoreId, const QString&
                 }
                 deletedAny = true;
             }
-            // 同名项只有源自身：替换自身无意义，直接跳过（不新建、不删除）
+
             if (!deletedAny) return {};
         }
     }
@@ -1770,7 +1770,7 @@ QString LibraryService::copyScoreToFolder(const QString& scoreId, const QString&
         .updatedAt = now
     };
     if (!m_repository.insert(score, targetFolderId, &error)) {
-        (void)FileService::removeFile(storedPath, &error); // 回滚：尽力删除已复制文件
+        (void)FileService::removeFile(storedPath, &error);
         return QStringLiteral("创建乐谱记录失败");
     }
     if (FileService::isSupportedScoreFile(score.filePath)) {
@@ -1782,8 +1782,8 @@ QString LibraryService::copyScoreToFolder(const QString& scoreId, const QString&
 QString LibraryService::copyFolderRecursive(const QString& folderId, const QString& targetParentId, const QString& conflictAction)
 {
     QString error;
-    // 防护：目标为源文件夹自身或其子文件夹时禁止复制，否则复制结果会成为源文件夹的子项，
-    // 触发对刚创建副本的递归复制，造成无限递归
+
+
     if (!m_repository.canMoveFolder(folderId, targetParentId, &error)) {
         return QStringLiteral("不能将文件夹复制到其自身或其子文件夹中");
     }
@@ -1800,7 +1800,7 @@ QString LibraryService::copyFolderRecursive(const QString& folderId, const QStri
             const auto children = m_repository.childFolders(targetParentId, QString(), &error);
             for (const auto& f : children) {
                 const auto existingId = f.toMap().value(QStringLiteral("id")).toString();
-                // 同目录复制：目标里的同名文件夹就是源自身，绝不能删除源文件夹
+
                 if (existingId == folderId) continue;
                 if (QString::compare(f.toMap().value(QStringLiteral("name")).toString(), sourceName, Qt::CaseInsensitive) != 0) continue;
                 if (!m_repository.deleteFolder(existingId, &error)) {
@@ -1808,7 +1808,7 @@ QString LibraryService::copyFolderRecursive(const QString& folderId, const QStri
                 }
                 deletedAny = true;
             }
-            // 同名项只有源自身：替换自身无意义，直接跳过（不新建、不删除）
+
             if (!deletedAny) return {};
         }
     }
@@ -1816,7 +1816,7 @@ QString LibraryService::copyFolderRecursive(const QString& folderId, const QStri
     if (!m_repository.createFolder(targetName, targetParentId, &error)) {
         return QStringLiteral("创建文件夹失败");
     }
-    // createFolder 内部自己生成 UUID，创建后必须重新查询获取真实 id
+
     const auto updated = m_repository.childFolders(targetParentId, QString(), &error);
     QString newFolderId;
     for (const auto& f : updated) {
@@ -1848,7 +1848,7 @@ QString LibraryService::getOrCreateFolder(const QString& name, const QString& pa
             return f.toMap().value(QStringLiteral("id")).toString();
         }
     }
-    // createFolder 内部自己生成 UUID，创建后必须重新查询获取真实 id
+
     if (!m_repository.createFolder(name, parentId, &error)) {
         emit errorOccurred(QStringLiteral("创建文件夹失败：%1").arg(name));
         return {};
@@ -1867,7 +1867,7 @@ void LibraryService::expandFolderToQueue(const QString& sourceFolderId, const QS
     QString error;
     int insertOffset = 0;
 
-    // 展开内部乐谱：插入到当前位置之后，逐个进入冲突处理流程
+
     const auto scores = m_repository.listAtFolder(sourceFolderId, QString(), &error);
     for (const auto& s : scores) {
         m_pasteQueue.insert(m_pasteIndex + 1 + insertOffset, QVariantMap{
@@ -1877,7 +1877,7 @@ void LibraryService::expandFolderToQueue(const QString& sourceFolderId, const QS
         ++insertOffset;
     }
 
-    // 展开子文件夹：targetFolderId 为父目标，continuePaste 会自动合并同名子文件夹并递归展开
+
     const auto subFolders = m_repository.childFolders(sourceFolderId, QString(), &error);
     for (const auto& f : subFolders) {
         m_pasteQueue.insert(m_pasteIndex + 1 + insertOffset, QVariantMap{
@@ -1891,12 +1891,12 @@ void LibraryService::expandFolderToQueue(const QString& sourceFolderId, const QS
 void LibraryService::deleteEmptyFolderTree(const QString& folderId)
 {
     QString error;
-    // 先递归清理空子文件夹
+
     const auto subFolders = m_repository.childFolders(folderId, QString(), &error);
     for (const auto& f : subFolders) {
         deleteEmptyFolderTree(f.toMap().value(QStringLiteral("id")).toString());
     }
-    // 重新检查：仅当文件夹内已无乐谱且无子文件夹时才删除
+
     const auto scores = m_repository.listAtFolder(folderId, QString(), &error);
     const auto remainingSubFolders = m_repository.childFolders(folderId, QString(), &error);
     if (scores.isEmpty() && remainingSubFolders.isEmpty()) {
@@ -1976,7 +1976,7 @@ void LibraryService::continuePaste()
 
         const bool isFolder = type == QStringLiteral("folder");
 
-        // 剪切到同一目录：跳过（对齐 Windows：剪切后原地粘贴无操作）
+
         const auto currentParent = isFolder
             ? m_repository.folderParent(itemId, &error)
             : m_repository.scoreFolderId(itemId, &error);
@@ -1984,17 +1984,17 @@ void LibraryService::continuePaste()
             ++m_pasteIndex;
             continue;
         }
-        // 复制到同一目录：与其他复制一致，同样走统一冲突弹窗（对齐 Windows），不做静默自动命名
 
-        // 文件夹处理
+
+
         if (isFolder) {
             const auto sourceName = m_repository.folderName(itemId, &error);
             if (sourceName.isEmpty()) { ++m_pasteIndex; continue; }
 
             const bool hasConflict = nameExistsInFolder(sourceName, targetFolderId, true);
 
-            // 目标为源文件夹自身或其子文件夹：拒绝并跳过（对齐 Windows 文件管理器，
-            // 同时防止复制文件夹时对刚创建的副本递归复制造成无限递归）
+
+
             if (!m_repository.canMoveFolder(itemId, targetFolderId, &error)) {
                 emit errorOccurred(QStringLiteral("不能将文件夹移动到其自身或其子文件夹中"));
                 ++m_pasteIndex;
@@ -2002,7 +2002,7 @@ void LibraryService::continuePaste()
                 continue;
             }
 
-            // 剪切文件夹：直接移动整个文件夹
+
             if (isCut) {
                 if (hasConflict) {
                     QString action = m_pendingFolderConflictAction;
@@ -2016,7 +2016,7 @@ void LibraryService::continuePaste()
                         continue;
                     }
                     if (action == QStringLiteral("overwrite")) {
-                        // 删除目标文件夹（对齐 Windows：大小写不敏感比较）
+
                         const auto children = m_repository.childFolders(targetFolderId, QString(), &error);
                         for (const auto& f : children) {
                             if (QString::compare(f.toMap().value(QStringLiteral("name")).toString(), sourceName, Qt::CaseInsensitive) != 0) continue;
@@ -2033,7 +2033,7 @@ void LibraryService::continuePaste()
                         }
                     }
                 }
-                // 移动文件夹
+
                 if (!m_repository.moveFolder(itemId, targetFolderId, &error)) {
                     emit errorOccurred(QStringLiteral("移动文件夹失败：%1").arg(error));
                 }
@@ -2043,7 +2043,7 @@ void LibraryService::continuePaste()
                 continue;
             }
 
-            // 复制文件夹：检查冲突并弹窗
+
             if (hasConflict) {
                 QString action = m_pendingFolderConflictAction;
                 if (action.isEmpty()) {
@@ -2055,10 +2055,10 @@ void LibraryService::continuePaste()
                     if (!m_folderConflictApplyToAll) m_pendingFolderConflictAction.clear();
                     continue;
                 }
-                // overwrite 与 rename 无需在此预删/预改名：统一交给 copyFolderRecursive 处理，
-                // 且同目录复制时预删会误删源文件夹
+
+
             }
-            // 递归复制文件夹
+
             const auto result = copyFolderRecursive(itemId, targetFolderId, m_pendingFolderConflictAction);
             if (!result.isEmpty()) {
                 emit errorOccurred(result);
@@ -2069,7 +2069,7 @@ void LibraryService::continuePaste()
             continue;
         }
 
-        // 乐谱：逐个冲突判断
+
         QString itemName;
         {
             const auto all = m_repository.list(QString(), &error);
@@ -2079,7 +2079,7 @@ void LibraryService::continuePaste()
         }
         if (itemName.isEmpty()) { ++m_pasteIndex; continue; }
 
-        // 同目录复制乐谱：与其他复制一致，同样走统一冲突弹窗（对齐 Windows），不做静默自动命名
+
         const bool hasConflict = nameExistsInFolder(itemName, targetFolderId, false);
         QString action = m_pendingConflictAction;
         if (hasConflict && action.isEmpty()) {
@@ -2099,7 +2099,7 @@ void LibraryService::continuePaste()
                     const auto scores = m_repository.listAtFolder(targetFolderId, QString(), &error);
                     for (const auto& s : scores) {
                         if (QString::compare(s.title, itemName, Qt::CaseInsensitive) == 0) {
-                            // 必须先取路径再删记录：记录删除后 filePathById 会返回空，导致文件/缩略图残留磁盘
+
                             (void)FileService::removeFile(s.filePath, &error);
                             (void)FileService::removeFile(s.thumbnailPath, &error);
                             if (!m_repository.remove(s.id, &error)) {
@@ -2109,7 +2109,7 @@ void LibraryService::continuePaste()
                         }
                     }
                 }
-                // rename：移动后给乐谱改名
+
             }
             if (!m_repository.setFolder(itemId, targetFolderId, &error)) {
                 emit errorOccurred(QStringLiteral("移动乐谱失败"));
@@ -2325,7 +2325,7 @@ QString LibraryService::importDatabaseBackupMerged(const QUrl& backupFile)
     }
     QSqlDatabase::removeDatabase(connectionName);
 
-    // 1. 合并标签（按名称去重）
+
     QHash<QString, QString> currentTagNameToId;
     {
         const auto currentTags = m_repository.tags(&error);
@@ -2355,7 +2355,7 @@ QString LibraryService::importDatabaseBackupMerged(const QUrl& backupFile)
         }
     }
 
-    // 2. 合并文件夹：同名按层级向下合并（不弹窗），不存在则新建
+
     {
         std::function<void(const QString&, const QString&)> mergeFolderLevel =
             [&](const QString& backupParentId, const QString& targetParentId) {
@@ -2392,7 +2392,7 @@ QString LibraryService::importDatabaseBackupMerged(const QUrl& backupFile)
                 m_mergeFolderMap[oldId] = newId;
                 for (const auto& oldTagId : tagsByFolder.value(oldId)) {
                     if (m_mergeTagMap.contains(oldTagId)) {
-                        // 文件夹标签迁移为尽力而为，失败不影响文件夹合并主流程
+
                         (void)m_repository.addItemTag(newId, m_mergeTagMap.value(oldTagId), &error);
                     }
                 }
@@ -2402,7 +2402,7 @@ QString LibraryService::importDatabaseBackupMerged(const QUrl& backupFile)
         mergeFolderLevel(QString(), QString());
     }
 
-    // 3. 构建当前库哈希索引（文件内容判重）
+
     {
         const auto currentScores = m_repository.list(QString(), &error);
         for (const auto& score : currentScores) {
@@ -2413,7 +2413,7 @@ QString LibraryService::importDatabaseBackupMerged(const QUrl& backupFile)
         }
     }
 
-    // 4. 构建合并队列（备份乐谱 + 源文件路径 + 哈希）
+
     for (const auto& value : backupScores) {
         auto map = value.toMap();
         const auto sourcePath = m_mergeBackupRoot + QStringLiteral("/library/scores/")
@@ -2429,7 +2429,7 @@ QString LibraryService::importDatabaseBackupMerged(const QUrl& backupFile)
         m_mergeQueue.append(map);
     }
 
-    // 5. 开始合并（逐项处理，冲突时暂停等待用户决策）
+
     if (m_mergeQueue.isEmpty()) {
         reloadFolders();
         reload();
@@ -2468,7 +2468,7 @@ void LibraryService::importBackupScore(const QVariantMap& item, const QString& t
     const auto lastOpenedAt = item.value(QStringLiteral("lastOpenedAt")).toLongLong();
     if (lastOpenedAt > 0) score.lastOpenedAt = QDateTime::fromMSecsSinceEpoch(lastOpenedAt);
     if (!m_repository.insert(score, targetFolderId, &error)) {
-        (void)FileService::removeFile(storedPath, &error); // 回滚：尽力删除已复制文件
+        (void)FileService::removeFile(storedPath, &error);
         emit errorOccurred(QStringLiteral("导入乐谱失败：%1").arg(score.title));
         return;
     }
@@ -2478,7 +2478,7 @@ void LibraryService::importBackupScore(const QVariantMap& item, const QString& t
     const auto tagIds = item.value(QStringLiteral("tagIds")).toList();
     for (const auto& tagIdVariant : tagIds) {
         const auto tagId = tagIdVariant.toString();
-        // 乐谱标签迁移为尽力而为，失败不影响导入主流程
+
         if (m_mergeTagMap.contains(tagId)) (void)m_repository.addTag(newId, m_mergeTagMap.value(tagId), &error);
     }
     const auto annotations = item.value(QStringLiteral("annotations")).toList();
@@ -2513,7 +2513,7 @@ void LibraryService::continueMerge()
         QString existingScoreId;
         if (!hash.isEmpty() && m_mergeHashIndex.contains(hash)) existingScoreId = m_mergeHashIndex.value(hash);
 
-        // 当前项总是应用用户刚做出的决策；applyToAll 只决定后续项是否复用
+
         QString action = m_mergeConflictAction;
         if (!existingScoreId.isEmpty() && action.isEmpty()) {
             emit mergeConflict(title, m_mergeScoreTitles.value(existingScoreId), m_mergeIndex, m_mergeQueue.size());
@@ -2531,7 +2531,7 @@ void LibraryService::continueMerge()
                 (void)FileService::removeFile(filePath, &error);
                 (void)FileService::removeFile(thumbnailPath, &error);
                 if (!m_repository.remove(existingScoreId, &error)) {
-                    // 覆盖删除失败：跳过该项，避免同一内容产生两份记录
+
                     ++m_mergeIndex;
                     continue;
                 }
@@ -2542,7 +2542,7 @@ void LibraryService::continueMerge()
         importBackupScore(item, targetFolderId);
         ++processed;
         ++m_mergeIndex;
-        // 非"应用到所有"时，当前项决策用完即清空，下一项冲突时重新弹窗
+
         if (!m_mergeApplyToAll) m_mergeConflictAction.clear();
     }
 

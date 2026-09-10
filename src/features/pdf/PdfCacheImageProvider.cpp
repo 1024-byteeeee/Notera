@@ -16,7 +16,7 @@ QImage PdfCacheImageProvider::requestImage(const QString& id, QSize* size,
     if (!m_cache)
         return {};
 
-    // id 可能带查询参数（如 "0_3670_0?cachebuster=123"），取 '?' 前部分
+
     const QString key = id.section(QLatin1Char('?'), 0, 0);
     QImage img = m_cache->imageByKey(key);
     if (img.isNull())
@@ -31,4 +31,4 @@ QImage PdfCacheImageProvider::requestImage(const QString& id, QSize* size,
     return img;
 }
 
-} // namespace Notera
+}

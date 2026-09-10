@@ -17,8 +17,8 @@ Rectangle {
     property string dragThumbnailPath: ""
     property real rubberAutoScrollSpeed: 0
     property bool rubberAccumulateSelection: false
-    // 本次框选是否发生过滚动：滚动（自动滚动/滚轮）会使已选项滚出视野，
-    // GridView 回收其 delegate 后无法再枚举，选择更新必须切换为并集模式
+
+
     property bool rubberScrolled: false
     property real rubberLastContentX: 0
     property real rubberLastContentY: 0
@@ -115,9 +115,9 @@ Rectangle {
         if (delegate.itemType === "folder") {
             libraryService.enterFolder(delegate.itemId)
         } else {
-            // 打开文件：显示加载弹窗，真实反映加载过程——
-            // 加载快弹窗一闪而过（甚至来不及渲染），加载慢弹窗持续显示；
-            // 内容加载完成（文件展示）后由 ReaderPage 立即关闭。
+
+
+
             appShell.showLoading("正在打开乐谱")
             appController.openScore(delegate.scoreId, delegate.title,
                 delegate.filePath, delegate.fileType, delegate.pageCount,
@@ -147,7 +147,7 @@ Rectangle {
         return false
     }
 
-    // 系统快捷键仅在不处于文本输入、且没有弹窗拦截时生效，避免与搜索框/对话框的编辑快捷键冲突
+
     function textInputActive() {
         const focusItem = root.Window.activeFocusItem
         return focusItem && (focusItem instanceof TextInput || focusItem instanceof TextEdit)
@@ -175,9 +175,9 @@ Rectangle {
     function performSelectAll() { root.selectAll() }
 
     function updateRubberSelection() {
-        // 滚动检测：框选期间视图内容偏移一旦发生移动（自动滚动/滚轮滚动），
-        // 本次框选立即切换为并集模式；否则替换模式会把滚出视野、
-        // delegate 已被 GridView 回收的已选项误删。
+
+
+
         if (!root.rubberScrolled
             && (grid.contentX !== root.rubberLastContentX || grid.contentY !== root.rubberLastContentY)) {
             root.rubberScrolled = true
@@ -198,8 +198,8 @@ Rectangle {
             if (intersects) ids.push(item.itemId)
         }
         if (root.rubberAccumulateSelection || root.rubberScrolled) {
-            // 滚动期间用并集：保留已选中的，添加新进入框选区域的，
-            // 避免滚出视野的 delegate 被回收后丢失选中状态
+
+
             const existing = libraryService.selection.selectedIds
             const merged = []
             const seen = {}
@@ -259,10 +259,10 @@ Rectangle {
         target: libraryService
         function onImportRequested() { fileDialog.open() }
     }
-    // libraryService.filterMode 是数据过滤的事实来源（enterFolder/goUp/goToLibraryRoot
-    // 在 C++ 层已自动更新并 emit filterModeChanged）。此处同步 appController.libraryFilter
-    // 视图状态（侧边栏高亮、标题等）。delegate 内因 AOT 编译作用域限制无法直接访问
-    // appController，统一由此根级 Connections 同步。
+
+
+
+
     Connections {
         target: libraryService
         function onFilterModeChanged() {
@@ -273,9 +273,9 @@ Rectangle {
     }
     Component.onCompleted: libraryService.filterMode = appController.libraryFilter
 
-    // 系统快捷键：使用 StandardKey 自动映射 macOS(Cmd) / Windows(Ctrl)，
-    // 文本输入或弹窗打开时禁用，避免抢占搜索框与对话框的编辑快捷键。
-    // 注意必须用 sequences(数组) 形式，否则 StandardKey 的多键绑定只会命中其中一个。
+
+
+
     Shortcut {
         sequences: [StandardKey.Copy]
         enabled: root.visible && !root.textInputActive() && !root.dialogOpen()
@@ -410,11 +410,11 @@ Rectangle {
                 cellHeight: 326
                 model: libraryService.entries
 
-                // 视图级滚动位置记忆：key = filterMode + "|" + searchQuery。
-                // 用户滚动时防抖记录当前视图位置；整表重建（resetFinished）后恢复
-                // 当前视图上次停留的位置。进文件夹/返回上一级/切视图/搜索会改变 key：
-                // 新视图无记录则从顶部开始，切回原视图自动恢复上次位置，因此
-                // “不管从哪个页面回到哪个页面”都保持在原滚动位置。
+
+
+
+
+
                 property var viewScrollPositions: ({})
                 property bool suppressPositionRecord: false
                 property bool __positionDirty: false
@@ -432,7 +432,7 @@ Rectangle {
                 }
                 onContentYChanged: {
                     if (grid.suppressPositionRecord) return
-                    // 防抖：同帧多次滚动合并为一次记录
+
                     if (grid.__positionDirty) return
                     grid.__positionDirty = true
                     Qt.callLater(function() {
@@ -443,7 +443,7 @@ Rectangle {
                 Connections {
                     target: libraryService.entries
                     function onResetStarted() {
-                        // 模型重建期间 contentY 会被重置，禁止写入位置记录
+
                         grid.suppressPositionRecord = true
                     }
                     function onResetFinished() {
@@ -455,9 +455,9 @@ Rectangle {
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
                 WheelHandler {
-                    // 手动夹紧滚动：WheelHandler 直接赋值 contentY 不会触发
-                    // Flickable 的边界限制，滚过末尾会继续把内容推出边界显示空白，
-                    // 表现为"滚轮可以无限上滚/下滚"
+
+
+
                     onWheel: function(event) {
                         const delta = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y
                         grid.contentY = Math.max(0, Math.min(grid.contentY - delta,
@@ -480,7 +480,7 @@ Rectangle {
                     required property string fileType
                     required property var tags
                     readonly property string scoreId: itemId
-                    // 菜单懒加载：菜单未打开时 menuLoader.item 为 null，属性返回安全默认值
+
                     readonly property bool contextMenuOpenedOnce: menuLoader.item ? menuLoader.item.openedOnce : false
                     readonly property bool contextMenuVisible: menuLoader.item ? menuLoader.item.visible : false
                     readonly property real contextMenuWidth: menuLoader.item ? menuLoader.item.implicitWidth : 0
@@ -614,7 +614,7 @@ Rectangle {
 
                         HoverHandler {
                             id: cardHover
-                            // 长按进入拖拽移动后鼠标指针切换为抓取手势
+
                             cursorShape: (cardMouseArea.dragArmed || cardMouseArea.dragged)
                                 ? Qt.ClosedHandCursor : Qt.PointingHandCursor
                         }
@@ -624,8 +624,8 @@ Rectangle {
                             objectName: scoreDelegate.itemType === "score" ? "scoreCardMouse" : "folderCardMouse"
                             acceptedButtons: Qt.LeftButton
                             preventStealing: true
-                            // 拖拽移动改为长按触发：按下后按住不放（系统长按时长）进入拖拽模式，
-                            // 之后移动才激活拖拽；普通快速点击/拖动保持原有打开/选择语义。
+
+
                             property bool dragArmed: false
                             property bool dragged: false
                             property bool moved: false
@@ -633,8 +633,8 @@ Rectangle {
 
                             Timer {
                                 id: longPressTimer
-                                // 长按拖拽触发阈值：可在设置页“通用 → 长按拖拽时长”配置
-                                // （150~1000ms，默认 300ms）。下限 150ms 防止与快速点击混淆。
+
+
                                 interval: Math.max(150, appController.longPressDragMs)
                                 onTriggered: {
                                     cardMouseArea.dragArmed = true
@@ -666,7 +666,7 @@ Rectangle {
                                     return
                                 }
                                 if (dragArmed) {
-                                    // 长按完成，开始拖动即进入拖拽
+
                                     dragged = true
                                     root.dragInProgress = true
                                     return
@@ -674,7 +674,7 @@ Rectangle {
                                 const dx = mouse.x - pressPos.x
                                 const dy = mouse.y - pressPos.y
                                 if (dx * dx + dy * dy > Qt.styleHints.startDragDistance * Qt.styleHints.startDragDistance) {
-                                    // 未长按就移动超过阈值：取消长按，按普通点击处理
+
                                     moved = true
                                     longPressTimer.stop()
                                 }
@@ -684,7 +684,7 @@ Rectangle {
                                 if (dragged) {
                                     root.finishInternalDrag()
                                 } else if (!dragArmed && !moved) {
-                                    // 快速按下-释放：保持原有点击语义
+
                                     root.handleCardClick(scoreDelegate)
                                 }
                                 dragArmed = false
@@ -703,7 +703,7 @@ Rectangle {
                             acceptedButtons: Qt.RightButton
                             gesturePolicy: TapHandler.ReleaseWithinBounds
                             onTapped: {
-                                // 懒创建：右键时才实例化菜单（滚动经过的卡片不再背负整套菜单对象）
+
                                 if (scoreDelegate.itemType === "folder") {
                                     folderMenuLoader.active = true
                                     folderMenuLoader.item.popup()
@@ -932,8 +932,8 @@ Rectangle {
                                             }
                                             return
                                         }
-                                        // 注意：checkable 的 MenuItem 在触发 onTriggered 之前会先自动切换 checked，
-                                        // 因此不能依据 UI 的 checked 判断"当前是否已打标"，必须直接读取服务端状态。
+
+
                                         if (libraryService.itemHasTag(scoreDelegate.itemId, itemId)) {
                                             libraryService.removeItemTag(scoreDelegate.itemId, itemId)
                                         } else {
@@ -1093,8 +1093,8 @@ Rectangle {
                                             }
                                             return
                                         }
-                                        // 注意：checkable 的 MenuItem 在触发 onTriggered 之前会先自动切换 checked，
-                                        // 因此不能依据 UI 的 checked 判断"当前是否已打标"，必须直接读取服务端状态。
+
+
                                         if (libraryService.itemHasTag(scoreDelegate.itemId, itemId)) {
                                             libraryService.removeItemTag(scoreDelegate.itemId, itemId)
                                         } else {
@@ -1157,7 +1157,7 @@ Rectangle {
                         root.rubberScrolled = false
                         return
                     }
-                    // 记录框选起始时的内容偏移，作为本次框选滚动检测的基准
+
                     root.rubberLastContentX = grid.contentX
                     root.rubberLastContentY = grid.contentY
                     root.rubberScrolled = false
@@ -1173,7 +1173,7 @@ Rectangle {
                 onActiveTranslationChanged: {
                     if (!active || !validStart) return
                     const start = centroid.pressPosition
-                    // 框选范围限制在板块内
+
                     const curX = Math.max(0, Math.min(librarySurface.width, centroid.position.x))
                     const curY = Math.max(0, Math.min(librarySurface.height, centroid.position.y))
                     selectionBox.x = Math.min(start.x, curX)
@@ -1181,7 +1181,7 @@ Rectangle {
                     selectionBox.width = Math.abs(curX - start.x)
                     selectionBox.height = Math.abs(curY - start.y)
                     root.updateRubberSelection()
-                    // 拖动到上下边缘时自动滚动
+
                     root.updateRubberAutoScroll(centroid.position.y)
                 }
             }
@@ -1229,8 +1229,8 @@ Rectangle {
                 anchors.fill: parent
                 z: 1
                 onDropped: function(drop) {
-                    // 内部拖放（移动乐谱/文件夹）仅在文件夹卡片上生效；
-                    // 松开在空白区域时不修改数据库，项目自动回到原位置。
+
+
                     if (root.dragIds(drop).length > 0) {
                         drop.acceptProposedAction()
                     }
@@ -1240,7 +1240,7 @@ Rectangle {
             TapHandler {
                 acceptedButtons: Qt.RightButton
                 onTapped: {
-                    // 标签视图下空白区不弹右键菜单（卡片右键菜单保留）
+
                     if (appController.libraryFilter.startsWith("tag:")) return
                     blankContextMenu.popup()
                 }
@@ -1542,7 +1542,7 @@ Rectangle {
         }
     }
 
-    // 拼接导入只选了一个文件时的提示
+
     ConfirmDialog {
         id: stitchImportHintDialog
         title: "拼接导入"
@@ -1552,7 +1552,7 @@ Rectangle {
         showCancel: false
     }
 
-    // 拼接对话框：指定方向 / 顺序 / 文件名，确认后拼接并导入当前文件夹
+
     StitchDialog {
         id: stitchImagesDialog
         title: "拼接图片"
@@ -1635,10 +1635,10 @@ Rectangle {
         property string conflictSource: "paste"
 
         function resolveConflict(action) {
-            // 注意：这里不能在调用 resolve* 之后再 close()。服务层会在同一同步调用里
-            // 处理后续项，遇到下一个冲突会再次发出冲突信号并重新打开本弹窗；
-            // 若随后 close()，会把刚打开的下一个冲突弹窗又关掉，导致"弹窗不循环弹出"。
-            // 关闭动作统一交给 onPasteFinished / onMergeFinished 在整批操作结束时执行。
+
+
+
+
             if (conflictDialog.conflictSource === "merge") {
                 libraryService.resolveMergeConflict(action, conflictDialog.applyToAll)
             } else if (conflictDialog.conflictSource === "pasteFolder") {

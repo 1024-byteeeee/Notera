@@ -31,9 +31,9 @@ class LibraryService final : public QObject
     Q_PROPERTY(bool canGoUp READ canGoUp NOTIFY currentFolderChanged)
     Q_PROPERTY(QVariantList clipboardItems READ clipboardItems NOTIFY clipboardChanged)
     Q_PROPERTY(QString clipboardMode READ clipboardMode NOTIFY clipboardChanged)
-    // 当前选中项中可拼接（score 且为图片文件）的条目列表，
-    // 元素为 { path: 本地文件路径(QUrl 字符串), name: 乐谱标题 }，
-    // 供右键菜单/批量操作栏判断"拼接"入口是否可用并展示标题。
+
+
+
     Q_PROPERTY(QVariantList stitchableScores READ stitchableScores NOTIFY stitchableChanged)
 
 public:
@@ -60,7 +60,7 @@ public:
     Q_INVOKABLE void importFiles(const QVariantList& paths);
     Q_INVOKABLE void importFolder(const QVariant& folderPath);
     Q_INVOKABLE void importAndStitchImages(const QStringList& filePaths);
-    // 按指定顺序/方向拼接图片并作为乐谱导入当前文件夹，文件名用 outputName
+
     Q_INVOKABLE void stitchImages(const QVariantList& orderedPaths, const QString& direction,
         const QString& outputName);
     Q_INVOKABLE void toggleFavorite(const QString& scoreId, bool favorite);
@@ -145,13 +145,13 @@ private:
     void reload();
     void reloadFolders();
     void reloadTags();
-    // 标签增删后局部刷新对应条目的 tags，避免整表重建导致视图滚动位置回顶
+
     void updateEntryTagsLocally(const QString& itemId);
-    // 重命名后局部刷新条目标题
+
     void updateEntryTitleLocally(const QString& itemId, const QString& title);
-    // 收藏切换后局部刷新条目收藏状态
+
     void updateEntryFavoriteLocally(const QString& itemId, bool favorite);
-    // 缩略图刷新后局部更新多个条目的缩略图路径
+
     void updateEntryThumbnailsLocally(const QHash<QString, QString>& updates);
     void importFile(const QString& sourcePath, const QString& titleOverride = {});
     void continueImport();

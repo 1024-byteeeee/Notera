@@ -15,7 +15,7 @@ PdfRenderCache::PdfRenderCache(QObject* parent)
 
 int PdfRenderCache::quantizeScale(qreal scale)
 {
-    // 4 位小数精度：renderScale 通常 0.1~3.0，4 位足够区分不同缩放级别。
+
     return qRound(scale * 10000.0);
 }
 
@@ -36,7 +36,7 @@ size_t PdfRenderCache::imageBytes(const QImage& img)
 {
     if (img.isNull())
         return 0;
-    // QImage::sizeInBytes() 在 Qt 5.10+ 可用；用 width*height*depth/8 兜底。
+
     return static_cast<size_t>(img.width()) * static_cast<size_t>(img.height())
         * static_cast<size_t>((img.depth() + 7) / 8);
 }
@@ -53,7 +53,7 @@ void PdfRenderCache::insert(int page, qreal scale, int rotation, const QImage& i
 
     auto it = m_entries.find(key);
     if (it != m_entries.end()) {
-        // 覆盖：先减旧内存
+
         m_currentBytes -= it->bytes;
         it->image = image;
         it->bytes = bytes;
@@ -155,7 +155,7 @@ QImage PdfRenderCache::imageByKey(const QString& key) const
 
 void PdfRenderCache::evictIfNeeded()
 {
-    // 调用方已持锁。按 lastAccess 升序淘汰，直到内存低于预算。
+
     if (m_currentBytes <= m_memoryBudget || m_entries.isEmpty())
         return;
 
@@ -178,4 +178,4 @@ void PdfRenderCache::evictIfNeeded()
     }
 }
 
-} // namespace Notera
+}

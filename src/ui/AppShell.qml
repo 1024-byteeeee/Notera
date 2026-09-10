@@ -36,10 +36,10 @@ Item {
         animateContent()
     }
 
-    // 全局加载对话框：文件打开、数据库导入/导出等耗时操作使用。
-    // 调用 showLoading() 后必须用 Timer 延迟执行阻塞操作，给 UI 一帧时间渲染弹窗。
+
+
     function showLoading(message) { loadingDialog.show(message) }
-    // 立即关闭：真实反映加载完成，不做最小展示时长表演
+
     function hideLoading() { loadingDialog.hide() }
 
     Connections {
@@ -150,7 +150,7 @@ Item {
         }
     }
 
-    // 全局加载对话框：半透明遮罩 + 居中卡片 + BusyIndicator + 提示文字
+
     LoadingDialog {
         id: loadingDialog
         z: 200
