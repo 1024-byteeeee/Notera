@@ -1618,8 +1618,9 @@ Rectangle {
         id: folderImportDialog
         objectName: "folderImportDialog"
         title: "选择要导入的文件夹"
+        selectMultiple: true
         currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
-        onAccepted: libraryService.importFolder(selectedFolder)
+        onAccepted: libraryService.importFolders(selectedFolders)
     }
 
     FileDialog {

@@ -616,11 +616,68 @@ void LibraryService::importFolder(const QVariant& folderPathVariant)
         emit errorOccurred(QStringLiteral("所选文件夹不存在"));
         return;
     }
+
+    const bool queueBusy = m_importTaskActive || !m_importQueue.isEmpty();
+    const auto targetRoot = currentImportTargetFolder();
+    const int count = enqueueFolderTree(rootPath, targetRoot);
+    if (count < 0)
+        return;
+    if (count == 0)
+    {
+        emit noticeOccurred(QStringLiteral("所选文件夹中没有可导入的乐谱文件"));
+        return;
+    }
+    dispatchImportQueue(queueBusy);
+}
+
+void LibraryService::importFolders(const QVariantList& folderPaths)
+{
+    QStringList resolved;
+    resolved.reserve(folderPaths.size());
+    for (const auto& value : folderPaths)
+    {
+        const auto localPath = resolveImportPath(value);
+        if (localPath.isEmpty())
+        {
+            emit errorOccurred(QStringLiteral("请选择电脑上的文件夹"));
+            return;
+        }
+        const auto canonical = QFileInfo(localPath).canonicalFilePath();
+        if (canonical.isEmpty())
+        {
+            emit errorOccurred(QStringLiteral("所选文件夹不存在"));
+            return;
+        }
+        resolved.append(canonical);
+    }
+    if (resolved.isEmpty())
+        return;
+
+    const bool queueBusy = m_importTaskActive || !m_importQueue.isEmpty();
+    const auto targetRoot = currentImportTargetFolder();
+    int totalCount = 0;
+    for (const auto& rootPath : resolved)
+    {
+        const int count = enqueueFolderTree(rootPath, targetRoot);
+        if (count < 0)
+            return;
+        totalCount += count;
+    }
+    if (totalCount == 0)
+    {
+        emit noticeOccurred(QStringLiteral("所选文件夹中没有可导入的乐谱文件"));
+        return;
+    }
+    dispatchImportQueue(queueBusy);
+}
+
+int LibraryService::enqueueFolderTree(const QString& rootPath, const QString& targetRoot)
+{
     const QFileInfo rootInfo(rootPath);
     if (!rootInfo.exists() || !rootInfo.isDir())
     {
         emit errorOccurred(QStringLiteral("所选文件夹不存在"));
-        return;
+        return -1;
     }
 
     // 完整扫描目录树（含中间层目录），避免只收录“直接含乐谱文件的目录”导致漏建层级
@@ -649,19 +706,14 @@ void LibraryService::importFolder(const QVariant& folderPathVariant)
         }
     }
     if (scoreCount == 0)
-    {
-        emit noticeOccurred(QStringLiteral("所选文件夹中没有可导入的乐谱文件"));
-        return;
-    }
+        return 0;
 
     // 保留导入文件夹本身：在目标位置创建/复用以文件夹名命名的 Notera 文件夹
-    const auto targetRoot = currentImportTargetFolder();
     const auto newRootId = getOrCreateFolder(rootInfo.fileName(), targetRoot);
     if (newRootId.isEmpty())
-        return;
+        return -1;
 
     // 深度优先：为目录树中每个含内容的目录创建对应 Notera 文件夹，乐谱归入其所在目录
-    const bool queueBusy = m_importTaskActive || !m_importQueue.isEmpty();
     std::function<bool(const QString&, const QString&)> enqueueDir =
         [&](const QString& fsDir, const QString& noteraParentId) -> bool
     {
@@ -688,8 +740,13 @@ void LibraryService::importFolder(const QVariant& folderPathVariant)
         return true;
     };
     if (!enqueueDir(rootPath, targetRoot))
-        return;
+        return -1;
 
+    return scoreCount;
+}
+
+void LibraryService::dispatchImportQueue(bool queueBusy)
+{
     reloadFolders();
     reload();
 

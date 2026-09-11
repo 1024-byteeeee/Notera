@@ -58,6 +58,7 @@ class LibraryService final : public QObject
     Q_INVOKABLE void importLocalFile(const QUrl& url);
     Q_INVOKABLE void importFiles(const QVariantList& paths);
     Q_INVOKABLE void importFolder(const QVariant& folderPath);
+    Q_INVOKABLE void importFolders(const QVariantList& folderPaths);
     Q_INVOKABLE void importAndStitchImages(const QStringList& filePaths);
 
     Q_INVOKABLE void stitchImages(const QVariantList& orderedPaths, const QString& direction,
@@ -162,6 +163,9 @@ class LibraryService final : public QObject
     void consumeImportTemp(const QString& path);
     [[nodiscard]] QString currentImportTargetFolder() const;
     static QString resolveImportPath(const QVariant& value);
+    /** 扫描单个文件夹的目录树并入导入队列；返回入队乐谱数，0=无乐谱，-1=失败(已 emit error) */
+    int enqueueFolderTree(const QString& rootPath, const QString& targetRoot);
+    void dispatchImportQueue(bool queueBusy);
     void continuePaste();
     void beginPasteToFolder(const QString& folderId);
     QString copyScoreToFolder(const QString& scoreId, const QString& targetFolderId,

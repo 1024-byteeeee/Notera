@@ -349,17 +349,19 @@ int main(int argc, char* argv[])
     app.installTranslator(&qtTranslator);
 
     const auto arguments = app.arguments();
-    const auto isSmokeTest = arguments.contains(QStringLiteral("--theme-smoke-test")) ||
-                             arguments.contains(QStringLiteral("--import-smoke-test")) ||
-                             arguments.contains(QStringLiteral("--folder-import-smoke-test")) ||
-                             arguments.contains(QStringLiteral("--stitch-smoke-test")) ||
-                             arguments.contains(QStringLiteral("--reader-smoke-test")) ||
-                             arguments.contains(QStringLiteral("--ui-smoke-test")) ||
-                             arguments.contains(QStringLiteral("--folder-rename-smoke-test")) ||
-                             arguments.contains(QStringLiteral("--storage-migration-smoke-test")) ||
-                             arguments.contains(QStringLiteral("--clear-data-smoke-test")) ||
-                             arguments.contains(QStringLiteral("--clipboard-smoke-test")) ||
-                             arguments.contains(QStringLiteral("--tag-smoke-test"));
+    const auto isSmokeTest =
+        arguments.contains(QStringLiteral("--theme-smoke-test")) ||
+        arguments.contains(QStringLiteral("--import-smoke-test")) ||
+        arguments.contains(QStringLiteral("--folder-import-smoke-test")) ||
+        arguments.contains(QStringLiteral("--multi-folder-import-smoke-test")) ||
+        arguments.contains(QStringLiteral("--stitch-smoke-test")) ||
+        arguments.contains(QStringLiteral("--reader-smoke-test")) ||
+        arguments.contains(QStringLiteral("--ui-smoke-test")) ||
+        arguments.contains(QStringLiteral("--folder-rename-smoke-test")) ||
+        arguments.contains(QStringLiteral("--storage-migration-smoke-test")) ||
+        arguments.contains(QStringLiteral("--clear-data-smoke-test")) ||
+        arguments.contains(QStringLiteral("--clipboard-smoke-test")) ||
+        arguments.contains(QStringLiteral("--tag-smoke-test"));
     if (isSmokeTest)
     {
         QStandardPaths::setTestModeEnabled(true);
@@ -1861,6 +1863,82 @@ int main(int argc, char* argv[])
         return 0;
     }
 
+    if (arguments.contains(QStringLiteral("--multi-folder-import-smoke-test")))
+    {
+        QTemporaryDir folderImportRoot;
+        if (!folderImportRoot.isValid())
+            return 1;
+        const auto makeImage = [](const QString& path) -> bool
+        {
+            QImage image(64, 64, QImage::Format_Indexed8);
+            image.setColorTable({qRgb(255, 255, 255), qRgb(0, 0, 0)});
+            image.fill(0);
+            return image.save(path);
+        };
+        const auto root = folderImportRoot.path();
+        const auto dirA = root + QStringLiteral("/目录A");
+        const auto dirB = root + QStringLiteral("/目录B");
+        const auto subB = dirB + QStringLiteral("/子目录B");
+        if (!QDir().mkpath(dirA) || !QDir().mkpath(subB) ||
+            !makeImage(dirA + QStringLiteral("/乐谱A1.png")) ||
+            !makeImage(dirA + QStringLiteral("/乐谱A2.png")) ||
+            !makeImage(subB + QStringLiteral("/乐谱B1.png")) ||
+            !makeImage(dirB + QStringLiteral("/乐谱B2.png")))
+        {
+            return 1;
+        }
+
+        auto waitForImport = [&libraryService](int timeoutMs = 5000)
+        {
+            QEventLoop loop;
+            QObject::connect(&libraryService, &LibraryService::importFinished, &loop,
+                             &QEventLoop::quit);
+            QTimer::singleShot(timeoutMs, &loop, &QEventLoop::quit);
+            loop.exec();
+        };
+
+        libraryService.importFolders({QUrl::fromLocalFile(dirA), QUrl::fromLocalFile(dirB)});
+        waitForImport();
+
+        // 两个被选文件夹都应作为 Notera 文件夹出现在库根下
+        QString idA, idB;
+        for (const auto& item : libraryService.childFolders(QString()))
+        {
+            const auto map = item.toMap();
+            const auto name = map.value(QStringLiteral("name")).toString();
+            if (name == QStringLiteral("目录A"))
+                idA = map.value(QStringLiteral("id")).toString();
+            else if (name == QStringLiteral("目录B"))
+                idB = map.value(QStringLiteral("id")).toString();
+        }
+        if (idA.isEmpty() || idB.isEmpty())
+            return 1;
+
+        // 目录A：2 份乐谱，无子文件夹
+        if (libraryService.scoresInFolder(idA).size() != 2 ||
+            !libraryService.childFolders(idA).isEmpty())
+        {
+            return 1;
+        }
+
+        // 目录B：1 份直接乐谱 + 子目录B（1 份乐谱）
+        if (libraryService.scoresInFolder(idB).size() != 1)
+            return 1;
+        QString subBId;
+        for (const auto& item : libraryService.childFolders(idB))
+        {
+            const auto map = item.toMap();
+            if (map.value(QStringLiteral("name")).toString() == QStringLiteral("子目录B"))
+            {
+                subBId = map.value(QStringLiteral("id")).toString();
+                break;
+            }
+        }
+        if (subBId.isEmpty() || libraryService.scoresInFolder(subBId).size() != 1)
+            return 1;
+        return 0;
+    }
+
     if (arguments.contains(QStringLiteral("--tag-smoke-test")))
     {
 
@@ -2834,7 +2912,8 @@ int main(int argc, char* argv[])
                                     libraryService.entries()->data(idx, entryIdRoleF).toString();
                             }
                         }
-                        if (subFolderId.isEmpty() || !importRootTitles.contains(QStringLiteral("a")))
+                        if (subFolderId.isEmpty() ||
+                            !importRootTitles.contains(QStringLiteral("a")))
                         {
                             fail("folder-import-hierarchy-root-content");
                             return;
@@ -2850,12 +2929,14 @@ int main(int argc, char* argv[])
                                 const auto title =
                                     libraryService.entries()->data(idx, entryTitleRoleF).toString();
                                 subTitles << title;
-                                if (libraryService.entries()->data(idx, entryTypeRoleF).toString() ==
-                                        QStringLiteral("folder") &&
+                                if (libraryService.entries()
+                                            ->data(idx, entryTypeRoleF)
+                                            .toString() == QStringLiteral("folder") &&
                                     title == QStringLiteral("deep"))
                                 {
-                                    deepFolderId =
-                                        libraryService.entries()->data(idx, entryIdRoleF).toString();
+                                    deepFolderId = libraryService.entries()
+                                                       ->data(idx, entryIdRoleF)
+                                                       .toString();
                                 }
                             }
                             if (deepFolderId.isEmpty() || !subTitles.contains(QStringLiteral("b")))
@@ -2889,9 +2970,8 @@ int main(int argc, char* argv[])
                         for (int i = 0; i < libraryService.entries()->rowCount(); ++i)
                         {
                             const auto idx = libraryService.entries()->index(i, 0);
-                            if (libraryService.entries()
-                                    ->data(idx, entryIdRoleF)
-                                    .toString() == importRootFolderId)
+                            if (libraryService.entries()->data(idx, entryIdRoleF).toString() ==
+                                importRootFolderId)
                             {
                                 importedIds.append(
                                     libraryService.entries()->data(idx, entryIdRoleF));
