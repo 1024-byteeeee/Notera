@@ -1402,7 +1402,11 @@ Rectangle {
         AppMenuItem {
             symbol: "folder"
             text: "导入文件夹…"
-            onTriggered: folderImportDialog.open()
+            onTriggered: {
+                const paths = folderPicker.pickFolders();
+                if (paths.length > 0)
+                    libraryService.importFolders(paths);
+            }
         }
         AppMenuItem {
             symbol: "stitch"
@@ -1440,7 +1444,11 @@ Rectangle {
             text: "导入文件夹"
             symbol: "folder"
             visible: !blankContextMenu.isTagView
-            onTriggered: folderImportDialog.open()
+            onTriggered: {
+                const paths = folderPicker.pickFolders();
+                if (paths.length > 0)
+                    libraryService.importFolders(paths);
+            }
         }
         AppMenuSeparator {
             visible: !blankContextMenu.isTagView
@@ -1611,15 +1619,6 @@ Rectangle {
         nameFilters: ["支持的乐谱 (*.pdf *.jpg *.jpeg *.png *.bmp *.gif *.webp *.tif *.tiff)", "所有文件 (*)"]
         onAccepted: {
             libraryService.importFiles(selectedFiles);
-        }
-    }
-
-    FolderMultiSelectDialog {
-        id: folderImportDialog
-        objectName: "folderImportDialog"
-        title: "选择要导入的文件夹"
-        onImportRequested: function (urls) {
-            libraryService.importFolders(urls);
         }
     }
 

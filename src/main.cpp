@@ -46,6 +46,7 @@
 #include "features/pdf/PdfCacheImageProvider.h"
 #include "features/pdf/PdfRenderService.h"
 #include "platform/AppDataPaths.h"
+#include "services/FolderPicker.h"
 #include "services/MetronomeService.h"
 
 namespace
@@ -517,6 +518,7 @@ int main(int argc, char* argv[])
 
     ApplicationController controller;
     LibraryService libraryService;
+    FolderPicker folderPicker;
     MetronomeService metronome;
     QObject::connect(&controller, &ApplicationController::restartRequested, &app,
                      [&restartGuard]
@@ -2253,6 +2255,7 @@ int main(int argc, char* argv[])
 
     engine.rootContext()->setContextProperty(QStringLiteral("appController"), &controller);
     engine.rootContext()->setContextProperty(QStringLiteral("libraryService"), &libraryService);
+    engine.rootContext()->setContextProperty(QStringLiteral("folderPicker"), &folderPicker);
     engine.rootContext()->setContextProperty(QStringLiteral("metronome"), &metronome);
     engine.loadFromModule("Notera", "Main");
 

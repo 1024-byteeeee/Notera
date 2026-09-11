@@ -32,6 +32,7 @@ qt_add_executable(
   src/services/DatabaseService.cpp
   src/services/FileService.h
   src/services/FileService.cpp
+  src/services/FolderPicker.h
   src/services/MetronomeService.h
   src/services/MetronomeService.cpp
   src/services/MetronomeAudio.h
@@ -66,7 +67,12 @@ qt_add_resources(Notera "notera_assets" PREFIX "/" FILES
                  src/assets/notera-icon.png)
 
 if(WIN32)
-  target_sources(Notera PRIVATE src/assets/notera.rc)
+  target_sources(Notera PRIVATE src/assets/notera.rc src/services/FolderPicker_win.cpp)
+  target_link_libraries(Notera PRIVATE Ole32 Shell32)
+elseif(APPLE)
+  enable_language(OBJCXX)
+  target_sources(Notera PRIVATE src/services/FolderPicker_mac.mm)
+  target_link_libraries(Notera PRIVATE "-framework AppKit")
 endif()
 
 qt_add_qml_module(
@@ -85,7 +91,6 @@ qt_add_qml_module(
   src/ui/components/IconButton.qml
   src/ui/components/AppDialog.qml
   src/ui/components/ConfirmDialog.qml
-  src/ui/components/FolderMultiSelectDialog.qml
   src/ui/components/LoadingDialog.qml
   src/ui/components/StitchDialog.qml
   src/ui/components/AppMenu.qml
