@@ -85,6 +85,7 @@ qt_add_qml_module(
   src/ui/components/IconButton.qml
   src/ui/components/AppDialog.qml
   src/ui/components/ConfirmDialog.qml
+  src/ui/components/FolderMultiSelectDialog.qml
   src/ui/components/LoadingDialog.qml
   src/ui/components/StitchDialog.qml
   src/ui/components/AppMenu.qml

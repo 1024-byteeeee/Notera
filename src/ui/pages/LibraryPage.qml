@@ -1614,13 +1614,13 @@ Rectangle {
         }
     }
 
-    FolderDialog {
+    FolderMultiSelectDialog {
         id: folderImportDialog
         objectName: "folderImportDialog"
         title: "选择要导入的文件夹"
-        selectMultiple: true
-        currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
-        onAccepted: libraryService.importFolders(selectedFolders)
+        onImportRequested: function (urls) {
+            libraryService.importFolders(urls);
+        }
     }
 
     FileDialog {
