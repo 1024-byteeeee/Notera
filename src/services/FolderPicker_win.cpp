@@ -25,7 +25,7 @@ QStringList FolderPicker::pickFolders()
     }
 
     HWND ownerWindow = nullptr;
-    if (QWindow* window = QGuiApplication::activeWindow())
+    if (QWindow* window = QGuiApplication::focusWindow())
         ownerWindow = reinterpret_cast<HWND>(window->winId());
 
     if (SUCCEEDED(pDialog->Show(ownerWindow)))
