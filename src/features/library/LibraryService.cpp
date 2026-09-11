@@ -623,74 +623,79 @@ void LibraryService::importFolder(const QVariant& folderPathVariant)
         return;
     }
 
-    QHash<QString, QStringList> filesByDir;
-    const QDir rootDir(rootPath);
-    QDirIterator it(rootPath, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    // 完整扫描目录树（含中间层目录），避免只收录“直接含乐谱文件的目录”导致漏建层级
+    struct DirNode
+    {
+        QStringList files;
+        QStringList subdirs;
+    };
+    QHash<QString, DirNode> dirNodes;
+    int scoreCount = 0;
+    QDirIterator it(rootPath, QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot,
+                    QDirIterator::Subdirectories);
     while (it.hasNext())
     {
         it.next();
         const auto info = it.fileInfo();
-        if (!info.isFile() || !FileService::isSupportedScoreFile(info.filePath()))
-            continue;
-
-        auto relDir = rootDir.relativeFilePath(info.absolutePath());
-        if (relDir == QLatin1String("."))
-            relDir.clear();
-        filesByDir[relDir].append(info.filePath());
+        auto& node = dirNodes[info.absolutePath()];
+        if (info.isDir())
+        {
+            node.subdirs.append(info.fileName());
+        }
+        else if (info.isFile() && FileService::isSupportedScoreFile(info.filePath()))
+        {
+            node.files.append(info.filePath());
+            ++scoreCount;
+        }
     }
-    if (filesByDir.isEmpty())
+    if (scoreCount == 0)
     {
         emit noticeOccurred(QStringLiteral("所选文件夹中没有可导入的乐谱文件"));
         return;
     }
 
+    // 保留导入文件夹本身：在目标位置创建/复用以文件夹名命名的 Notera 文件夹
     const auto targetRoot = currentImportTargetFolder();
-    QHash<QString, QString> dirToId;
-    dirToId.insert(QString(), targetRoot);
-    auto dirs = filesByDir.keys();
-    std::sort(dirs.begin(), dirs.end(), [](const QString& a, const QString& b)
-              { return a.count(QLatin1Char('/')) < b.count(QLatin1Char('/')); });
-    for (const auto& dir : dirs)
-    {
-        if (dir.isEmpty())
-            continue;
-        const auto slashPos = dir.lastIndexOf(QLatin1Char('/'));
-        const auto parentRel = slashPos < 0 ? QString() : dir.left(slashPos);
+    const auto newRootId = getOrCreateFolder(rootInfo.fileName(), targetRoot);
+    if (newRootId.isEmpty())
+        return;
 
-        if (!dirToId.contains(parentRel))
-            continue;
-        const auto id = getOrCreateFolder(dir.mid(slashPos + 1), dirToId.value(parentRel));
-        if (id.isEmpty())
-            return;
-        dirToId.insert(dir, id);
-    }
+    // 深度优先：为目录树中每个含内容的目录创建对应 Notera 文件夹，乐谱归入其所在目录
+    const bool queueBusy = m_importTaskActive || !m_importQueue.isEmpty();
+    std::function<bool(const QString&, const QString&)> enqueueDir =
+        [&](const QString& fsDir, const QString& noteraParentId) -> bool
+    {
+        const auto& node = dirNodes.value(fsDir);
+        if (node.files.isEmpty() && node.subdirs.isEmpty())
+            return true;
+        const auto noteraId = (fsDir == rootPath)
+                                  ? newRootId
+                                  : getOrCreateFolder(QFileInfo(fsDir).fileName(), noteraParentId);
+        if (noteraId.isEmpty())
+            return false;
+        for (const auto& file : node.files)
+        {
+            m_importQueue.append(file);
+            m_importQueueFolders.append(noteraId);
+        }
+        auto subdirs = node.subdirs;
+        std::sort(subdirs.begin(), subdirs.end());
+        for (const auto& sub : subdirs)
+        {
+            if (!enqueueDir(fsDir + QLatin1Char('/') + sub, noteraId))
+                return false;
+        }
+        return true;
+    };
+    if (!enqueueDir(rootPath, targetRoot))
+        return;
+
     reloadFolders();
     reload();
 
-    const auto enqueueFolderFiles = [this, &dirToId, &filesByDir]
-    {
-        auto sortedDirs = filesByDir.keys();
-        std::sort(sortedDirs.begin(), sortedDirs.end());
-        for (const auto& dir : sortedDirs)
-        {
-            const auto folderId = dirToId.value(dir);
-            const auto paths = filesByDir.value(dir);
-            for (const auto& path : paths)
-            {
-                m_importQueue.append(path);
-                m_importQueueFolders.append(folderId);
-            }
-        }
-    };
-    if (m_importTaskActive || !m_importQueue.isEmpty())
-    {
-
-        enqueueFolderFiles();
+    if (queueBusy)
         return;
-    }
-    m_importQueue.clear();
     m_importQueueTitles.clear();
-    m_importQueueFolders.clear();
     m_importTempFiles.clear();
     m_importIndex = 0;
     m_importSucceededCount = 0;
@@ -698,7 +703,6 @@ void LibraryService::importFolder(const QVariant& folderPathVariant)
     m_importTaskActive = false;
     m_importConflictAction.clear();
     m_importApplyToAll = false;
-    enqueueFolderFiles();
     continueImport();
 }
 

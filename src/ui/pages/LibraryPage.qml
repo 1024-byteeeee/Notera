@@ -595,8 +595,7 @@ Rectangle {
                             }
                             RowLayout {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: scoreDelegate.tags.length > 0 ? 22 : 0
-                                visible: scoreDelegate.tags.length > 0
+                                Layout.preferredHeight: 22
                                 spacing: 5
                                 Repeater {
                                     model: Math.min(2, scoreDelegate.tags.length)
@@ -628,6 +627,20 @@ Rectangle {
                                     text: "+" + (scoreDelegate.tags.length - 2)
                                     color: Theme.mutedForeground
                                     font.pixelSize: Theme.fontXs
+                                }
+                                Rectangle {
+                                    visible: scoreDelegate.tags.length === 0
+                                    Layout.preferredWidth: noTagText.implicitWidth + 20
+                                    Layout.preferredHeight: 22
+                                    radius: 8
+                                    color: Theme.sunkenSurface
+                                    Label {
+                                        id: noTagText
+                                        anchors.centerIn: parent
+                                        text: "无标签"
+                                        color: Theme.mutedForeground
+                                        font.pixelSize: Theme.fontXs
+                                    }
                                 }
                                 Item {
                                     Layout.fillWidth: true

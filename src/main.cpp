@@ -351,6 +351,7 @@ int main(int argc, char* argv[])
     const auto arguments = app.arguments();
     const auto isSmokeTest = arguments.contains(QStringLiteral("--theme-smoke-test")) ||
                              arguments.contains(QStringLiteral("--import-smoke-test")) ||
+                             arguments.contains(QStringLiteral("--folder-import-smoke-test")) ||
                              arguments.contains(QStringLiteral("--stitch-smoke-test")) ||
                              arguments.contains(QStringLiteral("--reader-smoke-test")) ||
                              arguments.contains(QStringLiteral("--ui-smoke-test")) ||
@@ -1759,6 +1760,107 @@ int main(int argc, char* argv[])
         return 0;
     }
 
+    if (arguments.contains(QStringLiteral("--folder-import-smoke-test")))
+    {
+        QTemporaryDir folderImportRoot;
+        if (!folderImportRoot.isValid())
+            return 1;
+        const auto makeImage = [](const QString& path) -> bool
+        {
+            QImage image(64, 64, QImage::Format_Indexed8);
+            image.setColorTable({qRgb(255, 255, 255), qRgb(0, 0, 0)});
+            image.fill(0);
+            return image.save(path);
+        };
+        const auto root = folderImportRoot.path();
+        const auto subA = root + QStringLiteral("/子目录A");
+        const auto subB = root + QStringLiteral("/子目录B");
+        const auto deep = subB + QStringLiteral("/深层");
+        const auto emptyDir = root + QStringLiteral("/空目录");
+        if (!makeImage(root + QStringLiteral("/根级乐谱.png")) || !QDir().mkpath(subA) ||
+            !QDir().mkpath(deep) || !QDir().mkpath(emptyDir) ||
+            !makeImage(subA + QStringLiteral("/乐谱A.png")) ||
+            !makeImage(deep + QStringLiteral("/乐谱B.png")))
+        {
+            return 1;
+        }
+
+        auto waitForImport = [&libraryService](int timeoutMs = 5000)
+        {
+            QEventLoop loop;
+            QObject::connect(&libraryService, &LibraryService::importFinished, &loop,
+                             &QEventLoop::quit);
+            QTimer::singleShot(timeoutMs, &loop, &QEventLoop::quit);
+            loop.exec();
+        };
+
+        libraryService.importFolder(QUrl::fromLocalFile(root));
+        waitForImport();
+
+        // 导入的文件夹本身应作为 Notera 文件夹保留在库根下（而非平铺成单独乐谱）
+        const auto rootName = QDir(root).dirName();
+        QString rootFolderId;
+        for (const auto& item : libraryService.childFolders(QString()))
+        {
+            const auto map = item.toMap();
+            if (map.value(QStringLiteral("name")).toString() == rootName)
+            {
+                rootFolderId = map.value(QStringLiteral("id")).toString();
+                break;
+            }
+        }
+        if (rootFolderId.isEmpty())
+            return 1;
+
+        // 根文件夹下：根级乐谱 1 份 + 子目录A/子目录B；空目录不应被创建
+        if (libraryService.scoresInFolder(rootFolderId).size() != 1)
+            return 1;
+        QString subAId, subBId;
+        for (const auto& item : libraryService.childFolders(rootFolderId))
+        {
+            const auto map = item.toMap();
+            const auto name = map.value(QStringLiteral("name")).toString();
+            if (name == QStringLiteral("子目录A"))
+                subAId = map.value(QStringLiteral("id")).toString();
+            else if (name == QStringLiteral("子目录B"))
+                subBId = map.value(QStringLiteral("id")).toString();
+            else if (name == QStringLiteral("空目录"))
+                return 1;
+        }
+        if (subAId.isEmpty() || subBId.isEmpty())
+            return 1;
+
+        // 子目录A：仅 1 份乐谱，无子文件夹
+        if (libraryService.scoresInFolder(subAId).size() != 1 ||
+            !libraryService.childFolders(subAId).isEmpty())
+        {
+            return 1;
+        }
+
+        // 子目录B → 深层：中间层目录（本身无直接乐谱）也应被保留，深层内有 1 份乐谱
+        QString deepId;
+        for (const auto& item : libraryService.childFolders(subBId))
+        {
+            const auto map = item.toMap();
+            if (map.value(QStringLiteral("name")).toString() == QStringLiteral("深层"))
+            {
+                deepId = map.value(QStringLiteral("id")).toString();
+                break;
+            }
+        }
+        if (deepId.isEmpty() || libraryService.scoresInFolder(deepId).size() != 1)
+            return 1;
+
+        // 乐谱标题与文件名一致，证明文件归入了各自目录
+        const auto rootScores = libraryService.scoresInFolder(rootFolderId);
+        if (rootScores.constFirst().toMap().value(QStringLiteral("title")).toString() !=
+            QStringLiteral("根级乐谱"))
+        {
+            return 1;
+        }
+        return 0;
+    }
+
     if (arguments.contains(QStringLiteral("--tag-smoke-test")))
     {
 
@@ -2686,7 +2788,8 @@ int main(int argc, char* argv[])
                         libraryService.entries()->roleNames().key("title", -1);
                     const auto entryIdRoleF =
                         libraryService.entries()->roleNames().key("itemId", -1);
-                    QString subFolderId;
+                    const auto importRootName = QDir(folderRoot.path()).dirName();
+                    QString importRootFolderId;
                     QStringList rootTitles;
                     for (int i = 0; i < libraryService.entries()->rowCount(); ++i)
                     {
@@ -2696,14 +2799,16 @@ int main(int argc, char* argv[])
                         rootTitles << title;
                         if (libraryService.entries()->data(idx, entryTypeRoleF).toString() ==
                                 QStringLiteral("folder") &&
-                            title == QStringLiteral("sub"))
+                            title == importRootName)
                         {
-                            subFolderId =
+                            importRootFolderId =
                                 libraryService.entries()->data(idx, entryIdRoleF).toString();
                         }
                     }
-                    if (subFolderId.isEmpty() || !rootTitles.contains(QStringLiteral("a")) ||
+                    // 导入的文件夹本身应保留在库根下，内部内容不应平铺出来
+                    if (importRootFolderId.isEmpty() || rootTitles.contains(QStringLiteral("a")) ||
                         rootTitles.contains(QStringLiteral("b")) ||
+                        rootTitles.contains(QStringLiteral("sub")) ||
                         rootTitles.contains(QStringLiteral("empty")) ||
                         rootTitles.contains(QStringLiteral("ignore")))
                     {
@@ -2711,44 +2816,69 @@ int main(int argc, char* argv[])
                         return;
                     }
 
-                    libraryService.setFilterMode(QStringLiteral("folder:") + subFolderId);
+                    libraryService.setFilterMode(QStringLiteral("folder:") + importRootFolderId);
                     {
-                        QStringList subTitles;
-                        QString deepFolderId;
+                        QStringList importRootTitles;
+                        QString subFolderId;
                         for (int i = 0; i < libraryService.entries()->rowCount(); ++i)
                         {
                             const auto idx = libraryService.entries()->index(i, 0);
                             const auto title =
                                 libraryService.entries()->data(idx, entryTitleRoleF).toString();
-                            subTitles << title;
+                            importRootTitles << title;
                             if (libraryService.entries()->data(idx, entryTypeRoleF).toString() ==
                                     QStringLiteral("folder") &&
-                                title == QStringLiteral("deep"))
+                                title == QStringLiteral("sub"))
                             {
-                                deepFolderId =
+                                subFolderId =
                                     libraryService.entries()->data(idx, entryIdRoleF).toString();
                             }
                         }
-                        if (deepFolderId.isEmpty() || !subTitles.contains(QStringLiteral("b")))
+                        if (subFolderId.isEmpty() || !importRootTitles.contains(QStringLiteral("a")))
                         {
-                            fail("folder-import-hierarchy-sub");
+                            fail("folder-import-hierarchy-root-content");
                             return;
                         }
 
-                        libraryService.setFilterMode(QStringLiteral("folder:") + deepFolderId);
+                        libraryService.setFilterMode(QStringLiteral("folder:") + subFolderId);
                         {
-                            QStringList deepTitles;
+                            QStringList subTitles;
+                            QString deepFolderId;
                             for (int i = 0; i < libraryService.entries()->rowCount(); ++i)
                             {
-                                deepTitles << libraryService.entries()
-                                                  ->data(libraryService.entries()->index(i, 0),
-                                                         entryTitleRoleF)
-                                                  .toString();
+                                const auto idx = libraryService.entries()->index(i, 0);
+                                const auto title =
+                                    libraryService.entries()->data(idx, entryTitleRoleF).toString();
+                                subTitles << title;
+                                if (libraryService.entries()->data(idx, entryTypeRoleF).toString() ==
+                                        QStringLiteral("folder") &&
+                                    title == QStringLiteral("deep"))
+                                {
+                                    deepFolderId =
+                                        libraryService.entries()->data(idx, entryIdRoleF).toString();
+                                }
                             }
-                            if (!deepTitles.contains(QStringLiteral("c")))
+                            if (deepFolderId.isEmpty() || !subTitles.contains(QStringLiteral("b")))
                             {
-                                fail("folder-import-hierarchy-deep");
+                                fail("folder-import-hierarchy-sub");
                                 return;
+                            }
+
+                            libraryService.setFilterMode(QStringLiteral("folder:") + deepFolderId);
+                            {
+                                QStringList deepTitles;
+                                for (int i = 0; i < libraryService.entries()->rowCount(); ++i)
+                                {
+                                    deepTitles << libraryService.entries()
+                                                      ->data(libraryService.entries()->index(i, 0),
+                                                             entryTitleRoleF)
+                                                      .toString();
+                                }
+                                if (!deepTitles.contains(QStringLiteral("c")))
+                                {
+                                    fail("folder-import-hierarchy-deep");
+                                    return;
+                                }
                             }
                         }
                     }
@@ -2759,9 +2889,9 @@ int main(int argc, char* argv[])
                         for (int i = 0; i < libraryService.entries()->rowCount(); ++i)
                         {
                             const auto idx = libraryService.entries()->index(i, 0);
-                            const auto title =
-                                libraryService.entries()->data(idx, entryTitleRoleF).toString();
-                            if (title == QStringLiteral("sub") || title == QStringLiteral("a"))
+                            if (libraryService.entries()
+                                    ->data(idx, entryIdRoleF)
+                                    .toString() == importRootFolderId)
                             {
                                 importedIds.append(
                                     libraryService.entries()->data(idx, entryIdRoleF));
