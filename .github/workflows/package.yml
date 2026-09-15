@@ -149,14 +149,6 @@ jobs:
               esac
             done
 
-      - name: Attach DMG to GitHub Release
-        if: github.event_name == 'release' || inputs.release_tag != ''
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ github.event.release.tag_name || inputs.release_tag }}
-          files: build/macos-arm64/packages/Notera-v*-macOS-arm64.dmg
-          overwrite_files: true
-
   windows-msi:
     name: Windows x64 MSI
     runs-on: windows-2022
@@ -240,10 +232,34 @@ jobs:
           path: build/windows-x64/packages/*.msi
           if-no-files-found: error
 
-      - name: Attach MSI to GitHub Release
-        if: github.event_name == 'release' || inputs.release_tag != ''
+  publish-release:
+    name: Publish release assets
+    if: github.event_name == 'release' || inputs.release_tag != ''
+    needs: [macos-dmg, windows-msi]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download macOS DMG
+        uses: actions/download-artifact@v7
+        with:
+          name: Notera-macos-arm64-dmg
+          path: release-assets/macos
+
+      - name: Download Windows MSI
+        uses: actions/download-artifact@v7
+        with:
+          name: Notera-windows-x64-msi
+          path: release-assets/windows
+
+      - name: Attach macOS DMG to GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.release.tag_name || inputs.release_tag }}
-          files: build/windows-x64/packages/*.msi
+          files: release-assets/macos/Notera-v*-macOS-arm64.dmg
+          overwrite_files: true
+
+      - name: Attach Windows MSI to GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.event.release.tag_name || inputs.release_tag }}
+          files: release-assets/windows/*.msi
           overwrite_files: true
