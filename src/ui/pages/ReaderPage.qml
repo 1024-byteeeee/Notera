@@ -15,6 +15,12 @@ Rectangle {
     property real scrollSpeed: appController.autoScrollSpeed
     property real scrollAccumulator: 0
     property real zoomLevel: 1.0
+    onZoomLevelChanged: root.syncZoomInput()
+    readonly property real minimumZoom: 0.4
+    readonly property real maximumZoom: 3.0
+    readonly property string zoomShortcutHint: Qt.platform.os === "osx" ? "⌘ + 滚轮可缩放" : "Ctrl + 滚轮可缩放"
+    readonly property real readerPagePadding: 24
+    readonly property real maximumDefaultPageWidth: 1100
     property int viewRotation: 0
     onViewRotationChanged: root.updateBaseScaleUnit()
     property real pinchBaseZoom: 1.0
@@ -41,8 +47,10 @@ Rectangle {
             return;
         }
         const displayWidth = root.viewRotation % 180 !== 0 ? maxH : maxW;
-        const w = pdfView.width > 0 ? pdfView.width : readerViewport.width;
-        root.baseScaleUnit = displayWidth > 0 ? Math.min(w - 48, 1100) / displayWidth : 0;
+        // QML geometry is measured in device-independent pixels. Base scale must only use the
+        // reader viewport, never a physical-pixel ratio or an asynchronously sized PDF view.
+        const availableWidth = Math.max(1, readerViewport.width - root.readerPagePadding * 2);
+        root.baseScaleUnit = Math.min(availableWidth, root.maximumDefaultPageWidth) / displayWidth;
     }
     property var folderScores: []
     readonly property int currentScoreIndex: {
@@ -129,7 +137,7 @@ Rectangle {
         const safeHeight = Math.max(pdfView.height, pdfView.contentHeight);
         const normalizedX = (pdfView.contentX + viewportX) / safeWidth;
         const normalizedY = (pdfView.contentY + viewportY) / safeHeight;
-        root.zoomLevel = Math.max(0.4, Math.min(3.0, newZoom));
+        root.zoomLevel = Math.max(root.minimumZoom, Math.min(root.maximumZoom, newZoom));
         Qt.callLater(function () {
             root.restoreAnchor(normalizedX, normalizedY, viewportX, viewportY);
         });
@@ -188,6 +196,19 @@ Rectangle {
     function resetZoom() {
         root.markUserInteraction();
         applyDefaultView();
+    }
+    function setZoomPercent(percent) {
+        const parsed = Number(percent);
+        if (!Number.isFinite(parsed)) {
+            root.syncZoomInput();
+            return;
+        }
+        root.markUserInteraction();
+        zoomAroundViewport(parsed / 100, pdfView.width / 2, pdfView.height / 2);
+        root.syncZoomInput();
+    }
+    function syncZoomInput() {
+        zoomPercentInput.text = Math.round(root.zoomLevel * 100).toString();
     }
     function resetReaderView() {
         root.markUserInteraction();
@@ -453,7 +474,10 @@ Rectangle {
                 }
 
                 Rectangle {
-                    Layout.preferredWidth: 170
+                    Layout.minimumWidth: 136
+                    Layout.preferredWidth: 136
+                    Layout.maximumWidth: 136
+                    Layout.alignment: Qt.AlignVCenter
                     height: Theme.controlHeight
                     radius: Theme.radiusMd
                     color: Theme.buttonBackground
@@ -461,14 +485,12 @@ Rectangle {
                     border.width: 1
                     visible: root.isPdf || root.isImage
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 8
-                        anchors.rightMargin: 8
+                    Row {
+                        anchors.centerIn: parent
                         spacing: 2
 
                         Rectangle {
-                            Layout.preferredWidth: 30
+                            width: 30
                             height: 28
                             radius: 6
                             color: zoomOutMouse.containsMouse ? Theme.buttonHover : "transparent"
@@ -489,28 +511,48 @@ Rectangle {
                         }
 
                         Rectangle {
-                            Layout.fillWidth: true
+                            id: zoomInputBackground
+                            width: 52
                             height: 28
                             radius: 6
-                            color: zoomResetMouse.containsMouse ? Theme.buttonHover : "transparent"
-                            Label {
+                            color: Theme.buttonBackground
+                            border.width: zoomPercentInput.activeFocus ? 1 : 0
+                            border.color: Theme.inputFocusBorder
+                            Row {
                                 anchors.centerIn: parent
-                                text: Math.round(root.zoomLevel * 100) + "%"
-                                color: Theme.buttonText
-                                font.pixelSize: 12
-                                font.weight: Font.Medium
-                            }
-                            MouseArea {
-                                id: zoomResetMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.resetZoom()
+                                spacing: 0
+
+                                TextInput {
+                                    id: zoomPercentInput
+                                    objectName: "zoomPercentInput"
+                                    width: Math.max(20, contentWidth)
+                                    height: parent.height
+                                    text: Math.round(root.zoomLevel * 100).toString()
+                                    color: Theme.buttonText
+                                    font.pixelSize: 12
+                                    font.weight: Font.Medium
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    selectByMouse: true
+                                    inputMethodHints: Qt.ImhDigitsOnly
+                                    validator: IntValidator {
+                                        bottom: Math.round(root.minimumZoom * 100)
+                                        top: Math.round(root.maximumZoom * 100)
+                                    }
+                                    onAccepted: root.setZoomPercent(text)
+                                    onEditingFinished: root.setZoomPercent(text)
+                                }
+                                Label {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "%"
+                                    color: Theme.mutedForeground
+                                    font.pixelSize: 12
+                                }
                             }
                         }
 
                         Rectangle {
-                            Layout.preferredWidth: 30
+                            width: 30
                             height: 28
                             radius: 6
                             color: zoomInMouse.containsMouse ? Theme.buttonHover : "transparent"
@@ -530,6 +572,14 @@ Rectangle {
                             }
                         }
                     }
+                }
+
+                Label {
+                    visible: root.isPdf || root.isImage
+                    text: root.zoomShortcutHint
+                    color: Theme.mutedForeground
+                    font.pixelSize: Theme.fontXs
+                    Layout.leftMargin: -2
                 }
 
                 ToolButton {
@@ -605,7 +655,7 @@ Rectangle {
                     }
                 }
                 onActiveScaleChanged: {
-                    root.zoomLevel = Math.max(0.4, Math.min(3.0, root.pinchBaseZoom * pinchZoom.activeScale));
+                    root.zoomLevel = Math.max(root.minimumZoom, Math.min(root.maximumZoom, root.pinchBaseZoom * pinchZoom.activeScale));
                     Qt.callLater(function () {
                         root.restoreAnchor(root.pinchAnchorX, root.pinchAnchorY, root.pinchViewportX, root.pinchViewportY);
                     });
@@ -626,10 +676,10 @@ Rectangle {
 
                 Item {
                     id: imageViewport
-                    width: Math.min(readerViewport.width - 48, 1400) * root.zoomLevel
+                    width: Math.min(readerViewport.width - root.readerPagePadding * 2, 1400) * root.zoomLevel
                     height: rotated ? width * imageRatio : width / imageRatio
                     x: Math.max(0, (readerViewport.width - width) / 2)
-                    y: 24
+                    y: root.readerPagePadding
                     readonly property bool rotated: root.viewRotation % 180 !== 0
                     readonly property real imageRatio: scoreImage.sourceSize.height > 0 ? scoreImage.sourceSize.width / scoreImage.sourceSize.height : 0.7
 
@@ -1095,9 +1145,9 @@ Rectangle {
                     }
                 }
 
-                ColumnLayout {
+                RowLayout {
                     Layout.fillWidth: true
-                    spacing: Theme.spacingXs
+                    spacing: Theme.spacingSm
 
                     Label {
                         text: "音量"
@@ -1139,7 +1189,18 @@ Rectangle {
                             border.color: Theme.accent
                         }
                     }
+
+                    Label {
+                        Layout.preferredWidth: 42
+                        text: Math.round(metronome.volume * 100) + "%"
+                        color: Theme.foreground
+                        font.pixelSize: Theme.fontSm
+                        font.weight: Font.Medium
+                        horizontalAlignment: Text.AlignRight
+                    }
                 }
+
+                Item { Layout.preferredHeight: Theme.spacingSm }
             }
         }
     }

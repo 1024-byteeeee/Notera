@@ -123,8 +123,8 @@ target_link_libraries(
 
 if(APPLE)
   target_link_options(
-    Notera PRIVATE "-Wl,-weak_framework,AGL" "-Wl,-framework,CoreAudio"
-    "-Wl,-framework,CoreFoundation" "-Wl,-framework,AudioToolbox")
+    Notera PRIVATE "-Wl,-framework,CoreAudio" "-Wl,-framework,CoreFoundation"
+    "-Wl,-framework,AudioToolbox")
 endif()
 
 set_target_properties(
@@ -159,18 +159,24 @@ if(APPLE)
   set(CPACK_DMG_BACKGROUND_IMAGE "${CMAKE_BINARY_DIR}/dmg-background.png")
   set(CPACK_DMG_DS_STORE_SETUP_SCRIPT
       "${CMAKE_CURRENT_SOURCE_DIR}/packaging/configure-dmg.applescript")
+  set(NOTERA_DMG_BACKGROUND_RENDER_DIR
+      "${CMAKE_BINARY_DIR}/dmg-background-render")
+  file(MAKE_DIRECTORY "${NOTERA_DMG_BACKGROUND_RENDER_DIR}")
   execute_process(
     COMMAND
-      /usr/bin/sips -s format png
-      "${CMAKE_CURRENT_SOURCE_DIR}/packaging/dmg-background.svg" --out
-      "${CPACK_DMG_BACKGROUND_IMAGE}"
+      /usr/bin/qlmanage -t -s 720 -o "${NOTERA_DMG_BACKGROUND_RENDER_DIR}"
+      "${CMAKE_CURRENT_SOURCE_DIR}/packaging/dmg-background.svg"
     RESULT_VARIABLE dmg_background_result
     OUTPUT_QUIET
     ERROR_VARIABLE dmg_background_error)
-  if(NOT dmg_background_result EQUAL 0)
+  set(NOTERA_DMG_BACKGROUND_RENDERED
+      "${NOTERA_DMG_BACKGROUND_RENDER_DIR}/dmg-background.svg.png")
+  if(NOT dmg_background_result EQUAL 0 OR NOT EXISTS "${NOTERA_DMG_BACKGROUND_RENDERED}")
     message(
       FATAL_ERROR "Failed to render DMG background: ${dmg_background_error}")
   endif()
+  file(RENAME "${NOTERA_DMG_BACKGROUND_RENDERED}"
+       "${CPACK_DMG_BACKGROUND_IMAGE}")
   set(CPACK_PRE_BUILD_SCRIPTS
       "${CMAKE_CURRENT_SOURCE_DIR}/cmake/SignMacBundle.cmake")
 elseif(WIN32)
