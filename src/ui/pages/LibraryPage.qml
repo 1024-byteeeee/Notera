@@ -504,9 +504,10 @@ Rectangle {
                     readonly property int folderSubmenuItemCount: menuLoader.item ? menuLoader.item.folderSubmenuRef.count : 0
                     readonly property int tagSubmenuItemCount: menuLoader.item ? menuLoader.item.tagSubmenuRef.count : 0
                     readonly property int normalMenuArrowCount: menuLoader.item ? menuLoader.item.favoriteMenuItemRef.visibleArrowCount : -1
-                    readonly property int folderSubmenuArrowCount: menuLoader.item && menuLoader.item.openedOnce && menuLoader.item.count > 6 && menuLoader.item.itemAt(6) ? menuLoader.item.itemAt(6).visibleArrowCount : -1
-                    readonly property real folderSubmenuArrowWidth: menuLoader.item && menuLoader.item.openedOnce && menuLoader.item.count > 6 && menuLoader.item.itemAt(6) ? menuLoader.item.itemAt(6).arrowVisualWidth : -1
-                    readonly property real folderSubmenuArrowRightInset: menuLoader.item && menuLoader.item.openedOnce && menuLoader.item.count > 6 && menuLoader.item.itemAt(6) ? menuLoader.item.itemAt(6).arrowRightInset : -1
+                    // The separator is item 6; the folder submenu follows at item 7.
+                    readonly property int folderSubmenuArrowCount: menuLoader.item && menuLoader.item.openedOnce && menuLoader.item.count > 7 && menuLoader.item.itemAt(7) ? menuLoader.item.itemAt(7).visibleArrowCount : -1
+                    readonly property real folderSubmenuArrowWidth: menuLoader.item && menuLoader.item.openedOnce && menuLoader.item.count > 7 && menuLoader.item.itemAt(7) ? menuLoader.item.itemAt(7).arrowVisualWidth : -1
+                    readonly property real folderSubmenuArrowRightInset: menuLoader.item && menuLoader.item.openedOnce && menuLoader.item.count > 7 && menuLoader.item.itemAt(7) ? menuLoader.item.itemAt(7).arrowRightInset : -1
                     readonly property bool tagMenuHasDefaultCheckIndicator: menuLoader.item && menuLoader.item.tagSubmenuRef.count > 0 && menuLoader.item.tagSubmenuRef.itemAt(0).indicator.visible && menuLoader.item.tagSubmenuRef.itemAt(0).indicator.implicitWidth > 0
                     readonly property alias card: card
 
