@@ -129,6 +129,7 @@ Rectangle {
             anchors.leftMargin: (navItem.selected ? 16 : 18) + navItem.indent
             anchors.rightMargin: 12
             spacing: 10
+            z: 1
             scale: navMouse.pressed ? 0.985 : 1
             Behavior on scale {
                 NumberAnimation {
@@ -141,6 +142,7 @@ Rectangle {
                 Layout.preferredWidth: 16
                 Layout.preferredHeight: 16
                 visible: navItem.hasChildren
+                z: 1
                 iconName: navItem.expanded ? "chevron-down" : "chevron-right"
                 iconColor: navItem.selected ? Theme.selectedText : Theme.mutedForeground
                 MouseArea {

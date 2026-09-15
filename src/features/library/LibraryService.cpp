@@ -21,13 +21,14 @@
 #include <QStandardPaths>
 #include <QUrl>
 #include <QUuid>
-#include <QtCore/private/qzipreader_p.h>
 #include <algorithm>
 #include <functional>
 #include <utility>
 
 #include "platform/AppDataPaths.h"
+#include "services/BackupArchiveService.h"
 #include "services/FileService.h"
+#include "services/LibraryFileLifecycle.h"
 
 namespace
 {
@@ -72,97 +73,6 @@ QString availableExportPath(const QString& requestedPath)
         if (!QFileInfo::exists(candidate))
             return candidate;
     }
-}
-
-bool unzipBackupToDirectory(const QString& zipPath, const QString& dstDir, QString* error)
-{
-    QZipReader reader(zipPath);
-    if (!reader.exists())
-    {
-        *error = QStringLiteral("无法打开备份压缩包");
-        return false;
-    }
-    const auto entries = reader.fileInfoList();
-    for (const auto& entry : entries)
-    {
-        const auto targetPath = QDir(dstDir).filePath(entry.filePath);
-        if (entry.isDir)
-        {
-            if (!QDir().mkpath(targetPath))
-            {
-                *error = QStringLiteral("无法创建目录：%1").arg(targetPath);
-                return false;
-            }
-        }
-        else
-        {
-            if (!QDir().mkpath(QFileInfo(targetPath).absolutePath()))
-            {
-                *error =
-                    QStringLiteral("无法创建目录：%1").arg(QFileInfo(targetPath).absolutePath());
-                return false;
-            }
-            QFile file(targetPath);
-            if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
-            {
-                *error = QStringLiteral("无法写入文件：%1").arg(targetPath);
-                return false;
-            }
-            file.write(reader.fileData(entry.filePath));
-            file.close();
-        }
-    }
-    reader.close();
-    return true;
-}
-
-bool readBackupManifest(const QString& backupRoot, QJsonObject* manifest, QString* error)
-{
-    QFile file(backupRoot + QStringLiteral("/manifest.json"));
-    if (!file.open(QIODevice::ReadOnly))
-    {
-        *error = QStringLiteral("所选文件不是 Notera 数据库备份");
-        return false;
-    }
-    QJsonParseError parseError;
-    const auto document = QJsonDocument::fromJson(file.readAll(), &parseError);
-    if (parseError.error != QJsonParseError::NoError || !document.isObject())
-    {
-        *error = QStringLiteral("备份清单已损坏");
-        return false;
-    }
-    *manifest = document.object();
-    if (manifest->value(QStringLiteral("format")).toString() != QStringLiteral("notera-backup") ||
-        manifest->value(QStringLiteral("formatVersion")).toInt() != 1 ||
-        !QFileInfo::exists(backupRoot + QStringLiteral("/database/notera.db")))
-    {
-        *error = QStringLiteral("备份格式不受支持或数据库文件缺失");
-        return false;
-    }
-    return true;
-}
-
-bool validateBackupDatabase(const QString& databasePath, QString* error)
-{
-    const auto connectionName = QStringLiteral("notera_merge_validation_") +
-                                QUuid::createUuid().toString(QUuid::WithoutBraces);
-    bool valid = false;
-    {
-        auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
-        database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
-        database.setDatabaseName(databasePath);
-        if (database.open())
-        {
-            QSqlQuery query(database);
-            valid = query.exec(QStringLiteral("PRAGMA integrity_check")) && query.next() &&
-                    query.value(0).toString() == QStringLiteral("ok");
-        }
-        if (!valid)
-            *error = QStringLiteral("备份数据库完整性校验失败");
-        database.close();
-    }
-    QSqlDatabase::removeDatabase(connectionName);
-    return valid;
 }
 
 } // namespace
@@ -210,6 +120,7 @@ void LibraryService::setSearchQuery(const QString& searchQuery)
 {
     if (m_searchQuery == searchQuery)
         return;
+    m_selection.clear();
     m_searchQuery = searchQuery;
     emit searchQueryChanged();
     reload();
@@ -464,22 +375,26 @@ void LibraryService::deleteFolder(const QString& folderId)
         emit errorOccurred(QStringLiteral("读取文件夹内容失败"));
         return;
     }
+    LibraryFileLifecycle lifecycle;
     for (const auto& value : files)
     {
         const auto item = value.toMap();
-        if (!FileService::removeFile(item.value(QStringLiteral("filePath")).toString(), &error) ||
-            !FileService::removeFile(item.value(QStringLiteral("thumbnailPath")).toString(),
-                                     &error))
+        if (!lifecycle.stageForRemoval(item.value(QStringLiteral("filePath")).toString(), &error) ||
+            !lifecycle.stageForRemoval(item.value(QStringLiteral("thumbnailPath")).toString(),
+                                       &error))
         {
+            (void)lifecycle.restore(&error);
             emit errorOccurred(error);
             return;
         }
     }
     if (!m_repository.deleteFolder(folderId, &error))
     {
+        (void)lifecycle.restore(&error);
         emit errorOccurred(QStringLiteral("删除文件夹失败"));
         return;
     }
+    (void)lifecycle.commit(&error);
 
     if (m_currentFolderId == folderId)
     {
@@ -594,7 +509,6 @@ void LibraryService::importFiles(const QVariantList& paths)
     m_importTempFiles.clear();
     m_importIndex = 0;
     m_importSucceededCount = 0;
-    m_pendingInsertCount = 0;
     m_importTaskActive = false;
     m_importConflictAction.clear();
     m_importApplyToAll = false;
@@ -756,7 +670,6 @@ void LibraryService::dispatchImportQueue(bool queueBusy)
     m_importTempFiles.clear();
     m_importIndex = 0;
     m_importSucceededCount = 0;
-    m_pendingInsertCount = 0;
     m_importTaskActive = false;
     m_importConflictAction.clear();
     m_importApplyToAll = false;
@@ -822,11 +735,6 @@ void LibraryService::resolveImportConflict(const QString& action, bool applyToAl
         m_importQueueTitles.clear();
         m_importQueueFolders.clear();
         m_importIndex = 0;
-        if (m_pendingInsertCount > 0)
-        {
-            m_repository.rollbackTransaction();
-            m_pendingInsertCount = 0;
-        }
         emit noticeOccurred(QStringLiteral("已取消导入"));
         emit importFinished(0);
         return;
@@ -889,37 +797,7 @@ void LibraryService::continueImport()
             {
                 title = uniqueNameInFolder(baseTitle, folderId, false);
             }
-            else if (action == QStringLiteral("overwrite"))
-            {
-
-                const auto scores = m_repository.listAtFolder(folderId, QString(), &error);
-                bool removedAny = false;
-                for (const auto& s : scores)
-                {
-                    if (QString::compare(s.title, baseTitle, Qt::CaseInsensitive) != 0)
-                        continue;
-                    (void)FileService::removeFile(s.filePath, &error);
-                    (void)FileService::removeFile(s.thumbnailPath, &error);
-                    if (m_repository.remove(s.id, &error))
-                    {
-                        removedAny = true;
-                    }
-                    else
-                    {
-                        emit errorOccurred(QStringLiteral("替换旧乐谱失败"));
-                    }
-                }
-                if (!removedAny)
-                {
-
-                    consumeImportTemp(sourcePath);
-                    ++m_importIndex;
-                    if (!m_importApplyToAll)
-                        m_importConflictAction.clear();
-                    continue;
-                }
-            }
-            startImportTask(sourcePath, title, folderId);
+            startImportTask(sourcePath, title, folderId, action == QStringLiteral("overwrite"));
             if (!m_importApplyToAll)
                 m_importConflictAction.clear();
             return;
@@ -938,15 +816,6 @@ void LibraryService::continueImport()
     m_importQueueFolders.clear();
     m_importIndex = 0;
 
-    if (m_pendingInsertCount > 0)
-    {
-        QString txError;
-        if (!m_repository.commitTransaction(&txError))
-        {
-            qWarning() << "[LibraryService] commitTransaction failed at import end:" << txError;
-        }
-        m_pendingInsertCount = 0;
-    }
     reload();
     if (m_importSucceededCount > 0)
     {
@@ -956,19 +825,20 @@ void LibraryService::continueImport()
 }
 
 void LibraryService::startImportTask(const QString& sourcePath, const QString& title,
-                                     const QString& folderId)
+                                     const QString& folderId, const bool replaceExistingTitle)
 {
     m_importTaskActive = true;
     const auto scoreId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     const QPointer<LibraryService> service(this);
     m_importThreadPool.start(
-        [service, sourcePath, title, folderId, scoreId]
+        [service, sourcePath, title, folderId, scoreId, replaceExistingTitle]
         {
             ImportTaskResult result;
             result.scoreId = scoreId;
             result.sourcePath = sourcePath;
             result.title = title;
             result.folderId = folderId;
+            result.replaceExistingTitle = replaceExistingTitle;
             result.fileType = FileService::canonicalSuffix(sourcePath);
             result.storedPath =
                 FileService::copyScoreIntoLibrary(sourcePath, scoreId, &result.error);
@@ -1011,39 +881,54 @@ void LibraryService::finishImportTask(ImportTaskResult result)
                     .updatedAt = now};
         QString error;
 
-        if (m_pendingInsertCount == 0 && !m_repository.beginTransaction(&error))
+        LibraryFileLifecycle lifecycle;
+        bool transactionStarted = m_repository.beginTransaction(&error);
+        if (!transactionStarted)
         {
-            emit errorOccurred(QStringLiteral("将乐谱添加到乐谱库失败"));
+            if (error.isEmpty())
+                error = QStringLiteral("无法启动乐谱导入事务");
         }
-        else if (!m_repository.insert(score, result.folderId, &error))
+        else
         {
-            (void)FileService::removeFile(result.storedPath, &error);
-            QString txError;
-            if (!m_repository.commitTransaction(&txError))
+            if (result.replaceExistingTitle)
             {
-                qWarning() << "[LibraryService] commitTransaction failed after insert error:"
-                           << txError;
+                const auto existingScores =
+                    m_repository.listAtFolder(result.folderId, QString(), &error);
+                for (const auto& existing : existingScores)
+                {
+                    if (QString::compare(existing.title, result.title, Qt::CaseInsensitive) != 0)
+                        continue;
+                    if (!lifecycle.stageForRemoval(existing.filePath, &error) ||
+                        !lifecycle.stageForRemoval(existing.thumbnailPath, &error) ||
+                        !m_repository.remove(existing.id, &error))
+                    {
+                        break;
+                    }
+                }
             }
-            m_pendingInsertCount = 0;
+            if (error.isEmpty() && !m_repository.insert(score, result.folderId, &error))
+            {
+                error = QStringLiteral("写入乐谱记录失败");
+            }
+            if (error.isEmpty() && !m_repository.commitTransaction(&error))
+            {
+                error = QStringLiteral("提交乐谱记录失败");
+            }
+        }
+        if (!error.isEmpty())
+        {
+            if (transactionStarted)
+                m_repository.rollbackTransaction();
+            (void)lifecycle.restore(&error);
+            (void)FileService::removeFile(result.storedPath, &error);
             emit errorOccurred(QStringLiteral("将乐谱添加到乐谱库失败"));
         }
         else
         {
+            (void)lifecycle.commit(&error);
             if (FileService::isSupportedScoreFile(score.filePath))
-            {
                 m_thumbnailGenerator.generate(score.id, score.filePath, score.fileType);
-            }
             ++m_importSucceededCount;
-            if (++m_pendingInsertCount >= 32)
-            {
-                QString txError;
-                if (!m_repository.commitTransaction(&txError))
-                {
-                    qWarning() << "[LibraryService] commitTransaction failed at batch boundary:"
-                               << txError;
-                }
-                m_pendingInsertCount = 0;
-            }
         }
     }
     ++m_importIndex;
@@ -1442,15 +1327,22 @@ void LibraryService::deleteScore(const QString& scoreId, const QString& filePath
                                  const QString& thumbnailPath)
 {
     QString error;
-    if (!FileService::removeFile(filePath, &error) ||
-        !FileService::removeFile(thumbnailPath, &error))
+    LibraryFileLifecycle lifecycle;
+    if (!lifecycle.stageForRemoval(filePath, &error) ||
+        !lifecycle.stageForRemoval(thumbnailPath, &error))
     {
         emit errorOccurred(error);
         return;
     }
     if (!m_repository.remove(scoreId, &error))
     {
+        (void)lifecycle.restore(&error);
         emit errorOccurred(QStringLiteral("删除乐谱记录失败"));
+        return;
+    }
+    if (!lifecycle.commit(&error))
+    {
+        emit errorOccurred(error);
         return;
     }
     reload();
@@ -1470,10 +1362,17 @@ void LibraryService::deleteItems(const QVariantList& ids)
         {
             const auto filePath = m_repository.filePathById(id, &error);
             const auto thumbPath = m_repository.thumbnailPathById(id, &error);
-            if (!FileService::removeFile(filePath, &error) ||
-                !FileService::removeFile(thumbPath, &error) || !m_repository.remove(id, &error))
+            LibraryFileLifecycle lifecycle;
+            if (!lifecycle.stageForRemoval(filePath, &error) ||
+                !lifecycle.stageForRemoval(thumbPath, &error) || !m_repository.remove(id, &error))
             {
+                (void)lifecycle.restore(&error);
                 emit errorOccurred(error.isEmpty() ? QStringLiteral("删除乐谱失败") : error);
+                return;
+            }
+            if (!lifecycle.commit(&error))
+            {
+                emit errorOccurred(error);
                 return;
             }
             ++deletedCount;
@@ -1486,21 +1385,29 @@ void LibraryService::deleteItems(const QVariantList& ids)
                 emit errorOccurred(QStringLiteral("读取文件夹内容失败"));
                 return;
             }
+            LibraryFileLifecycle lifecycle;
             for (const auto& value : files)
             {
                 const auto item = value.toMap();
-                if (!FileService::removeFile(item.value(QStringLiteral("filePath")).toString(),
-                                             &error) ||
-                    !FileService::removeFile(item.value(QStringLiteral("thumbnailPath")).toString(),
-                                             &error))
+                if (!lifecycle.stageForRemoval(item.value(QStringLiteral("filePath")).toString(),
+                                               &error) ||
+                    !lifecycle.stageForRemoval(
+                        item.value(QStringLiteral("thumbnailPath")).toString(), &error))
                 {
+                    (void)lifecycle.restore(&error);
                     emit errorOccurred(error);
                     return;
                 }
             }
             if (!m_repository.deleteFolder(id, &error))
             {
+                (void)lifecycle.restore(&error);
                 emit errorOccurred(QStringLiteral("删除文件夹失败"));
+                return;
+            }
+            if (!lifecycle.commit(&error))
+            {
+                emit errorOccurred(error);
                 return;
             }
             ++deletedCount;
@@ -1749,18 +1656,28 @@ QString LibraryService::moveItems(const QVariantList& itemIds, const QString& fo
 
 QString LibraryService::favoriteItems(const QVariantList& itemIds)
 {
+    return setItemsFavorite(itemIds, true);
+}
+
+QString LibraryService::setItemsFavorite(const QVariantList& itemIds, const bool favorite)
+{
     const auto ids = uniqueItemIds(itemIds);
     if (ids.isEmpty())
-        return QStringLiteral("没有可收藏的项目");
+        return favorite ? QStringLiteral("没有可收藏的项目")
+                        : QStringLiteral("没有可取消收藏的项目");
     QString error;
-    if (!m_repository.setItemsFavorite(ids, true, &error))
+    if (!m_repository.setItemsFavorite(ids, favorite, &error))
     {
-        emit errorOccurred(QStringLiteral("添加收藏失败"));
-        return QStringLiteral("添加收藏失败");
+        const auto message =
+            favorite ? QStringLiteral("添加收藏失败") : QStringLiteral("取消收藏失败");
+        emit errorOccurred(message);
+        return message;
     }
     reloadFolders();
     reload();
-    emit noticeOccurred(QStringLiteral("已收藏 %1 个项目").arg(ids.size()));
+    emit noticeOccurred(
+        (favorite ? QStringLiteral("已收藏 %1 个项目") : QStringLiteral("已取消收藏 %1 个项目"))
+            .arg(ids.size()));
     return {};
 }
 
@@ -2067,6 +1984,7 @@ QString LibraryService::copyScoreToFolder(const QString& scoreId, const QString&
     }
 
     QString targetTitle = sourceTitle;
+    const bool shouldOverwrite = conflictAction == QStringLiteral("overwrite");
     if (nameExistsInFolder(sourceTitle, targetFolderId, false))
     {
         if (conflictAction == QStringLiteral("skip"))
@@ -2074,29 +1992,6 @@ QString LibraryService::copyScoreToFolder(const QString& scoreId, const QString&
         if (conflictAction == QStringLiteral("rename"))
         {
             targetTitle = uniqueNameInFolder(sourceTitle, targetFolderId, false);
-        }
-        else if (conflictAction == QStringLiteral("overwrite"))
-        {
-            bool deletedAny = false;
-            for (const auto& s : scores)
-            {
-
-                if (s.id == scoreId)
-                    continue;
-                if (QString::compare(s.title, sourceTitle, Qt::CaseInsensitive) != 0)
-                    continue;
-
-                (void)FileService::removeFile(s.filePath, &error);
-                (void)FileService::removeFile(s.thumbnailPath, &error);
-                if (!m_repository.remove(s.id, &error))
-                {
-                    return error.isEmpty() ? QStringLiteral("移除旧乐谱失败") : error;
-                }
-                deletedAny = true;
-            }
-
-            if (!deletedAny)
-                return {};
         }
     }
 
@@ -2114,11 +2009,39 @@ QString LibraryService::copyScoreToFolder(const QString& scoreId, const QString&
                 .pageCount = pageCountForFile(storedPath, FileService::canonicalSuffix(sourcePath)),
                 .createdAt = now,
                 .updatedAt = now};
-    if (!m_repository.insert(score, targetFolderId, &error))
+    LibraryFileLifecycle lifecycle;
+    if (!m_repository.beginTransaction(&error))
     {
         (void)FileService::removeFile(storedPath, &error);
         return QStringLiteral("创建乐谱记录失败");
     }
+    if (shouldOverwrite)
+    {
+        for (const auto& existing : scores)
+        {
+            if (existing.id == scoreId ||
+                QString::compare(existing.title, sourceTitle, Qt::CaseInsensitive) != 0)
+                continue;
+            if (!lifecycle.stageForRemoval(existing.filePath, &error) ||
+                !lifecycle.stageForRemoval(existing.thumbnailPath, &error) ||
+                !m_repository.remove(existing.id, &error))
+            {
+                break;
+            }
+        }
+    }
+    if (error.isEmpty() && !m_repository.insert(score, targetFolderId, &error))
+        error = QStringLiteral("创建乐谱记录失败");
+    if (error.isEmpty() && !m_repository.commitTransaction(&error))
+        error = QStringLiteral("提交乐谱记录失败");
+    if (!error.isEmpty())
+    {
+        m_repository.rollbackTransaction();
+        (void)lifecycle.restore(&error);
+        (void)FileService::removeFile(storedPath, &error);
+        return QStringLiteral("创建乐谱记录失败");
+    }
+    (void)lifecycle.commit(&error);
     if (FileService::isSupportedScoreFile(score.filePath))
     {
         m_thumbnailGenerator.generate(score.id, score.filePath, score.fileType);
@@ -2488,6 +2411,7 @@ void LibraryService::continuePaste()
             ++m_pasteIndex;
             continue;
         }
+        bool operationSucceeded = true;
 
         const bool hasConflict = nameExistsInFolder(itemName, targetFolderId, false);
         QString action = m_pendingConflictAction;
@@ -2501,6 +2425,8 @@ void LibraryService::continuePaste()
 
         if (isCut)
         {
+            LibraryFileLifecycle lifecycle;
+            bool transactionStarted = false;
             if (hasConflict)
             {
                 if (action == QStringLiteral("skip"))
@@ -2512,42 +2438,65 @@ void LibraryService::continuePaste()
                 }
                 if (action == QStringLiteral("overwrite"))
                 {
+                    transactionStarted = m_repository.beginTransaction(&error);
+                    if (!transactionStarted)
+                    {
+                        emit errorOccurred(QStringLiteral("移除旧乐谱失败"));
+                        ++m_pasteIndex;
+                        continue;
+                    }
                     const auto scores =
                         m_repository.listAtFolder(targetFolderId, QString(), &error);
                     for (const auto& s : scores)
                     {
                         if (QString::compare(s.title, itemName, Qt::CaseInsensitive) == 0)
                         {
-
-                            (void)FileService::removeFile(s.filePath, &error);
-                            (void)FileService::removeFile(s.thumbnailPath, &error);
-                            if (!m_repository.remove(s.id, &error))
-                            {
-                                emit errorOccurred(QStringLiteral("移除旧乐谱失败"));
-                            }
-                            break;
+                            if (!lifecycle.stageForRemoval(s.filePath, &error) ||
+                                !lifecycle.stageForRemoval(s.thumbnailPath, &error) ||
+                                !m_repository.remove(s.id, &error))
+                                break;
                         }
                     }
                 }
             }
-            if (!m_repository.setFolder(itemId, targetFolderId, &error))
+            if (error.isEmpty() && !m_repository.setFolder(itemId, targetFolderId, &error))
             {
-                emit errorOccurred(QStringLiteral("移动乐谱失败"));
+                error = QStringLiteral("移动乐谱失败");
             }
-            else if (hasConflict && action == QStringLiteral("rename"))
+            else if (error.isEmpty() && hasConflict && action == QStringLiteral("rename"))
             {
                 if (!m_repository.rename(
                         itemId, uniqueNameInFolder(itemName, targetFolderId, false), &error))
                 {
-                    emit errorOccurred(QStringLiteral("重命名乐谱失败"));
+                    error = QStringLiteral("重命名乐谱失败");
                 }
+            }
+            if (error.isEmpty() && transactionStarted && !m_repository.commitTransaction(&error))
+                error = QStringLiteral("提交移动操作失败");
+            if (!error.isEmpty())
+            {
+                if (transactionStarted)
+                    m_repository.rollbackTransaction();
+                (void)lifecycle.restore(&error);
+                emit errorOccurred(error);
+                operationSucceeded = false;
+            }
+            else if (transactionStarted)
+            {
+                (void)lifecycle.commit(&error);
             }
         }
         else
         {
-            (void)copyScoreToFolder(itemId, targetFolderId, action);
+            const auto copyError = copyScoreToFolder(itemId, targetFolderId, action);
+            if (!copyError.isEmpty())
+            {
+                emit errorOccurred(copyError);
+                operationSucceeded = false;
+            }
         }
-        ++processed;
+        if (operationSucceeded)
+            ++processed;
         ++m_pasteIndex;
         if (!m_pasteApplyToAll)
             m_pendingConflictAction.clear();
@@ -2583,6 +2532,7 @@ void LibraryService::cleanupMergeState()
     m_mergeBackupRoot.clear();
     m_mergeQueue.clear();
     m_mergeIndex = 0;
+    m_mergeProcessedCount = 0;
     m_mergeConflictAction.clear();
     m_mergeApplyToAll = false;
     m_mergeFolderMap.clear();
@@ -2613,19 +2563,19 @@ QVariantMap LibraryService::probeDatabaseBackup(const QUrl& backupFile)
         return result;
     }
     QString error;
-    if (!unzipBackupToDirectory(zipPath, tempDir.path(), &error))
+    if (!BackupArchiveService::extractToDirectory(zipPath, tempDir.path(), &error))
     {
         result[QStringLiteral("error")] = error;
         return result;
     }
     QJsonObject manifest;
-    if (!readBackupManifest(tempDir.path(), &manifest, &error))
+    if (!BackupArchiveService::readManifest(tempDir.path(), &manifest, &error))
     {
         result[QStringLiteral("error")] = error;
         return result;
     }
     const auto databasePath = tempDir.path() + QStringLiteral("/database/notera.db");
-    if (!validateBackupDatabase(databasePath, &error))
+    if (!BackupArchiveService::validateDatabase(databasePath, &error))
     {
         result[QStringLiteral("error")] = error;
         return result;
@@ -2671,12 +2621,13 @@ QString LibraryService::importDatabaseBackupMerged(const QUrl& backupFile)
     m_mergeBackupRoot = m_mergeTempDir->path();
 
     QString error;
-    if (!unzipBackupToDirectory(zipPath, m_mergeBackupRoot, &error))
+    if (!BackupArchiveService::extractToDirectory(zipPath, m_mergeBackupRoot, &error))
         return error;
     QJsonObject manifest;
-    if (!readBackupManifest(m_mergeBackupRoot, &manifest, &error))
+    if (!BackupArchiveService::readManifest(m_mergeBackupRoot, &manifest, &error))
         return error;
-    if (!validateBackupDatabase(m_mergeBackupRoot + QStringLiteral("/database/notera.db"), &error))
+    if (!BackupArchiveService::validateDatabase(
+            m_mergeBackupRoot + QStringLiteral("/database/notera.db"), &error))
         return error;
 
     const auto databasePath = m_mergeBackupRoot + QStringLiteral("/database/notera.db");
@@ -2916,7 +2867,8 @@ QString LibraryService::importDatabaseBackupMerged(const QUrl& backupFile)
     return {};
 }
 
-void LibraryService::importBackupScore(const QVariantMap& item, const QString& targetFolderId)
+bool LibraryService::importBackupScore(const QVariantMap& item, const QString& targetFolderId,
+                                       QString* importedScoreId)
 {
     const auto newId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     const auto sourcePath = item.value(QStringLiteral("filePath")).toString();
@@ -2925,7 +2877,7 @@ void LibraryService::importBackupScore(const QVariantMap& item, const QString& t
     if (storedPath.isEmpty())
     {
         emit errorOccurred(error.isEmpty() ? QStringLiteral("导入乐谱失败") : error);
-        return;
+        return false;
     }
     const auto fileType = item.value(QStringLiteral("fileType")).toString();
     Score score;
@@ -2949,19 +2901,27 @@ void LibraryService::importBackupScore(const QVariantMap& item, const QString& t
     {
         (void)FileService::removeFile(storedPath, &error);
         emit errorOccurred(QStringLiteral("导入乐谱失败：%1").arg(score.title));
-        return;
+        return false;
     }
-    if (FileService::isSupportedScoreFile(storedPath))
+
+    const auto discardImportedScore = [&]
     {
-        m_thumbnailGenerator.generate(newId, storedPath, fileType);
-    }
+        QString cleanupError;
+        (void)m_repository.remove(newId, &cleanupError);
+        (void)FileService::removeFile(storedPath, &cleanupError);
+    };
     const auto tagIds = item.value(QStringLiteral("tagIds")).toList();
     for (const auto& tagIdVariant : tagIds)
     {
         const auto tagId = tagIdVariant.toString();
 
-        if (m_mergeTagMap.contains(tagId))
-            (void)m_repository.addTag(newId, m_mergeTagMap.value(tagId), &error);
+        if (m_mergeTagMap.contains(tagId) &&
+            !m_repository.addTag(newId, m_mergeTagMap.value(tagId), &error))
+        {
+            discardImportedScore();
+            emit errorOccurred(QStringLiteral("导入乐谱标签失败：%1").arg(score.title));
+            return false;
+        }
     }
     const auto annotations = item.value(QStringLiteral("annotations")).toList();
     if (!annotations.isEmpty())
@@ -2982,15 +2942,21 @@ void LibraryService::importBackupScore(const QVariantMap& item, const QString& t
                 annotation.value(QStringLiteral("createdAt")).toLongLong());
             insertAnnotation.addBindValue(
                 annotation.value(QStringLiteral("updatedAt")).toLongLong());
-            insertAnnotation.exec();
+            if (!insertAnnotation.exec())
+            {
+                discardImportedScore();
+                emit errorOccurred(QStringLiteral("导入乐谱标注失败：%1").arg(score.title));
+                return false;
+            }
         }
     }
+    *importedScoreId = newId;
+    return true;
 }
 
 void LibraryService::continueMerge()
 {
     QString error;
-    int processed = 0;
     while (m_mergeIndex < m_mergeQueue.size())
     {
         const auto item = m_mergeQueue[m_mergeIndex].toMap();
@@ -3016,26 +2982,85 @@ void LibraryService::continueMerge()
             if (action == QStringLiteral("skip"))
             {
                 ++m_mergeIndex;
+                if (!m_mergeApplyToAll)
+                    m_mergeConflictAction.clear();
                 continue;
             }
             if (action == QStringLiteral("overwrite"))
             {
                 const auto filePath = m_repository.filePathById(existingScoreId, &error);
                 const auto thumbnailPath = m_repository.thumbnailPathById(existingScoreId, &error);
-                (void)FileService::removeFile(filePath, &error);
-                (void)FileService::removeFile(thumbnailPath, &error);
-                if (!m_repository.remove(existingScoreId, &error))
+                LibraryFileLifecycle lifecycle;
+                if (!lifecycle.stageForRemoval(filePath, &error) ||
+                    !lifecycle.stageForRemoval(thumbnailPath, &error))
                 {
-
+                    (void)lifecycle.restore(&error);
+                    emit errorOccurred(error.isEmpty() ? QStringLiteral("替换旧乐谱失败") : error);
                     ++m_mergeIndex;
                     continue;
                 }
-                m_mergeHashIndex.remove(hash);
+                if (!m_repository.beginTransaction(&error))
+                {
+                    (void)lifecycle.restore(&error);
+                    emit errorOccurred(QStringLiteral("替换旧乐谱失败"));
+                    ++m_mergeIndex;
+                    continue;
+                }
+                if (!m_repository.remove(existingScoreId, &error))
+                {
+                    m_repository.rollbackTransaction();
+                    (void)lifecycle.restore(&error);
+                    emit errorOccurred(QStringLiteral("替换旧乐谱失败"));
+                    ++m_mergeIndex;
+                    continue;
+                }
+
+                QString importedScoreId;
+                if (!importBackupScore(item, targetFolderId, &importedScoreId) ||
+                    !m_repository.commitTransaction(&error))
+                {
+                    m_repository.rollbackTransaction();
+                    (void)lifecycle.restore(&error);
+                    emit errorOccurred(QStringLiteral("替换乐谱失败，已恢复原文件"));
+                    ++m_mergeIndex;
+                    if (!m_mergeApplyToAll)
+                        m_mergeConflictAction.clear();
+                    continue;
+                }
+                (void)lifecycle.commit(&error);
+                ++m_mergeProcessedCount;
+                if (!hash.isEmpty())
+                {
+                    m_mergeHashIndex[hash] = importedScoreId;
+                    m_mergeScoreTitles.remove(existingScoreId);
+                    m_mergeScoreTitles[importedScoreId] = title;
+                }
+                const auto importedPath = m_repository.filePathById(importedScoreId, &error);
+                if (FileService::isSupportedScoreFile(importedPath))
+                    m_thumbnailGenerator.generate(
+                        importedScoreId, importedPath,
+                        item.value(QStringLiteral("fileType")).toString());
+                ++m_mergeIndex;
+                if (!m_mergeApplyToAll)
+                    m_mergeConflictAction.clear();
+                continue;
             }
         }
 
-        importBackupScore(item, targetFolderId);
-        ++processed;
+        QString importedScoreId;
+        if (importBackupScore(item, targetFolderId, &importedScoreId))
+        {
+            ++m_mergeProcessedCount;
+            if (!hash.isEmpty())
+            {
+                m_mergeHashIndex[hash] = importedScoreId;
+                m_mergeScoreTitles[importedScoreId] = title;
+            }
+            const auto importedPath = m_repository.filePathById(importedScoreId, &error);
+            if (FileService::isSupportedScoreFile(importedPath))
+                m_thumbnailGenerator.generate(importedScoreId, importedPath,
+                                              item.value(QStringLiteral("fileType")).toString());
+        }
         ++m_mergeIndex;
 
         if (!m_mergeApplyToAll)
@@ -3045,9 +3070,10 @@ void LibraryService::continueMerge()
     reloadFolders();
     reloadTags();
     reload();
-    emit noticeOccurred(processed > 0 ? QStringLiteral("已合并导入 %1 份乐谱").arg(processed)
-                                      : QStringLiteral("备份已合并，无新增乐谱"));
-    emit mergeFinished(processed);
+    emit noticeOccurred(m_mergeProcessedCount > 0
+                            ? QStringLiteral("已合并导入 %1 份乐谱").arg(m_mergeProcessedCount)
+                            : QStringLiteral("备份已合并，无新增乐谱"));
+    emit mergeFinished(m_mergeProcessedCount);
     cleanupMergeState();
 }
 

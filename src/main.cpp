@@ -357,6 +357,7 @@ int main(int argc, char* argv[])
         arguments.contains(QStringLiteral("--multi-folder-import-smoke-test")) ||
         arguments.contains(QStringLiteral("--stitch-smoke-test")) ||
         arguments.contains(QStringLiteral("--reader-smoke-test")) ||
+        arguments.contains(QStringLiteral("--merge-smoke-test")) ||
         arguments.contains(QStringLiteral("--ui-smoke-test")) ||
         arguments.contains(QStringLiteral("--folder-rename-smoke-test")) ||
         arguments.contains(QStringLiteral("--storage-migration-smoke-test")) ||

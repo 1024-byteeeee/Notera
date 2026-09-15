@@ -92,6 +92,7 @@ class LibraryService final : public QObject
     Q_INVOKABLE void resolvePasteFolderConflict(const QString& action, bool applyToAll);
     Q_INVOKABLE void resolveImportConflict(const QString& action, bool applyToAll);
     Q_INVOKABLE QString favoriteItems(const QVariantList& itemIds);
+    Q_INVOKABLE QString setItemsFavorite(const QVariantList& itemIds, bool favorite);
     Q_INVOKABLE QString tagItems(const QVariantList& itemIds, const QString& tagId);
     Q_INVOKABLE QString saveScoreAs(const QString& scoreId, const QUrl& destination);
     Q_INVOKABLE QString saveFolderAs(const QString& folderId, const QUrl& destinationDirectory);
@@ -142,6 +143,7 @@ class LibraryService final : public QObject
         QString folderId;
         QString error;
         int pageCount{1};
+        bool replaceExistingTitle{false};
     };
 
     void reload();
@@ -157,7 +159,8 @@ class LibraryService final : public QObject
     void updateEntryThumbnailsLocally(const QHash<QString, QString>& updates);
     void importFile(const QString& sourcePath, const QString& titleOverride = {});
     void continueImport();
-    void startImportTask(const QString& sourcePath, const QString& title, const QString& folderId);
+    void startImportTask(const QString& sourcePath, const QString& title, const QString& folderId,
+                         bool replaceExistingTitle = false);
     void finishImportTask(ImportTaskResult result);
     void flushThumbnailUpdates();
     void consumeImportTemp(const QString& path);
@@ -179,7 +182,8 @@ class LibraryService final : public QObject
     void deleteEmptyFolderTree(const QString& folderId);
     void continueMerge();
     void cleanupMergeState();
-    void importBackupScore(const QVariantMap& item, const QString& targetFolderId);
+    [[nodiscard]] bool importBackupScore(const QVariantMap& item, const QString& targetFolderId,
+                                         QString* importedScoreId);
     static QString sha256OfFile(const QString& path);
     void refreshStitchablePaths();
 
@@ -218,7 +222,6 @@ class LibraryService final : public QObject
     QStringList m_importTempFiles;
     int m_importIndex{0};
     int m_importSucceededCount{0};
-    int m_pendingInsertCount{0};
     bool m_importTaskActive{false};
     QString m_importConflictAction;
     bool m_importApplyToAll{false};
@@ -226,6 +229,7 @@ class LibraryService final : public QObject
     QString m_mergeBackupRoot;
     QVariantList m_mergeQueue;
     int m_mergeIndex{0};
+    int m_mergeProcessedCount{0};
     QString m_mergeConflictAction;
     bool m_mergeApplyToAll{false};
     QHash<QString, QString> m_mergeFolderMap;

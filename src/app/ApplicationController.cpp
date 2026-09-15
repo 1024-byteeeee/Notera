@@ -1,5 +1,6 @@
 #include "app/ApplicationController.h"
 #include "platform/AppDataPaths.h"
+#include "services/BackupArchiveService.h"
 
 #include <QColor>
 #include <QCoreApplication>
@@ -293,52 +294,6 @@ static bool zipDirectory(const QString& srcDir, const QString& zipPath, QString*
     return true;
 }
 
-static bool unzipToDirectory(const QString& zipPath, const QString& dstDir, QString* error)
-{
-    QZipReader reader(zipPath);
-    if (!reader.exists())
-    {
-        if (error)
-            *error = QStringLiteral("无法打开备份压缩包");
-        return false;
-    }
-    const auto entries = reader.fileInfoList();
-    for (const auto& entry : entries)
-    {
-        const auto targetPath = QDir(dstDir).filePath(entry.filePath);
-        if (entry.isDir)
-        {
-            if (!QDir().mkpath(targetPath))
-            {
-                if (error)
-                    *error = QStringLiteral("无法创建目录：%1").arg(targetPath);
-                return false;
-            }
-        }
-        else
-        {
-            if (!QDir().mkpath(QFileInfo(targetPath).absolutePath()))
-            {
-                if (error)
-                    *error = QStringLiteral("无法创建目录：%1")
-                                 .arg(QFileInfo(targetPath).absolutePath());
-                return false;
-            }
-            QFile file(targetPath);
-            if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
-            {
-                if (error)
-                    *error = QStringLiteral("无法写入文件：%1").arg(targetPath);
-                return false;
-            }
-            file.write(reader.fileData(entry.filePath));
-            file.close();
-        }
-    }
-    reader.close();
-    return true;
-}
-
 static QString escapedSqlString(QString value)
 {
     return value.replace(QLatin1Char('\''), QStringLiteral("''"));
@@ -365,55 +320,6 @@ static bool writeBackupManifest(const QString& backupRoot, const QString& source
         return false;
     }
     return true;
-}
-
-static bool readBackupManifest(const QString& backupRoot, QJsonObject* manifest, QString* error)
-{
-    QFile file(backupRoot + QStringLiteral("/manifest.json"));
-    if (!file.open(QIODevice::ReadOnly))
-    {
-        *error = QStringLiteral("所选目录不是 Notera 数据库备份");
-        return false;
-    }
-    QJsonParseError parseError;
-    const auto document = QJsonDocument::fromJson(file.readAll(), &parseError);
-    if (parseError.error != QJsonParseError::NoError || !document.isObject())
-    {
-        *error = QStringLiteral("备份清单已损坏");
-        return false;
-    }
-    *manifest = document.object();
-    if (manifest->value(QStringLiteral("format")).toString() != QStringLiteral("notera-backup") ||
-        manifest->value(QStringLiteral("formatVersion")).toInt() != 1 ||
-        !QFileInfo::exists(backupRoot + QStringLiteral("/database/notera.db")))
-    {
-        *error = QStringLiteral("备份格式不受支持或数据库文件缺失");
-        return false;
-    }
-    return true;
-}
-
-static bool validateBackupDatabase(const QString& databasePath, QString* error)
-{
-    const auto connectionName = QStringLiteral("notera_backup_validation_") +
-                                QUuid::createUuid().toString(QUuid::WithoutBraces);
-    bool valid = false;
-    {
-        auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
-        database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
-        database.setDatabaseName(databasePath);
-        if (database.open())
-        {
-            QSqlQuery query(database);
-            valid = query.exec(QStringLiteral("PRAGMA integrity_check")) && query.next() &&
-                    query.value(0).toString() == QStringLiteral("ok");
-        }
-        if (!valid)
-            *error = QStringLiteral("备份数据库完整性校验失败");
-        database.close();
-    }
-    QSqlDatabase::removeDatabase(connectionName);
-    return valid;
 }
 
 QString ApplicationController::migrateDataDirectory(const QUrl& newDirectory)
@@ -468,6 +374,11 @@ QString ApplicationController::openDataDirectory() const
     return QDesktopServices::openUrl(QUrl::fromLocalFile(path))
                ? QString{}
                : QStringLiteral("无法打开数据存储目录");
+}
+
+QUrl ApplicationController::localFileUrl(const QString& path) const
+{
+    return path.isEmpty() ? QUrl{} : QUrl::fromLocalFile(path);
 }
 
 QString ApplicationController::runExportBackup(const QUrl& destinationFile)
@@ -594,14 +505,15 @@ QString ApplicationController::runImportBackup(const QUrl& backupFile)
     const auto backupRoot = tempDir.path();
 
     QString error;
-    if (!unzipToDirectory(zipPath, backupRoot, &error))
+    if (!BackupArchiveService::extractToDirectory(zipPath, backupRoot, &error))
     {
         return error;
     }
 
     QJsonObject manifest;
-    if (!readBackupManifest(backupRoot, &manifest, &error) ||
-        !validateBackupDatabase(backupRoot + QStringLiteral("/database/notera.db"), &error))
+    if (!BackupArchiveService::readManifest(backupRoot, &manifest, &error) ||
+        !BackupArchiveService::validateDatabase(backupRoot + QStringLiteral("/database/notera.db"),
+                                                &error))
     {
         return error;
     }
@@ -665,8 +577,9 @@ bool ApplicationController::applyPendingBackupRestore(QString* error)
     if (stagedRoot.isEmpty())
         return true;
     QJsonObject manifest;
-    if (!readBackupManifest(stagedRoot, &manifest, error) ||
-        !validateBackupDatabase(stagedRoot + QStringLiteral("/database/notera.db"), error))
+    if (!BackupArchiveService::readManifest(stagedRoot, &manifest, error) ||
+        !BackupArchiveService::validateDatabase(stagedRoot + QStringLiteral("/database/notera.db"),
+                                                error))
     {
         return false;
     }

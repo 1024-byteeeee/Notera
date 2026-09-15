@@ -24,6 +24,8 @@ Rectangle {
     property real pinchViewportY: 0
     property bool viewInitializationPending: false
     property int viewInitializationToken: 0
+    property bool pdfLoadFailed: false
+    property bool imageLoadFailed: false
 
     property real baseScaleUnit: 0
 
@@ -154,6 +156,8 @@ Rectangle {
     function beginViewInitialization() {
         root.viewInitializationToken += 1;
         root.viewInitializationPending = true;
+        root.pdfLoadFailed = false;
+        root.imageLoadFailed = false;
         root.autoScrolling = false;
         pdfView.cancelFlick();
         root.viewRotation = 0;
@@ -563,9 +567,13 @@ Rectangle {
                 }
                 onStatusChanged: function (status) {
                     if (status === PdfDocument.Ready) {
+                        root.pdfLoadFailed = false;
                         pdfRender.setDocument(pdfDocument);
                         root.updateBaseScaleUnit();
                         root.finishInitialViewIfReady();
+                    } else if (status === PdfDocument.Error) {
+                        root.pdfLoadFailed = true;
+                        root.viewInitializationPending = false;
                     } else if (status === PdfDocument.Null) {
                         pdfRender.clearCache();
                         root.baseScaleUnit = 0;
@@ -635,7 +643,14 @@ Rectangle {
                         asynchronous: true
                         fillMode: Image.PreserveAspectFit
                         smooth: true
-                        onStatusChanged: root.finishInitialViewIfReady()
+                        onStatusChanged: {
+                            if (status === Image.Error) {
+                                root.imageLoadFailed = true;
+                                root.viewInitializationPending = false;
+                            } else {
+                                root.finishInitialViewIfReady();
+                            }
+                        }
                     }
                 }
 
@@ -695,7 +710,7 @@ Rectangle {
 
             Rectangle {
                 objectName: "pdfLoadingOverlay"
-                visible: root.isPdf && appController.currentFileUrl.toString().length > 0 && (pdfDocument.status !== PdfDocument.Ready || pdfView.currentPageRenderingStatus !== Image.Ready)
+                visible: root.isPdf && !root.pdfLoadFailed && appController.currentFileUrl.toString().length > 0 && (pdfDocument.status !== PdfDocument.Ready || pdfView.currentPageRenderingStatus !== Image.Ready)
                 anchors.fill: parent
                 z: 20
                 color: Theme.background
@@ -714,6 +729,45 @@ Rectangle {
                         text: "正在打开 PDF…"
                         color: Theme.mutedForeground
                         font.pixelSize: Theme.fontMd
+                    }
+                }
+            }
+
+            Rectangle {
+                visible: root.pdfLoadFailed || root.imageLoadFailed
+                anchors.centerIn: parent
+                width: Math.min(parent.width - 64, 440)
+                height: errorContent.implicitHeight + 40
+                radius: Theme.radiusLg
+                color: Theme.surface
+                border.color: Theme.strongBorder
+                border.width: 1
+                z: 21
+
+                Column {
+                    id: errorContent
+                    anchors.centerIn: parent
+                    width: parent.width - 40
+                    spacing: 12
+                    Label {
+                        width: parent.width
+                        text: root.pdfLoadFailed ? "无法打开这份 PDF" : "无法加载这张图片"
+                        color: Theme.foreground
+                        font.pixelSize: Theme.fontLg
+                        font.weight: Font.DemiBold
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                    Label {
+                        width: parent.width
+                        text: "文件可能已损坏、被移动，或格式不受支持。"
+                        color: Theme.mutedForeground
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                    AppButton {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: "返回乐谱库"
+                        onClicked: appController.currentPage = "library"
                     }
                 }
             }

@@ -14,6 +14,7 @@ Rectangle {
     readonly property int selectedCount: libraryService.selection.count
     property bool dragInProgress: false
     property var dragItemIds: []
+    property var contextItemIds: []
     property string dragThumbnailPath: ""
     property real rubberAutoScrollSpeed: 0
     property bool rubberAccumulateSelection: false
@@ -92,8 +93,7 @@ Rectangle {
     function localFileUrl(path) {
         if (!path || path.length === 0)
             return "";
-        const normalized = path.replace(/\\/g, "/");
-        return normalized.startsWith("/") ? "file://" + normalized : "file:///" + normalized;
+        return appController.localFileUrl(path);
     }
     function finishInternalDrag() {
         if (root.dragInProgress) {
@@ -120,6 +120,11 @@ Rectangle {
             appShell.showLoading("正在打开乐谱");
             appController.openScore(delegate.scoreId, delegate.title, delegate.filePath, delegate.fileType, delegate.pageCount, libraryService.scoreFolderId(delegate.scoreId));
         }
+    }
+    function prepareContextMenu(itemId) {
+        if (!libraryService.selection.contains(itemId))
+            libraryService.selection.replace([itemId]);
+        root.contextItemIds = libraryService.selection.selectedIds;
     }
     function canMoveAll(ids, folderId) {
         if (!ids || ids.length === 0)
@@ -741,6 +746,7 @@ Rectangle {
                             acceptedButtons: Qt.RightButton
                             gesturePolicy: TapHandler.ReleaseWithinBounds
                             onTapped: {
+                                root.prepareContextMenu(scoreDelegate.itemId);
                                 if (scoreDelegate.itemType === "folder") {
                                     folderMenuLoader.active = true;
                                     folderMenuLoader.item.popup();
@@ -851,8 +857,7 @@ Rectangle {
                                 symbol: scoreDelegate.favorite ? "star-filled" : "star"
                                 text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
                                 onTriggered: {
-                                    const ids = libraryService.selection.count > 0 ? libraryService.selection.selectedIds : [scoreDelegate.itemId];
-                                    libraryService.favoriteItems(ids);
+                                    libraryService.setItemsFavorite(root.contextItemIds, !scoreDelegate.favorite);
                                 }
                             }
                             AppMenuItem {
@@ -904,7 +909,7 @@ Rectangle {
                                 id: folderSubmenu
                                 title: "移动到文件夹"
                                 symbol: "folder"
-                                enabled: rootChildFolderModel.count > 0
+                                enabled: true
                                 AppMenuItem {
                                     symbol: "folder-up"
                                     text: "无（移出文件夹）"
@@ -1011,8 +1016,7 @@ Rectangle {
                                 symbol: scoreDelegate.favorite ? "star-filled" : "star"
                                 text: scoreDelegate.favorite ? "取消收藏" : "添加到收藏"
                                 onTriggered: {
-                                    const ids = libraryService.selection.count > 0 ? libraryService.selection.selectedIds : [scoreDelegate.itemId];
-                                    libraryService.favoriteItems(ids);
+                                    libraryService.setItemsFavorite(root.contextItemIds, !scoreDelegate.favorite);
                                 }
                             }
                             AppMenuItem {
@@ -1061,7 +1065,7 @@ Rectangle {
                                 id: folderMoveSubmenu
                                 title: "移动到文件夹"
                                 symbol: "folder"
-                                enabled: rootChildFolderModel.count > 0
+                                enabled: true
                                 AppMenuItem {
                                     symbol: "folder-up"
                                     text: "无（移出文件夹）"

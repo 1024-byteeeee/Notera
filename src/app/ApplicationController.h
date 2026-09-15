@@ -70,6 +70,7 @@ class ApplicationController final : public QObject
     Q_INVOKABLE void startImportDatabaseBackup(const QUrl& backupFile);
     Q_INVOKABLE void requestRestart();
     Q_INVOKABLE QString clearAllData(const QString& confirmation);
+    Q_INVOKABLE QUrl localFileUrl(const QString& path) const;
     Q_INVOKABLE void openScore(const QString& scoreId, const QString& title,
                                const QString& filePath, const QString& fileType, int pageCount,
                                const QString& folderId);

@@ -30,8 +30,12 @@ qt_add_executable(
   src/platform/AppDataPaths.cpp
   src/services/DatabaseService.h
   src/services/DatabaseService.cpp
+  src/services/BackupArchiveService.h
+  src/services/BackupArchiveService.cpp
   src/services/FileService.h
   src/services/FileService.cpp
+  src/services/LibraryFileLifecycle.h
+  src/services/LibraryFileLifecycle.cpp
   src/services/FolderPicker.h
   src/services/MetronomeService.h
   src/services/MetronomeService.cpp
