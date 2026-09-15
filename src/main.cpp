@@ -251,6 +251,13 @@ bool dragItemToItem(QObject* root, const QString& sourceName, const QString& tar
         sendMouseEvent(window, QEvent::MouseButtonRelease, start, Qt::LeftButton, Qt::NoButton);
         return false;
     }
+    // Library cards require a long press before movement arms the internal drag. Give the
+    // timer a deterministic opportunity to fire across platforms before sending motion events.
+    for (int waited = 0; waited < 240; waited += 20)
+    {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+        QThread::msleep(20);
+    }
     bool previewReady = false;
     for (int step = 1; step <= 8; ++step)
     {

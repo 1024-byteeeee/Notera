@@ -39,7 +39,14 @@ void ThumbnailGenerator::generate(const QString& scoreId, const QString& scorePa
             }
             else
             {
-                image.load(scorePath);
+                if (!image.load(scorePath))
+                {
+                    QMetaObject::invokeMethod(
+                        this, [this, scoreId]
+                        { emit failed(scoreId, QStringLiteral("Notera 无法读取乐谱图片")); },
+                        Qt::QueuedConnection);
+                    return;
+                }
                 image = image.scaled(300, 400, Qt::KeepAspectRatio, Qt::SmoothTransformation);
             }
 
