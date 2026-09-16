@@ -18,6 +18,7 @@ Item {
     property real rowSpacing: 20
     property real topMargin: 24
     property real bottomMargin: 24
+    property int wheelSmoothness: 70
 
     signal viewMovementStarted
 
@@ -127,6 +128,12 @@ Item {
             id: vscroll
         }
         ScrollBar.horizontal: ScrollBar {}
+
+        SmoothWheelScroller {
+            objectName: "pdfWheelScroller"
+            flickable: tableView
+            smoothness: root.wheelSmoothness
+        }
 
         WheelHandler {
             target: null
