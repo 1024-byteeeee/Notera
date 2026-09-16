@@ -28,9 +28,14 @@ Item {
     }
 
     function setContentY(value) {
+        const boundedValue = root.boundedContentY(value);
         root.writingContentY = true;
-        flickable.contentY = root.boundedContentY(value);
+        flickable.contentY = boundedValue;
         root.writingContentY = false;
+        if (boundedValue !== value) {
+            root.targetContentY = boundedValue;
+            settleTimer.stop();
+        }
     }
 
     function stop() {
@@ -40,7 +45,8 @@ Item {
 
     function enqueueWheelStep(delta) {
         flickable.cancelFlick();
-        root.targetContentY = root.boundedContentY((settleTimer.running ? root.targetContentY : flickable.contentY) + delta);
+        const basePosition = settleTimer.running ? root.targetContentY : flickable.contentY;
+        root.targetContentY = root.boundedContentY(basePosition + delta);
         if (root.smoothness <= 0) {
             root.setContentY(root.targetContentY);
             return;
@@ -73,24 +79,25 @@ Item {
         repeat: true
         onTriggered: {
             const distance = root.targetContentY - flickable.contentY;
-            if (Math.abs(distance) < 0.5) {
+            // Smoothness changes a constant velocity, never the acceleration profile.
+            const pixelsPerSecond = 1600 - root.smoothness * 12;
+            const frameDistance = pixelsPerSecond * interval / 1000;
+            if (Math.abs(distance) <= frameDistance) {
                 root.setContentY(root.targetContentY);
-                stop();
+                settleTimer.stop();
                 return;
             }
-
-            // Exponential smoothing produces the same feel at different frame rates.
-            const timeConstant = 15 + root.smoothness * 1.1;
-            const progress = 1 - Math.exp(-interval / timeConstant);
-            root.setContentY(flickable.contentY + distance * progress);
+            root.setContentY(flickable.contentY + (distance > 0 ? frameDistance : -frameDistance));
         }
     }
 
     Connections {
         target: root.flickable
         function onContentYChanged() {
-            if (!root.writingContentY && !settleTimer.running)
+            if (!root.writingContentY) {
+                settleTimer.stop();
                 root.targetContentY = root.flickable.contentY;
+            }
         }
         function onDraggingChanged() {
             if (root.flickable.dragging)
