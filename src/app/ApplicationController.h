@@ -27,8 +27,6 @@ class ApplicationController final : public QObject
                    defaultScrollSpeedChanged)
     Q_PROPERTY(int longPressDragMs READ longPressDragMs WRITE setLongPressDragMs NOTIFY
                    longPressDragMsChanged)
-    Q_PROPERTY(int wheelSmoothness READ wheelSmoothness WRITE setWheelSmoothness NOTIFY
-                   wheelSmoothnessChanged)
     Q_PROPERTY(QString dataDirectory READ dataDirectory NOTIFY dataDirectoryChanged)
     Q_PROPERTY(QString pendingDataDirectory READ pendingDataDirectory NOTIFY dataDirectoryChanged)
 
@@ -58,8 +56,6 @@ class ApplicationController final : public QObject
     void setDefaultScrollSpeed(double speed);
     [[nodiscard]] int longPressDragMs() const;
     void setLongPressDragMs(int ms);
-    [[nodiscard]] int wheelSmoothness() const;
-    void setWheelSmoothness(int smoothness);
     [[nodiscard]] QString dataDirectory() const;
     [[nodiscard]] QString pendingDataDirectory() const;
     static bool applyPendingDataMigration(QString* error);
@@ -90,7 +86,6 @@ class ApplicationController final : public QObject
     void autoScrollSpeedChanged();
     void defaultScrollSpeedChanged();
     void longPressDragMsChanged();
-    void wheelSmoothnessChanged();
     void dataDirectoryChanged();
     void restartRequested();
 
@@ -117,5 +112,4 @@ class ApplicationController final : public QObject
     double m_autoScrollSpeed{15.0};
     double m_defaultScrollSpeed{15.0};
     int m_longPressDragMs{168};
-    int m_wheelSmoothness{70};
 };

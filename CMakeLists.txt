@@ -102,7 +102,6 @@ qt_add_qml_module(
   src/ui/components/AppMenuSeparator.qml
   src/ui/components/FolderIcon.qml
   src/ui/components/TagIcon.qml
-  src/ui/components/SmoothWheelScroller.qml
   src/ui/components/Sidebar.qml
   src/ui/pdf/PdfMultiPageView.qml
   src/ui/pdf/CachedPdfPageImage.qml

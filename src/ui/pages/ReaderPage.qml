@@ -639,7 +639,6 @@ Rectangle {
                 document: pdfDocument
                 pageRotation: root.viewRotation
                 renderScale: root.isPdf && root.baseScaleUnit > 0 ? root.baseScaleUnit * root.zoomLevel : 1
-                wheelSmoothness: appController.wheelSmoothness
             }
 
             PinchHandler {
@@ -707,12 +706,6 @@ Rectangle {
 
                 ScrollBar.vertical: ScrollBar {
                     policy: ScrollBar.AsNeeded
-                }
-
-                SmoothWheelScroller {
-                    objectName: "imageWheelScroller"
-                    flickable: imageFlick
-                    smoothness: appController.wheelSmoothness
                 }
 
                 WheelHandler {

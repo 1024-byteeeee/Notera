@@ -320,12 +320,6 @@ Rectangle {
                 policy: ScrollBar.AsNeeded
             }
 
-            SmoothWheelScroller {
-                objectName: "collectionsWheelScroller"
-                flickable: collectionsFlick
-                smoothness: appController.wheelSmoothness
-            }
-
             ColumnLayout {
                 id: collectionsLayout
                 objectName: "collectionsLayout"

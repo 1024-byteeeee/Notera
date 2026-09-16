@@ -472,10 +472,13 @@ Rectangle {
                     policy: ScrollBar.AsNeeded
                 }
 
-                SmoothWheelScroller {
-                    objectName: "libraryWheelScroller"
-                    flickable: grid
-                    smoothness: appController.wheelSmoothness
+                WheelHandler {
+
+                    onWheel: function (event) {
+                        const delta = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y;
+                        grid.contentY = Math.max(0, Math.min(grid.contentY - delta, Math.max(0, grid.contentHeight - grid.height)));
+                        event.accepted = true;
+                    }
                 }
 
                 delegate: Item {

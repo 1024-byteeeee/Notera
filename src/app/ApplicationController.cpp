@@ -49,11 +49,6 @@ ApplicationController::ApplicationController(QObject* parent) : QObject(parent)
     {
         m_longPressDragMs = 168;
     }
-    m_wheelSmoothness = settings.value(QStringLiteral("interaction/wheelSmoothness"), 70).toInt();
-    if (m_wheelSmoothness < 0 || m_wheelSmoothness > 100)
-    {
-        m_wheelSmoothness = 70;
-    }
 }
 
 int ApplicationController::themeMode() const { return m_themeMode; }
@@ -158,20 +153,6 @@ void ApplicationController::setLongPressDragMs(const int ms)
     m_longPressDragMs = boundedMs;
     QSettings().setValue(QStringLiteral("gestures/longPressDragMs"), boundedMs);
     emit longPressDragMsChanged();
-}
-
-int ApplicationController::wheelSmoothness() const { return m_wheelSmoothness; }
-
-void ApplicationController::setWheelSmoothness(const int smoothness)
-{
-    const int boundedSmoothness = std::clamp(smoothness, 0, 100);
-    if (m_wheelSmoothness == boundedSmoothness)
-    {
-        return;
-    }
-    m_wheelSmoothness = boundedSmoothness;
-    QSettings().setValue(QStringLiteral("interaction/wheelSmoothness"), boundedSmoothness);
-    emit wheelSmoothnessChanged();
 }
 
 void ApplicationController::openScore(const QString& scoreId, const QString& title,
